@@ -8,6 +8,7 @@ const now = () => Date.now();
 const id = () => crypto.randomUUID();
 const token = () => crypto.randomBytes(24).toString('hex');
 const RESULT_MS = 4000;
+const resultDuration = (q: Row) => q.result_seconds === null || q.result_seconds === undefined ? RESULT_MS : Math.max(RESULT_MS, (Number(q.result_seconds) + 6) * 1000);
 const SCOREBOARD_MS = 4000;
 const TURN_TRANSITION_MS = 3000;
 function fail(message: string): never { throw new Error(message); }
@@ -50,7 +51,7 @@ async function finishBidding(r: Row) {
 async function startNextGroup(r: Row, announce = false) {
   const groups = groupBids((await bids(String(r.id), Number(r.question_index))).map(b => ({ playerId: String(b.player_id), amount: Number(b.amount) })));
   const group = nextGroup(groups, r.active_bid === null ? null : Number(r.active_bid));
-  if (!group) { await setPhase(String(r.id), 'ROUND_RESULT', RESULT_MS); await event(String(r.id), 'ROUND_ENDED'); return; }
+  if (!group) { const q = await question(String(r.quiz_id), Number(r.question_index)); await setPhase(String(r.id), 'ROUND_RESULT', resultDuration(q)); await event(String(r.id), 'ROUND_ENDED'); return; }
   await setPhase(String(r.id), announce ? 'TURN_TRANSITION' : 'MEDIA_PLAYING', announce ? TURN_TRANSITION_MS : (group.amount + 5) * 1000, group.amount);
   await event(String(r.id), 'CHALLENGERS_SELECTED', { amount: group.amount, playerIds: group.playerIds });
 }
@@ -81,11 +82,12 @@ async function resolveAnswers(r: Row) {
     }
   }
   await event(roomId, 'ANSWER_RESOLVED', { amount, correct });
-  if (correct) { await setPhase(roomId, 'ROUND_RESULT', RESULT_MS); await event(roomId, 'ROUND_ENDED'); }
+  if (correct) { await setPhase(roomId, 'ROUND_RESULT', resultDuration(q)); await event(roomId, 'ROUND_ENDED'); }
   else await startNextGroup(r, true);
 }
 async function resolveOpenAnswers(r: Row) {
   const roomId = String(r.id); const index = Number(r.question_index);
+  const q = await question(String(r.quiz_id), index);
   const attempts = await all('SELECT * FROM answers WHERE room_id=? AND question_index=? AND amount=0 ORDER BY created_at, rowid', roomId, index);
   let correctRank = 0;
   for (const answer of attempts) {
@@ -97,7 +99,7 @@ async function resolveOpenAnswers(r: Row) {
     await event(roomId, 'SCORE_AWARDED', { playerId: answer.player_id, points, correctRank, gameRound: 1 });
   }
   await event(roomId, 'ANSWER_RESOLVED', { gameRound: 1, correct: correctRank > 0 });
-  await setPhase(roomId, 'ROUND_RESULT', RESULT_MS);
+  await setPhase(roomId, 'ROUND_RESULT', resultDuration(q));
   await event(roomId, 'ROUND_ENDED');
 }
 async function advance(r: Row) {
@@ -123,7 +125,7 @@ async function tick(roomId: string) {
   }
 }
 
-export type QuestionInput = { prompt: string; gameRound: 1 | 2; topicKey: string; listenSeconds: number; answerSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number };
+export type QuestionInput = { prompt: string; gameRound: 1 | 2; topicKey: string; listenSeconds: number; answerSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number };
 export type TopicInput = { key: string; gameRound: 1 | 2; title: string; songCount: number };
 export async function saveQuiz(input: { id?: string; ownerToken?: string; title: string; description: string; visibility: string; topics: TopicInput[]; questions: QuestionInput[] }) {
   return await tx(async () => {
@@ -159,7 +161,10 @@ export async function saveQuiz(input: { id?: string; ownerToken?: string; title:
       if (songId) songIds.add(songId);
       if (q.mediaType === 'uploaded_audio' && !storedAssetExists(q.mediaUrl)) fail('Tệp âm thanh chưa được tải lên hoặc không tồn tại.');
       if (!['youtube', 'uploaded_audio'].includes(q.mediaType)) fail('Nguồn nhạc không hợp lệ.');
-      if (!Number.isFinite(q.mediaStart) || q.mediaStart < 1) fail('Thời điểm bắt đầu phải từ 1 giây.');
+      if (!Number.isFinite(q.mediaStart) || q.mediaStart < 0) fail('Thời điểm bắt đầu phải từ 0 giây.');
+      if ((q.resultStart == null) !== (q.resultSeconds == null)) fail('Đoạn video công bố đáp án cần cả thời điểm bắt đầu và thời lượng.');
+      if (q.resultStart != null && (!Number.isFinite(q.resultStart) || q.resultStart < 0 || q.resultStart > 36000 || !Number.isInteger(q.resultSeconds) || q.resultSeconds! < 1 || q.resultSeconds! > 60)) fail('Đoạn video công bố đáp án phải bắt đầu từ 0 giây và dài từ 1 đến 60 giây.');
+      if (q.resultStart != null && q.mediaType !== 'youtube') fail('Đoạn video công bố đáp án chỉ hỗ trợ YouTube.');
       if (q.revealMin < 1 || q.revealMax > 30 || q.revealMax < q.revealMin || q.revealStep < 1) fail('Cấu hình thời gian đấu giá không hợp lệ.');
     }
     let replacedId: string | undefined;
@@ -180,7 +185,7 @@ export async function saveQuiz(input: { id?: string; ownerToken?: string; title:
     const sorted = [1, 2].flatMap(round => input.topics.filter(topic => topic.gameRound === round).flatMap(topic => input.questions.filter(q => q.topicKey === topic.key)));
     for (const [index, q] of sorted.entries()) {
       const questionId = id();
-      await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,primary_answer,artist,hint,topic_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!);
+      await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null);
       for (const answer of new Set(q.acceptedAnswers.map(x => x.trim()).filter(Boolean))) await run('INSERT OR IGNORE INTO accepted_answers VALUES(?,?)', questionId, answer);
     }
     return { id: quizId, ownerToken, replacedId };
@@ -274,7 +279,7 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
       else if (action === 'nextQuestion') {
         if (r.phase !== 'SCOREBOARD') fail('Chưa đến bảng điểm.');
         await moveToNextQuestion(r);
-      } else if (action === 'skipQuestion') { if (['LOBBY', 'GAME_FINISHED', 'SCOREBOARD'].includes(String(r.phase))) fail('Không thể bỏ qua lúc này.'); await setPhase(roomId, 'ROUND_RESULT', RESULT_MS); await event(roomId, 'QUESTION_SKIPPED'); }
+      } else if (action === 'skipQuestion') { if (['LOBBY', 'GAME_FINISHED', 'SCOREBOARD'].includes(String(r.phase))) fail('Không thể bỏ qua lúc này.'); await setPhase(roomId, 'ROUND_RESULT', resultDuration(await question(String(r.quiz_id), index))); await event(roomId, 'QUESTION_SKIPPED'); }
     } else {
       if (r.paused_at !== null) fail('Trò chơi đang tạm dừng.');
       const p = await player(r, auth);
@@ -365,7 +370,7 @@ export async function getState(roomId: string, auth: string) {
     question: { id: q.id, prompt: q.prompt, type: q.type, revealType: q.reveal_type, revealUnit: q.reveal_unit, revealMin: q.reveal_min, revealMax: q.reveal_max, revealStep: q.reveal_step,
       mediaType: q.media_type, mediaUrl: canHear || reveal ? q.media_url : undefined,
       mediaStart: canHear || reveal ? q.media_start : undefined,
-      listenSeconds: q.listen_seconds, answerSeconds: q.answer_seconds, primaryAnswer: reveal ? q.primary_answer : undefined, artist: reveal ? q.artist : undefined, hint: q.hint },
+      listenSeconds: q.listen_seconds, answerSeconds: q.answer_seconds, primaryAnswer: reveal ? q.primary_answer : undefined, artist: reveal ? q.artist : undefined, hint: q.hint, resultStart: reveal ? q.result_start : undefined, resultSeconds: reveal ? q.result_seconds : undefined },
     activeBid: r.active_bid, activeChallengerIds: (currentRound === 1 && r.phase !== 'LOBBY') || r.active_bid !== null ? await challengers(r) : [],
     turnNotice,
     players, me: me ? { id: me.id, nickname: me.nickname } : null, isHost: host,

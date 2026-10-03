@@ -12,7 +12,7 @@ async function state(roomId, token) { return call(`/api/state?roomId=${roomId}`,
 async function command(roomId, token, action, value) { return call('/api/command', { roomId, action, value }, token); }
 
 const bidQuestion = { prompt: 'Tên bài hát?', gameRound: 2, topicKey: 'bid', listenSeconds: 5, answerSeconds: 12, mediaType: 'youtube', mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', mediaStart: 1, primaryAnswer: 'Chúng Ta Của Hiện Tại', acceptedAnswers: [], artist: '', hint: 'Một bài hát của Sơn Tùng M-TP', revealMin: 1, revealMax: 10, revealStep: 1 };
-const openingQuestion = { ...bidQuestion, gameRound: 1, topicKey: 'open', mediaUrl: 'https://www.youtube.com/watch?v=jNQXAC9IVRw', answerSeconds: 9, prompt: 'Bài hát vòng 1?', primaryAnswer: 'Bài hát khác', hint: '' };
+const openingQuestion = { ...bidQuestion, gameRound: 1, topicKey: 'open', mediaUrl: 'https://www.youtube.com/watch?v=jNQXAC9IVRw', mediaStart: 0, resultStart: 0, resultSeconds: 1, answerSeconds: 9, prompt: 'Bài hát vòng 1?', primaryAnswer: 'Bài hát khác', hint: '' };
 const quiz = await call('/api/quiz', { title: `Smoke ${Date.now()}`, description: 'Integration test', visibility: 'private', topics: [{ key: 'open', gameRound: 1, title: 'Mở màn', songCount: 1 }, { key: 'bid', gameRound: 2, title: 'Đấu giá', songCount: 1 }], questions: [openingQuestion, bidQuestion] });
 const room = await call('/api/room', { action: 'create', quizId: quiz.id, ownerToken: quiz.ownerToken, nickname: 'Hosty', avatarId: 17 });
 const a = await call('/api/room', { action: 'join', pin: room.pin, nickname: 'Alpha', avatarId: 2 });
@@ -40,6 +40,7 @@ await sleep(3200);
 const opening = await state(room.roomId, a.playerToken);
 assert.equal(opening.gameRound, 1);
 assert.equal(opening.phase, 'OPEN_MEDIA_PLAYING');
+assert.equal(opening.question.mediaStart, 0);
 assert.equal(opening.activeChallengerIds.length, 4);
 assert.ok(opening.question.mediaUrl);
 for (const playerToken of [room.hostToken, b.playerToken, c.playerToken]) {
@@ -65,8 +66,12 @@ assert.equal(openingAnswerPhase.phase, 'OPEN_ANSWERING');
 assert.equal(openingAnswerPhase.question.answerSeconds, 9);
 assert.equal(openingAnswerPhase.phaseEndsAt - openingAnswerPhase.phaseStartedAt, 9000);
 for (const playerToken of [room.hostToken, a.playerToken, b.playerToken, c.playerToken]) await command(room.roomId, playerToken, 'answer', 'Sai vòng 1');
-assert.equal((await state(room.roomId, room.hostToken)).phase, 'ROUND_RESULT');
-await sleep(4200);
+const openingResult = await state(room.roomId, room.hostToken);
+assert.equal(openingResult.phase, 'ROUND_RESULT');
+assert.equal(openingResult.question.resultStart, 0);
+assert.equal(openingResult.question.resultSeconds, 1);
+assert.ok(openingResult.phaseEndsAt - openingResult.phaseStartedAt >= 7000);
+await sleep(7200);
 assert.equal((await state(room.roomId, a.playerToken)).phase, 'SCOREBOARD');
 await sleep(4200);
 assert.equal((await state(room.roomId, a.playerToken)).phase, 'TOPIC_INTRO');

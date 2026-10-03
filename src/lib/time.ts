@@ -2,12 +2,12 @@ export function parseStartTime(value: string): number | null {
   const input = value.trim();
   if (/^\d+(?:\.\d+)?$/.test(input)) {
     const seconds = Number(input);
-    return Number.isFinite(seconds) && seconds >= 1 ? seconds : null;
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
   }
   const match = input.match(/^(\d+):([0-5]\d(?:\.\d+)?)$/);
   if (!match) return null;
   const seconds = Number(match[1]) * 60 + Number(match[2]);
-  return Number.isFinite(seconds) && seconds >= 1 ? seconds : null;
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
 
 export function formatStartTime(seconds: number): string {

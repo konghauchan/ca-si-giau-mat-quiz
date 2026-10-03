@@ -16,7 +16,7 @@ function loadYouTube(): Promise<void> {
   });
   return loading;
 }
-export function ClipPlayer({ url, start, duration, preview = false, paused = false }: { url: string; start: number; duration: number; preview?: boolean; paused?: boolean }) {
+export function ClipPlayer({ url, start, duration, preview = false, reveal = false, paused = false }: { url: string; start: number; duration: number; preview?: boolean; reveal?: boolean; paused?: boolean }) {
   const videoId = youtubeId(url);
   const mount = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
@@ -69,7 +69,7 @@ export function ClipPlayer({ url, start, duration, preview = false, paused = fal
       });
     }).catch(e => { if (active) setError(e.message); });
     return () => { active = false; if (stopTimer.current) clearTimeout(stopTimer.current); player.current?.destroy(); player.current = null; };
-  }, [videoId, start, duration, preview]);
+  }, [videoId, start, duration, preview, reveal]);
   useEffect(() => {
     pausedRef.current = paused;
     if (preview || !player.current || endedRef.current) return;
@@ -83,7 +83,7 @@ export function ClipPlayer({ url, start, duration, preview = false, paused = fal
   }
   if (!videoId) return <div className="notice error">Đường dẫn YouTube không hợp lệ.</div>;
   return <div className="clip-player">
-    <div className={`video-frame ${preview ? '' : 'concealed'}`}><div ref={mount} />{!preview && <div className="video-mask" aria-label="Video YouTube được che để giữ bí mật đáp án"><span className="video-mask-icon">♫</span><strong>{playing ? 'Đang phát đoạn nhạc' : played ? 'Đã nghe đoạn nhạc' : 'Đoạn nhạc bí mật'}</strong><small>{duration} giây từ mốc {formatStartTime(start)}</small></div>}</div>
+    <div className={`video-frame ${preview || reveal ? '' : 'concealed'}`}><div ref={mount} />{!preview && !reveal && <div className="video-mask" aria-label="Video YouTube được che để giữ bí mật đáp án"><span className="video-mask-icon">♫</span><strong>{playing ? 'Đang phát đoạn nhạc' : played ? 'Đã nghe đoạn nhạc' : 'Đoạn nhạc bí mật'}</strong><small>{duration} giây từ mốc {formatStartTime(start)}</small></div>}</div>
     <div className="clip-actions"><button className="button primary" type="button" disabled={paused || !ready || playing || (!preview && played)} onClick={play}>{paused ? 'Đã tạm dừng' : playing ? 'Đang phát đoạn nhạc…' : played && !preview ? 'Đã phát đoạn nhạc' : `▶ Phát ${duration} giây`}</button><span className="muted">Bắt đầu tại {formatStartTime(start)}{start < 60 ? 's' : ''}</span></div>
     {error && <div className="notice error">{error}</div>}
   </div>;

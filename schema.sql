@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS questions (
   game_round INTEGER NOT NULL DEFAULT 2, listen_seconds INTEGER NOT NULL DEFAULT 5,
   answer_seconds INTEGER NOT NULL DEFAULT 12,
   primary_answer TEXT NOT NULL, artist TEXT NOT NULL DEFAULT '', hint TEXT NOT NULL DEFAULT '',
-  topic_id TEXT REFERENCES topics(id),
+  topic_id TEXT REFERENCES topics(id), result_start REAL, result_seconds INTEGER,
   UNIQUE(quiz_id, order_index)
 );
 CREATE TABLE IF NOT EXISTS accepted_answers (
