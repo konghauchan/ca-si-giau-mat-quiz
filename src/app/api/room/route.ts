@@ -6,8 +6,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     if (body.action === 'create') {
-      const data = z.object({ quizId: z.string().uuid(), ownerToken: z.string(), nickname: z.string().min(2).max(24), avatarId: z.number().int().min(1).max(20).optional() }).parse(body);
-      return NextResponse.json(await createRoom(data.quizId, data.ownerToken, data.nickname, data.avatarId ?? 1));
+      const data = z.object({ quizId: z.string().uuid(), ownerToken: z.string().optional(), nickname: z.string().min(2).max(24), avatarId: z.number().int().min(1).max(20).optional() }).parse(body);
+      return NextResponse.json(await createRoom(data.quizId, data.ownerToken || '', data.nickname, data.avatarId ?? 1));
     }
     if (body.action === 'join') {
       const data = z.object({ pin: z.string().regex(/^\d{6}$/), nickname: z.string().min(2).max(24), avatarId: z.number().int().min(1).max(20).optional() }).parse(body);

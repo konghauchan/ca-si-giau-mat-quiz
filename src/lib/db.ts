@@ -22,6 +22,7 @@ async function initialize(): Promise<Client> {
     if (!columns.some(column => column.name === name)) await client.execute(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
   }
   await addColumn('quizzes', 'deleted_at', 'INTEGER');
+  await addColumn('quizzes', 'replacement_id', 'TEXT');
   await addColumn('quizzes', 'cover_url', 'TEXT');
   await addColumn('questions', 'game_round', 'INTEGER NOT NULL DEFAULT 2');
   await addColumn('questions', 'listen_seconds', 'INTEGER NOT NULL DEFAULT 5');

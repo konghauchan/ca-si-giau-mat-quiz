@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
   description TEXT NOT NULL DEFAULT '', visibility TEXT NOT NULL DEFAULT 'private',
   cover_url TEXT,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-  deleted_at INTEGER
+  deleted_at INTEGER, replacement_id TEXT
 );
 CREATE TABLE IF NOT EXISTS topics (
   id TEXT PRIMARY KEY, quiz_id TEXT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,

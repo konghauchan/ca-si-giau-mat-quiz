@@ -15,6 +15,18 @@ const TURN_TRANSITION_MS = 3000;
 function fail(message: string): never { throw new Error(message); }
 async function event(roomId: string, type: string, payload: Row = {}) { await run('INSERT INTO game_events(room_id,type,payload,created_at) VALUES(?,?,?,?)', roomId, type, JSON.stringify(payload), now()); }
 async function room(roomId: string): Promise<Row> { return await one('SELECT * FROM rooms WHERE id=?', roomId) ?? fail('Không tìm thấy phòng.'); }
+async function activeQuiz(quizId: string): Promise<Row> {
+  const visited = new Set<string>();
+  let currentId = quizId;
+  while (!visited.has(currentId) && visited.size < 20) {
+    visited.add(currentId);
+    const quiz = await one('SELECT * FROM quizzes WHERE id=?', currentId) ?? fail('Không tìm thấy bộ câu hỏi.');
+    if (quiz.deleted_at === null) return quiz;
+    if (!quiz.replacement_id) break;
+    currentId = String(quiz.replacement_id);
+  }
+  fail('Bộ câu hỏi này không còn khả dụng.');
+}
 async function question(quizId: string, index: number): Promise<Row> { return await one('SELECT * FROM questions WHERE quiz_id=? AND order_index=?', quizId, index) ?? fail('Không tìm thấy câu hỏi.'); }
 function gameRound(q: Row): 1 | 2 { return Number(q.game_round) === 1 ? 1 : 2; }
 function assertHost(r: Row, value: string) { if (r.host_token !== value) fail('Chỉ người tạo phòng được thực hiện thao tác này.'); }
@@ -176,8 +188,8 @@ export async function saveQuiz(input: { id?: string; ownerToken?: string; coverS
     let replacedId: string | undefined;
     if (existing && await one('SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1', quizId)) {
       replacedId = quizId;
-      await run('UPDATE quizzes SET deleted_at=? WHERE id=?', now(), quizId);
       quizId = id(); ownerToken = token();
+      await run('UPDATE quizzes SET deleted_at=?,replacement_id=? WHERE id=?', now(), quizId, replacedId);
     }
     if (existing && !replacedId) { await run('UPDATE quizzes SET title=?,description=?,visibility=?,updated_at=? WHERE id=?', input.title.trim(), input.description.trim(), input.visibility, now(), quizId); await run('DELETE FROM questions WHERE quiz_id=?', quizId); await run('DELETE FROM topics WHERE quiz_id=?', quizId); }
     else await run('INSERT INTO quizzes(id,owner_token,title,description,visibility,cover_url,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)', quizId, ownerToken, input.title.trim(), input.description.trim(), input.visibility, existing?.cover_url ? String(existing.cover_url) : coverSource?.cover_url ? String(coverSource.cover_url) : null, now(), now());
@@ -208,16 +220,28 @@ export async function deleteQuiz(quizId: string, ownerToken?: string) {
   await removeUnusedCover(coverUrl);
   return { deleted: true };
 }
+export async function setQuizVisibility(quizId: string, ownerToken: string | undefined, visibility: 'private' | 'unlisted' | 'public') {
+  return tx(async () => {
+    const quiz = await one('SELECT owner_token FROM quizzes WHERE id=? AND deleted_at IS NULL', quizId) ?? fail('Không tìm thấy bộ câu hỏi.');
+    if (!ownerToken || quiz.owner_token !== ownerToken) fail('Bạn không có quyền chia sẻ bộ câu hỏi này.');
+    await run('UPDATE quizzes SET visibility=?,updated_at=? WHERE id=?', visibility, now(), quizId);
+    return { id: quizId, visibility };
+  });
+}
 export async function getQuiz(quizId: string, ownerToken?: string) {
-  const q = await one('SELECT * FROM quizzes WHERE id=? AND deleted_at IS NULL', quizId) ?? fail('Không tìm thấy bộ câu hỏi.');
+  const q = await activeQuiz(quizId);
+  quizId = String(q.id);
   const own = ownerToken === q.owner_token;
+  if (!own && q.visibility === 'private') fail('Bộ câu hỏi này chưa được chia sẻ.');
+  const counts = await one('SELECT COUNT(*) AS question_count,SUM(CASE WHEN game_round=1 THEN 1 ELSE 0 END) AS round_one_count,SUM(CASE WHEN game_round=2 THEN 1 ELSE 0 END) AS round_two_count FROM questions WHERE quiz_id=?', quizId);
+  if (!own) return { id: q.id, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, own: false };
   const questions = await Promise.all((await all('SELECT * FROM questions WHERE quiz_id=? ORDER BY order_index', quizId)).map(async question => ({
     ...question,
     primary_answer: own ? question.primary_answer : undefined,
     accepted_answers: own ? (await all('SELECT answer FROM accepted_answers WHERE question_id=?', String(question.id))).map(row => row.answer) : undefined
   })));
   const topics = await all('SELECT id,game_round,order_index,title,song_count FROM topics WHERE quiz_id=? ORDER BY game_round,order_index', quizId);
-  return { id: q.id, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, topics, questions, own, usedInRoom: own && Boolean(await one('SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1', quizId)) };
+  return { id: q.id, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, topics, questions, own, usedInRoom: Boolean(await one('SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1', quizId)) };
 }
 export async function listQuizzes(ownerToken?: string) {
   const counts = '(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id) AS question_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id AND game_round=1) AS round_one_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id AND game_round=2) AS round_two_count';
@@ -228,8 +252,9 @@ export async function listQuizzes(ownerToken?: string) {
 }
 export async function createRoom(quizId: string, ownerToken: string, nickname: string, avatarId = 1) {
   return await tx(async () => {
-    const quiz = await one('SELECT * FROM quizzes WHERE id=? AND deleted_at IS NULL', quizId) ?? fail('Không tìm thấy bộ câu hỏi.');
-    if (quiz.owner_token !== ownerToken && quiz.visibility !== 'public') fail('Bộ câu hỏi này được đặt ở chế độ riêng tư.');
+    const quiz = await activeQuiz(quizId);
+    quizId = String(quiz.id);
+    if (quiz.owner_token !== ownerToken && !['public', 'unlisted'].includes(String(quiz.visibility))) fail('Bộ câu hỏi này được đặt ở chế độ riêng tư.');
     if (!await one('SELECT 1 FROM questions WHERE quiz_id=?', quizId)) fail('Bộ câu hỏi chưa có câu hỏi nào.');
     const rounds = await all('SELECT game_round,COUNT(*) AS count FROM questions WHERE quiz_id=? GROUP BY game_round', quizId);
     if (!rounds.some(item => Number(item.game_round) === 1) || !rounds.some(item => Number(item.game_round) === 2)) fail('Bộ câu hỏi cần có bài hát cho cả hai vòng. Hãy lưu bản mới và phân bài vào từng vòng.');

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 
 const base = process.env.SMOKE_BASE_URL || 'http://localhost:3210';
-async function call(path, body, token = '') {
-  const response = await fetch(`${base}${path}`, { method: body ? 'POST' : 'GET', headers: { 'content-type': 'application/json', 'x-game-token': token, 'x-quiz-token': token }, body: body ? JSON.stringify(body) : undefined });
+async function call(path, body, token = '', method) {
+  const response = await fetch(`${base}${path}`, { method: method || (body ? 'POST' : 'GET'), headers: { 'content-type': 'application/json', 'x-game-token': token, 'x-quiz-token': token }, body: body ? JSON.stringify(body) : undefined });
   const data = await response.json();
   if (!response.ok) throw new Error(`${path}: ${JSON.stringify(data)}`);
   return data;
@@ -14,6 +14,18 @@ async function command(roomId, token, action, value) { return call('/api/command
 const bidQuestion = { prompt: 'Tên bài hát?', gameRound: 2, topicKey: 'bid', listenSeconds: 5, answerSeconds: 12, mediaType: 'youtube', mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', mediaStart: 1, primaryAnswer: 'Chúng Ta Của Hiện Tại', acceptedAnswers: [], artist: '', hint: 'Một bài hát của Sơn Tùng M-TP', revealMin: 1, revealMax: 10, revealStep: 1 };
 const openingQuestion = { ...bidQuestion, gameRound: 1, topicKey: 'open', mediaUrl: 'https://www.youtube.com/watch?v=jNQXAC9IVRw', mediaStart: 0, resultStart: 0, resultSeconds: 1, answerSeconds: 9, prompt: 'Bài hát vòng 1?', primaryAnswer: 'Bài hát khác', hint: '' };
 const quiz = await call('/api/quiz', { title: `Smoke ${Date.now()}`, description: 'Integration test', visibility: 'private', topics: [{ key: 'open', gameRound: 1, title: 'Mở màn', songCount: 1 }, { key: 'bid', gameRound: 2, title: 'Đấu giá', songCount: 1 }], questions: [openingQuestion, bidQuestion] });
+await assert.rejects(call(`/api/quiz?id=${quiz.id}`), /chưa được chia sẻ/);
+await assert.rejects(call('/api/room', { action: 'create', quizId: quiz.id, nickname: 'Anonymous' }), /riêng tư/);
+await assert.rejects(call('/api/quiz', { id: quiz.id, visibility: 'unlisted' }, 'wrong-token', 'PATCH'), /không có quyền/);
+await call('/api/quiz', { id: quiz.id, visibility: 'unlisted' }, quiz.ownerToken, 'PATCH');
+const sharedQuiz = await call(`/api/quiz?id=${quiz.id}`);
+assert.equal(sharedQuiz.title.startsWith('Smoke'), true);
+assert.equal(sharedQuiz.questionCount, 2);
+assert.equal(sharedQuiz.questions, undefined);
+assert.equal(sharedQuiz.own, false);
+assert.equal((await call('/api/quiz')).some(item => item.id === quiz.id), false);
+const sharedRoom = await call('/api/room', { action: 'create', quizId: quiz.id, nickname: 'Anonymous' });
+assert.equal((await state(sharedRoom.roomId, sharedRoom.hostToken)).players.length, 1);
 const room = await call('/api/room', { action: 'create', quizId: quiz.id, ownerToken: quiz.ownerToken, nickname: 'Hosty', avatarId: 17 });
 const a = await call('/api/room', { action: 'join', pin: room.pin, nickname: 'Alpha', avatarId: 2 });
 const b = await call('/api/room', { action: 'join', pin: room.pin, nickname: 'Beta', avatarId: 11 });
@@ -169,4 +181,9 @@ assert.equal(tiedResult.players.find(p => p.nickname === 'TieBeta').score, 675);
 assert.equal(tiedResult.players.find(p => p.nickname === 'TieAlpha').correctRank, 1);
 assert.equal(tiedResult.players.find(p => p.nickname === 'TieBeta').correctRank, 2);
 assert.equal(tiedResult.players.find(p => p.nickname === 'TieHost').correctRank, 3);
-console.log('Smoke test passed: four-player flow, repeated guesses, escalation, and faster correct tied bids earn more points.');
+const revised = await call('/api/quiz', { id: quiz.id, ownerToken: quiz.ownerToken, title: 'Updated shared quiz', description: 'New version', visibility: 'unlisted', topics: [{ key: 'open', gameRound: 1, title: 'Mở màn', songCount: 1 }, { key: 'bid', gameRound: 2, title: 'Đấu giá', songCount: 1 }], questions: [openingQuestion, bidQuestion] });
+assert.notEqual(revised.id, quiz.id);
+assert.equal((await call(`/api/quiz?id=${quiz.id}`)).id, revised.id);
+const redirectedRoom = await call('/api/room', { action: 'create', quizId: quiz.id, nickname: 'LinkVisitor' });
+assert.equal((await state(redirectedRoom.roomId, redirectedRoom.hostToken)).quizTitle, 'Updated shared quiz');
+console.log('Smoke test passed: private sharing, anonymous room creation, stable links after edits, four-player play, and repeated guesses.');
