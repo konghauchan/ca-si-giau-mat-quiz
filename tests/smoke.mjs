@@ -11,9 +11,9 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function state(roomId, token) { return call(`/api/state?roomId=${roomId}`, null, token); }
 async function command(roomId, token, action, value) { return call('/api/command', { roomId, action, value }, token); }
 
-const bidQuestion = { prompt: 'Tên bài hát?', gameRound: 2, listenSeconds: 5, answerSeconds: 12, mediaType: 'youtube', mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', mediaStart: 1, primaryAnswer: 'Chúng Ta Của Hiện Tại', acceptedAnswers: [], artist: '', hint: 'Một bài hát của Sơn Tùng M-TP', revealMin: 1, revealMax: 10, revealStep: 1 };
-const openingQuestion = { ...bidQuestion, gameRound: 1, answerSeconds: 9, prompt: 'Bài hát vòng 1?', primaryAnswer: 'Bài hát khác', hint: '' };
-const quiz = await call('/api/quiz', { title: `Smoke ${Date.now()}`, description: 'Integration test', visibility: 'private', questions: [openingQuestion, bidQuestion] });
+const bidQuestion = { prompt: 'Tên bài hát?', gameRound: 2, topicKey: 'bid', listenSeconds: 5, answerSeconds: 12, mediaType: 'youtube', mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', mediaStart: 1, primaryAnswer: 'Chúng Ta Của Hiện Tại', acceptedAnswers: [], artist: '', hint: 'Một bài hát của Sơn Tùng M-TP', revealMin: 1, revealMax: 10, revealStep: 1 };
+const openingQuestion = { ...bidQuestion, gameRound: 1, topicKey: 'open', mediaUrl: 'https://www.youtube.com/watch?v=jNQXAC9IVRw', answerSeconds: 9, prompt: 'Bài hát vòng 1?', primaryAnswer: 'Bài hát khác', hint: '' };
+const quiz = await call('/api/quiz', { title: `Smoke ${Date.now()}`, description: 'Integration test', visibility: 'private', topics: [{ key: 'open', gameRound: 1, title: 'Mở màn', songCount: 1 }, { key: 'bid', gameRound: 2, title: 'Đấu giá', songCount: 1 }], questions: [openingQuestion, bidQuestion] });
 const room = await call('/api/room', { action: 'create', quizId: quiz.id, ownerToken: quiz.ownerToken, nickname: 'Hosty', avatarId: 17 });
 const a = await call('/api/room', { action: 'join', pin: room.pin, nickname: 'Alpha', avatarId: 2 });
 const b = await call('/api/room', { action: 'join', pin: room.pin, nickname: 'Beta', avatarId: 11 });
@@ -34,6 +34,9 @@ const firstEvent = new TextDecoder().decode((await stream.body.getReader().read(
 assert.match(firstEvent, /data: \d+/);
 streamAbort.abort();
 await command(room.roomId, room.hostToken, 'start');
+assert.equal((await state(room.roomId, a.playerToken)).phase, 'TOPIC_INTRO');
+assert.equal((await state(room.roomId, a.playerToken)).topicName, 'Mở màn');
+await sleep(3200);
 const opening = await state(room.roomId, a.playerToken);
 assert.equal(opening.gameRound, 1);
 assert.equal(opening.phase, 'OPEN_MEDIA_PLAYING');
@@ -66,6 +69,9 @@ assert.equal((await state(room.roomId, room.hostToken)).phase, 'ROUND_RESULT');
 await sleep(4200);
 assert.equal((await state(room.roomId, a.playerToken)).phase, 'SCOREBOARD');
 await sleep(4200);
+assert.equal((await state(room.roomId, a.playerToken)).phase, 'TOPIC_INTRO');
+assert.equal((await state(room.roomId, a.playerToken)).topicName, 'Đấu giá');
+await sleep(3200);
 assert.equal((await state(room.roomId, a.playerToken)).phase, 'BIDDING');
 assert.equal((await state(room.roomId, room.hostToken)).gameRound, 2);
 assert.equal((await state(room.roomId, a.playerToken)).question.hint, 'Một bài hát của Sơn Tùng M-TP');
@@ -124,6 +130,8 @@ await command(tiedRoom.roomId, tiedRoom.hostToken, 'start');
 await command(tiedRoom.roomId, tiedRoom.hostToken, 'skipQuestion');
 await command(tiedRoom.roomId, tiedRoom.hostToken, 'showScoreboard');
 await command(tiedRoom.roomId, tiedRoom.hostToken, 'nextQuestion');
+assert.equal((await state(tiedRoom.roomId, tiedA.playerToken)).phase, 'TOPIC_INTRO');
+await sleep(3200);
 assert.equal((await state(tiedRoom.roomId, tiedA.playerToken)).phase, 'BIDDING');
 await command(tiedRoom.roomId, tiedRoom.hostToken, 'bid', 2);
 await command(tiedRoom.roomId, tiedA.playerToken, 'bid', 2);

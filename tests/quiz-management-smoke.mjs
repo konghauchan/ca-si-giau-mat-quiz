@@ -11,15 +11,27 @@ async function request(path, { method = 'GET', body, token } = {}) {
 }
 
 const question = gameRound => ({
-  prompt: 'Đây là bài hát nào?', gameRound, listenSeconds: 3, answerSeconds: 12,
-  mediaType: 'youtube', mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', mediaStart: 1,
-  primaryAnswer: 'Never Gonna Give You Up', acceptedAnswers: [], artist: 'Rick Astley',
+  prompt: 'Đây là bài hát nào?', gameRound, topicKey: `round-${gameRound}`, listenSeconds: 3, answerSeconds: 12,
+  mediaType: 'youtube', mediaUrl: `https://www.youtube.com/watch?v=${gameRound === 1 ? 'dQw4w9WgXcQ' : 'jNQXAC9IVRw'}`, mediaStart: 1,
+  primaryAnswer: gameRound === 1 ? 'Never Gonna Give You Up' : 'Me at the Zoo', acceptedAnswers: [], artist: 'Rick Astley',
   hint: 'Một bài hát quen thuộc', revealMin: 1, revealMax: 10, revealStep: 1
 });
-const input = { title: 'Kiểm tra quản lý quiz', description: '', visibility: 'private', questions: [question(1), question(2)] };
+const input = { title: 'Kiểm tra quản lý quiz', description: '', visibility: 'private', topics: [{ key: 'round-1', gameRound: 1, title: 'Nhạc mở màn', songCount: 1 }, { key: 'round-2', gameRound: 2, title: 'Nhạc đấu giá', songCount: 1 }], questions: [question(1), question(2)] };
+assert.equal((await request('/api/quiz', { method: 'POST', body: { ...input, topics: [{ ...input.topics[0], songCount: 2 }, input.topics[1]] } })).status, 400);
+const extraSong = { ...question(1), topicKey: 'extra', mediaUrl: 'https://www.youtube.com/watch?v=9bZkp7q19f0', primaryAnswer: 'Gangnam Style' };
+const multiTopic = await request('/api/quiz', { method: 'POST', body: { ...input, title: 'Kiểm tra nhiều chủ đề', topics: [input.topics[0], input.topics[1], { key: 'extra', gameRound: 1, title: 'Nhạc quốc tế', songCount: 1 }], questions: [extraSong, question(2), question(1)] } });
+assert.equal(multiTopic.status, 200, JSON.stringify(multiTopic.body));
+const multiSaved = await request(`/api/quiz?id=${multiTopic.body.id}`, { token: multiTopic.body.ownerToken });
+assert.deepEqual(multiSaved.body.questions.map(song => song.primary_answer), ['Never Gonna Give You Up', 'Gangnam Style', 'Me at the Zoo']);
+assert.deepEqual(multiSaved.body.topics.map(topic => topic.title), ['Nhạc mở màn', 'Nhạc quốc tế', 'Nhạc đấu giá']);
+assert.equal((await request('/api/quiz', { method: 'POST', body: { ...input, questions: [question(1), { ...question(2), mediaUrl: question(1).mediaUrl }] } })).status, 400);
+await request(`/api/quiz?id=${multiTopic.body.id}`, { method: 'DELETE', token: multiTopic.body.ownerToken });
 const created = await request('/api/quiz', { method: 'POST', body: input });
 assert.equal(created.status, 200);
 const { id, ownerToken } = created.body;
+const saved = await request(`/api/quiz?id=${id}`, { token: ownerToken });
+assert.deepEqual(saved.body.topics.map(topic => topic.title), ['Nhạc mở màn', 'Nhạc đấu giá']);
+assert.ok(saved.body.questions.every(song => song.topic_id));
 
 const rejected = await request(`/api/quiz?id=${id}`, { method: 'DELETE', token: 'not-the-owner' });
 assert.equal(rejected.status, 400);

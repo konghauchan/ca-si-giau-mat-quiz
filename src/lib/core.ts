@@ -1,4 +1,4 @@
-export type Phase = 'LOBBY' | 'OPEN_MEDIA_PLAYING' | 'OPEN_ANSWERING' | 'BIDDING' | 'BID_REVEAL' | 'TURN_TRANSITION' | 'MEDIA_PLAYING' | 'ANSWERING' | 'ROUND_RESULT' | 'SCOREBOARD' | 'GAME_FINISHED';
+export type Phase = 'LOBBY' | 'TOPIC_INTRO' | 'OPEN_MEDIA_PLAYING' | 'OPEN_ANSWERING' | 'BIDDING' | 'BID_REVEAL' | 'TURN_TRANSITION' | 'MEDIA_PLAYING' | 'ANSWERING' | 'ROUND_RESULT' | 'SCOREBOARD' | 'GAME_FINISHED';
 export type Bid = { playerId: string; amount: number };
 export type BidGroup = { amount: number; playerIds: string[] };
 

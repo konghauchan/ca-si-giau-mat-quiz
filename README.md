@@ -14,10 +14,10 @@ npm run dev
 
 Mở `http://localhost:3000`. Trên Windows có thể tạo `.env.local` bằng cách sao chép file trong Explorer; biến môi trường không bắt buộc vì mặc định dùng `./data/game.sqlite`.
 
-1. Vào **Tạo bộ câu hỏi**. Tạo ít nhất một câu mỗi vòng bằng các bài hát khác nhau. Vòng 1 chọn thời lượng nghe chung; vòng 2 nhập gợi ý trước khi đấu giá. Mỗi câu chọn thời gian trả lời từ 5 đến 60 giây, nhập đường dẫn YouTube, thời điểm bắt đầu và đáp án.
+1. Vào **Tạo bộ câu hỏi**. Trong mỗi tab vòng chơi, thêm một hoặc nhiều chủ đề, đặt tên và số bài hát cần có. Mỗi chủ đề phải đủ đúng số bài trước khi lưu; một video YouTube không thể dùng lại ở chủ đề hay vòng khác. Vòng 1 chọn thời lượng nghe chung; vòng 2 nhập gợi ý trước khi đấu giá. Mỗi bài chọn thời gian trả lời từ 5 đến 60 giây, nhập đường dẫn YouTube, thời điểm bắt đầu và đáp án.
 2. Tại **Thư viện**, bấm **Tạo phòng**, nhập tên hiển thị và chọn một trong 20 avatar. Người tạo phòng chiếm một trong bốn vị trí chơi và nhận mã phòng 6 số.
 3. Mở thêm 1–3 thẻ trình duyệt (hoặc thiết bị cùng mạng), vào `/join`, nhập mã phòng, tên hiển thị và chọn avatar. Không cần đăng nhập. Mỗi vị trí có màu riêng xuyên suốt trận đấu.
-4. Người tạo bắt đầu vòng 1: tất cả cùng nghe rồi trả lời. Hết các câu vòng 1, vòng 2 tự bắt đầu: người chơi chọn số giây, nghe khi tới lượt và nhập đáp án. Nếu nhóm trước không đoán đúng, cả phòng thấy thông báo và tên người nghe tiếp theo trong 3 giây.
+4. Người tạo bắt đầu vòng 1: chủ đề mới hiện 3 giây trước bài đầu tiên, sau đó tất cả cùng nghe rồi trả lời. Các chủ đề chạy lần lượt trong từng vòng; hết vòng 1, vòng 2 tự bắt đầu. Nếu nhóm trước không đoán đúng, cả phòng thấy thông báo và tên người nghe tiếp theo trong 3 giây.
 5. Kết quả hiển thị 4 giây, sau đó bảng điểm hiển thị 4 giây; câu tiếp theo tự bắt đầu. Người tạo phòng vẫn có nút chuyển ngay.
 
 Có thể chạy `npm run seed` để thêm quiz công khai **Đoán bài hát Việt** với 3 câu mẫu. Các YouTube URL và đáp án trong quiz seed là **placeholder**, không phát được. Khi seed, terminal in ra owner token; để chỉnh sửa quiz seed qua UI, lưu `localStorage` key `quiz:<quiz-id>` với token đó, hoặc dùng nút **Dùng mẫu 3 câu hỏi** trong trang tạo quiz và thay URL/đáp án trước khi lưu.
@@ -49,13 +49,13 @@ Quiz online chỉ hỗ trợ đường dẫn YouTube. Tệp âm thanh lưu trên
 
 - `src/lib/core.ts`: grouping bid, chọn nhóm tiếp theo, công thức điểm, chuẩn hóa đáp án, xác thực YouTube URL. Không phụ thuộc React hay database.
 - `src/lib/game.ts`: game engine và server authority. API chỉ gọi intents đã xác thực bằng token host/player. Mọi thay đổi room/bid/answer/score/event nằm trong transaction SQLite.
-- `src/lib/db.ts`, `schema.sql`: truy vấn SQLite bất đồng bộ qua libSQL; local lưu tại `data/game.sqlite`, online lưu trên Turso. `schema.sql` được áp dụng khi khởi tạo kết nối; các bảng gồm quizzes, questions, accepted_answers, rooms, players, bids, answers, score_events, game_events.
+- `src/lib/db.ts`, `schema.sql`: truy vấn SQLite bất đồng bộ qua libSQL; local lưu tại `data/game.sqlite`, online lưu trên Turso. `schema.sql` được áp dụng khi khởi tạo kết nối; các bảng gồm quizzes, topics, questions, accepted_answers, rooms, players, bids, answers, score_events, game_events. Quiz cũ không có chủ đề vẫn mở được và khi chỉnh sửa sẽ dùng chủ đề chung cho mỗi vòng.
 - `src/app/api`: HTTP command/state và event stream SSE. SSE gửi version của event log; client fetch state với token. Fallback poll 5 giây.
 - `src/components/AudioClipPlayer.tsx`, `src/lib/media.ts`: adapter audio tải lên. File gốc nằm tại `MEDIA_DIR`, ngoài thư mục public. API xác thực challenger và dùng FFmpeg để chỉ gửi đoạn từ `mediaStart` với độ dài bid; client không nhận cả bài hoặc thanh tua. Creator preview đoạn tối đa 10 giây bằng token upload.
 - `src/components/ClipPlayer.tsx`: YouTube IFrame adapter. Trong game, lớp che phủ player giữ tiêu đề và ảnh bìa khỏi màn hình; preview của người tạo vẫn hiện player gốc.
 - `src/components/GameRoom.tsx`: UI player/host gửi intent và render state server. Avatar được lưu bằng mã 1–20 trong bảng `players`; bốn màu nhận diện gắn với thứ tự tham gia, không đổi khi bảng điểm sắp xếp lại.
 
-Luồng trạng thái: `LOBBY → OPEN_MEDIA_PLAYING → OPEN_ANSWERING → ROUND_RESULT → SCOREBOARD` cho các câu vòng 1, rồi `BIDDING → BID_REVEAL → MEDIA_PLAYING → ANSWERING → ROUND_RESULT → SCOREBOARD` cho các câu vòng 2. Khi nhóm đang nghe không đoán đúng và vẫn còn nhóm khác, `ANSWERING → TURN_TRANSITION → MEDIA_PLAYING`. Thời gian trả lời theo từng câu; sau kết quả và bảng điểm, hệ thống tự chuyển câu hoặc kết thúc trò chơi. Giới hạn thời gian được xử lý trên máy chủ khi có yêu cầu trạng thái hoặc sự kiện. Người tạo phòng có thể kết thúc đấu giá, bỏ qua câu và kết thúc trò chơi.
+Luồng trạng thái bắt đầu bằng `TOPIC_INTRO` khi vào một chủ đề mới, rồi `OPEN_MEDIA_PLAYING → OPEN_ANSWERING → ROUND_RESULT → SCOREBOARD` cho các bài vòng 1 hoặc `BIDDING → BID_REVEAL → MEDIA_PLAYING → ANSWERING → ROUND_RESULT → SCOREBOARD` cho vòng 2. Khi nhóm đang nghe không đoán đúng và vẫn còn nhóm khác, `ANSWERING → TURN_TRANSITION → MEDIA_PLAYING`. Thời gian trả lời theo từng bài; sau kết quả và bảng điểm, hệ thống tự chuyển bài hoặc kết thúc trò chơi. Giới hạn thời gian được xử lý trên máy chủ khi có yêu cầu trạng thái hoặc sự kiện. Người tạo phòng có thể kết thúc đấu giá, bỏ qua bài và kết thúc trò chơi.
 
 Vòng 1 có 500 điểm cơ bản mỗi câu; các đáp án đúng nhận lần lượt 100%, 75%, 50%, 25% theo thứ tự server nhận. Vòng 2 điểm cơ bản giảm khi bid nhiều giây; nhóm trùng bid chia điểm theo cùng thứ tự. Đáp án sai không chiếm thứ hạng. Mỗi vòng dùng bài hát khác nhau để tránh lộ đáp án trước khi bid.
 

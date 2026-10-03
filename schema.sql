@@ -7,6 +7,12 @@ CREATE TABLE IF NOT EXISTS quizzes (
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
   deleted_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS topics (
+  id TEXT PRIMARY KEY, quiz_id TEXT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+  game_round INTEGER NOT NULL, order_index INTEGER NOT NULL,
+  title TEXT NOT NULL, song_count INTEGER NOT NULL,
+  UNIQUE(quiz_id, game_round, order_index)
+);
 CREATE TABLE IF NOT EXISTS questions (
   id TEXT PRIMARY KEY, quiz_id TEXT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
   order_index INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'music', prompt TEXT NOT NULL,
@@ -17,6 +23,7 @@ CREATE TABLE IF NOT EXISTS questions (
   game_round INTEGER NOT NULL DEFAULT 2, listen_seconds INTEGER NOT NULL DEFAULT 5,
   answer_seconds INTEGER NOT NULL DEFAULT 12,
   primary_answer TEXT NOT NULL, artist TEXT NOT NULL DEFAULT '', hint TEXT NOT NULL DEFAULT '',
+  topic_id TEXT REFERENCES topics(id),
   UNIQUE(quiz_id, order_index)
 );
 CREATE TABLE IF NOT EXISTS accepted_answers (

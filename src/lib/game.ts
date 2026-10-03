@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { one, all, run, tx } from './db';
-import { answerMatches, groupBids, nextGroup, scoreForBid, scoreForCorrectRank, youtubeId, type Phase } from './core';
+import { answerMatches, groupBids, nextGroup, normalizeAnswer, scoreForBid, scoreForCorrectRank, youtubeId, type Phase } from './core';
 import { storedAssetExists } from './media';
 
 type Row = Record<string, unknown>;
@@ -28,9 +28,14 @@ async function challengers(r: Row): Promise<string[]> {
 }
 async function startQuestion(r: Row, index: number) {
   const q = await question(String(r.quiz_id), index);
+  const previous = index > 0 ? await question(String(r.quiz_id), index - 1) : undefined;
+  if (!previous || previous.topic_id !== q.topic_id || gameRound(previous) !== gameRound(q)) await setPhase(String(r.id), 'TOPIC_INTRO', 3000);
+  else await beginQuestion(r, q);
+  await event(String(r.id), 'QUESTION_CHANGED', { index, gameRound: gameRound(q) });
+}
+async function beginQuestion(r: Row, q: Row) {
   if (gameRound(q) === 1) await setPhase(String(r.id), 'OPEN_MEDIA_PLAYING', (Number(q.listen_seconds) + 5) * 1000);
   else await setPhase(String(r.id), 'BIDDING', 30000);
-  await event(String(r.id), 'QUESTION_CHANGED', { index, gameRound: gameRound(q) });
 }
 async function finishBidding(r: Row) {
   const q = await question(String(r.quiz_id), Number(r.question_index));
@@ -98,7 +103,8 @@ async function resolveOpenAnswers(r: Row) {
 async function advance(r: Row) {
   const roomId = String(r.id);
   const q = await question(String(r.quiz_id), Number(r.question_index));
-  if (r.phase === 'OPEN_MEDIA_PLAYING') await setPhase(roomId, 'OPEN_ANSWERING', Number(q.answer_seconds) * 1000);
+  if (r.phase === 'TOPIC_INTRO') await beginQuestion(r, q);
+  else if (r.phase === 'OPEN_MEDIA_PLAYING') await setPhase(roomId, 'OPEN_ANSWERING', Number(q.answer_seconds) * 1000);
   else if (r.phase === 'OPEN_ANSWERING') await resolveOpenAnswers(r);
   else if (r.phase === 'BIDDING') await finishBidding(r);
   else if (r.phase === 'BID_REVEAL') await startNextGroup({ ...r, active_bid: null });
@@ -117,22 +123,40 @@ async function tick(roomId: string) {
   }
 }
 
-export type QuestionInput = { prompt: string; gameRound: 1 | 2; listenSeconds: number; answerSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number };
-export async function saveQuiz(input: { id?: string; ownerToken?: string; title: string; description: string; visibility: string; questions: QuestionInput[] }) {
+export type QuestionInput = { prompt: string; gameRound: 1 | 2; topicKey: string; listenSeconds: number; answerSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number };
+export type TopicInput = { key: string; gameRound: 1 | 2; title: string; songCount: number };
+export async function saveQuiz(input: { id?: string; ownerToken?: string; title: string; description: string; visibility: string; topics: TopicInput[]; questions: QuestionInput[] }) {
   return await tx(async () => {
     let quizId = input.id || id(); let ownerToken = input.ownerToken || token();
     if (!input.title.trim()) fail('Nhập tên bộ câu hỏi.');
     if (input.questions.length < 2 || !input.questions.some(q => q.gameRound === 1) || !input.questions.some(q => q.gameRound === 2)) fail('Bộ câu hỏi cần ít nhất một câu cho mỗi vòng.');
     if (input.questions.length > 30) fail('Tối đa 30 câu hỏi.');
+    if (![1, 2].every(round => input.topics.some(topic => topic.gameRound === round))) fail('Mỗi vòng cần ít nhất một chủ đề.');
+    const topicKeys = new Set<string>();
+    for (const topic of input.topics) {
+      if (topicKeys.has(topic.key)) fail('Mã chủ đề bị trùng.');
+      topicKeys.add(topic.key);
+      if (!topic.title.trim()) fail('Nhập tên cho từng chủ đề.');
+      if (input.questions.filter(q => q.topicKey === topic.key && q.gameRound === topic.gameRound).length !== topic.songCount) fail(`Chủ đề “${topic.title}” cần đúng ${topic.songCount} bài hát.`);
+    }
+    if (input.questions.some(q => !input.topics.some(topic => topic.key === q.topicKey && topic.gameRound === q.gameRound))) fail('Có bài hát chưa thuộc chủ đề hợp lệ.');
     const existing = input.id ? await one('SELECT * FROM quizzes WHERE id=?', quizId) ?? fail('Không tìm thấy bộ câu hỏi.') : undefined;
     if (existing && (existing.owner_token !== ownerToken || existing.deleted_at !== null)) fail('Bạn không có quyền sửa bộ câu hỏi này.');
+    const songIds = new Set<string>();
+    const songNames = new Set<string>();
     for (const q of input.questions) {
       if (!q.prompt.trim() || !q.primaryAnswer.trim()) fail('Câu hỏi và đáp án không được trống.');
+      const songName = normalizeAnswer(q.primaryAnswer);
+      if (songNames.has(songName)) fail('Tên bài hát không được lặp lại giữa các chủ đề hoặc hai vòng.');
+      songNames.add(songName);
       if (q.gameRound === 2 && !q.hint.trim()) fail('Câu ở vòng 2 cần có gợi ý trước khi đấu giá.');
       if (![1, 2].includes(q.gameRound)) fail('Vòng chơi không hợp lệ.');
       if (!Number.isInteger(q.listenSeconds) || q.listenSeconds < 1 || q.listenSeconds > 10) fail('Thời lượng nghe vòng 1 phải từ 1 đến 10 giây.');
       if (!Number.isInteger(q.answerSeconds) || q.answerSeconds < 5 || q.answerSeconds > 60) fail('Thời gian trả lời phải từ 5 đến 60 giây.');
       if (q.mediaType === 'youtube' && !youtubeId(q.mediaUrl)) fail('Đường dẫn YouTube không hợp lệ.');
+      const songId = q.mediaType === 'youtube' ? youtubeId(q.mediaUrl) : q.mediaUrl;
+      if (songId && songIds.has(songId)) fail('Một bài hát không được lặp lại giữa các chủ đề hoặc hai vòng.');
+      if (songId) songIds.add(songId);
       if (q.mediaType === 'uploaded_audio' && !storedAssetExists(q.mediaUrl)) fail('Tệp âm thanh chưa được tải lên hoặc không tồn tại.');
       if (!['youtube', 'uploaded_audio'].includes(q.mediaType)) fail('Nguồn nhạc không hợp lệ.');
       if (!Number.isFinite(q.mediaStart) || q.mediaStart < 1) fail('Thời điểm bắt đầu phải từ 1 giây.');
@@ -144,12 +168,19 @@ export async function saveQuiz(input: { id?: string; ownerToken?: string; title:
       await run('UPDATE quizzes SET deleted_at=? WHERE id=?', now(), quizId);
       quizId = id(); ownerToken = token();
     }
-    if (existing && !replacedId) { await run('UPDATE quizzes SET title=?,description=?,visibility=?,updated_at=? WHERE id=?', input.title.trim(), input.description.trim(), input.visibility, now(), quizId); await run('DELETE FROM questions WHERE quiz_id=?', quizId); }
+    if (existing && !replacedId) { await run('UPDATE quizzes SET title=?,description=?,visibility=?,updated_at=? WHERE id=?', input.title.trim(), input.description.trim(), input.visibility, now(), quizId); await run('DELETE FROM questions WHERE quiz_id=?', quizId); await run('DELETE FROM topics WHERE quiz_id=?', quizId); }
     else await run('INSERT INTO quizzes(id,owner_token,title,description,visibility,created_at,updated_at) VALUES(?,?,?,?,?,?,?)', quizId, ownerToken, input.title.trim(), input.description.trim(), input.visibility, now(), now());
-    const sorted = input.questions.map((q, index) => ({ q, index })).sort((a, b) => a.q.gameRound - b.q.gameRound || a.index - b.index);
-    for (const [index, { q }] of sorted.entries()) {
+    const topicIds = new Map<string, string>();
+    for (const round of [1, 2]) {
+      for (const [index, topic] of input.topics.filter(topic => topic.gameRound === round).entries()) {
+        const topicId = id(); topicIds.set(topic.key, topicId);
+        await run('INSERT INTO topics(id,quiz_id,game_round,order_index,title,song_count) VALUES(?,?,?,?,?,?)', topicId, quizId, round, index, topic.title.trim(), topic.songCount);
+      }
+    }
+    const sorted = [1, 2].flatMap(round => input.topics.filter(topic => topic.gameRound === round).flatMap(topic => input.questions.filter(q => q.topicKey === topic.key)));
+    for (const [index, q] of sorted.entries()) {
       const questionId = id();
-      await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,primary_answer,artist,hint) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim());
+      await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,primary_answer,artist,hint,topic_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!);
       for (const answer of new Set(q.acceptedAnswers.map(x => x.trim()).filter(Boolean))) await run('INSERT OR IGNORE INTO accepted_answers VALUES(?,?)', questionId, answer);
     }
     return { id: quizId, ownerToken, replacedId };
@@ -172,7 +203,8 @@ export async function getQuiz(quizId: string, ownerToken?: string) {
     primary_answer: own ? question.primary_answer : undefined,
     accepted_answers: own ? (await all('SELECT answer FROM accepted_answers WHERE question_id=?', String(question.id))).map(row => row.answer) : undefined
   })));
-  return { id: q.id, title: q.title, description: q.description, visibility: q.visibility, questions, own, usedInRoom: own && Boolean(await one('SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1', quizId)) };
+  const topics = await all('SELECT id,game_round,order_index,title,song_count FROM topics WHERE quiz_id=? ORDER BY game_round,order_index', quizId);
+  return { id: q.id, title: q.title, description: q.description, visibility: q.visibility, topics, questions, own, usedInRoom: own && Boolean(await one('SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1', quizId)) };
 }
 export async function listQuizzes(ownerToken?: string) {
   const counts = '(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id) AS question_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id AND game_round=1) AS round_one_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id AND game_round=2) AS round_two_count';
@@ -288,6 +320,7 @@ export async function getState(roomId: string, auth: string) {
   const me = host ? await one('SELECT * FROM players WHERE room_id=? AND token=?', roomId, auth) ?? null : await player(r, auth);
   if (me) await run('UPDATE players SET last_seen_at=? WHERE id=?', now(), String(me.id));
   const index = Number(r.question_index); const q = await question(String(r.quiz_id), index);
+  const topic = q.topic_id ? await one('SELECT title,song_count FROM topics WHERE id=?', String(q.topic_id)) : undefined;
   const currentRound = gameRound(q);
   const nextQuestion = await one('SELECT game_round FROM questions WHERE quiz_id=? AND order_index=?', String(r.quiz_id), index + 1);
   const reveal = ['ROUND_RESULT', 'SCOREBOARD', 'GAME_FINISHED'].includes(String(r.phase));
@@ -326,6 +359,9 @@ export async function getState(roomId: string, auth: string) {
     roundQuestionIndex: Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=? AND game_round=? AND order_index<=?', String(r.quiz_id), currentRound, index))?.count),
     roundQuestionCount: Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=? AND game_round=?', String(r.quiz_id), currentRound))?.count),
     quizTitle: (await one('SELECT title FROM quizzes WHERE id=?', String(r.quiz_id)))?.title,
+    topicName: topic?.title ?? 'Chủ đề chung',
+    topicQuestionIndex: q.topic_id ? Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=? AND topic_id=? AND order_index<=?', String(r.quiz_id), String(q.topic_id), index))?.count) : Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=? AND game_round=? AND order_index<=?', String(r.quiz_id), currentRound, index))?.count),
+    topicQuestionCount: topic?.song_count ?? Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=? AND game_round=?', String(r.quiz_id), currentRound))?.count),
     question: { id: q.id, prompt: q.prompt, type: q.type, revealType: q.reveal_type, revealUnit: q.reveal_unit, revealMin: q.reveal_min, revealMax: q.reveal_max, revealStep: q.reveal_step,
       mediaType: q.media_type, mediaUrl: canHear || reveal ? q.media_url : undefined,
       mediaStart: canHear || reveal ? q.media_start : undefined,

@@ -25,6 +25,7 @@ async function initialize(): Promise<Client> {
   await addColumn('questions', 'game_round', 'INTEGER NOT NULL DEFAULT 2');
   await addColumn('questions', 'listen_seconds', 'INTEGER NOT NULL DEFAULT 5');
   await addColumn('questions', 'answer_seconds', 'INTEGER NOT NULL DEFAULT 12');
+  await addColumn('questions', 'topic_id', 'TEXT REFERENCES topics(id)');
   await addColumn('rooms', 'paused_at', 'INTEGER');
   await addColumn('players', 'avatar_id', 'INTEGER NOT NULL DEFAULT 1');
   return client;
