@@ -37,7 +37,7 @@ npm run build
 
 ## Triển khai Vercel
 
-Bản đang chạy: https://ca-si-giau-mat-quiz.vercel.app (dự án `ca-si-giau-mat-quiz` trong tài khoản Vercel Kong Hau Chan). Mã nguồn nằm trong repo GitHub riêng tư `konghauchan/ca-si-giau-mat-quiz`, nhánh `main` được kết nối với dự án Vercel. Sau khi sửa, kiểm tra bằng các lệnh ở mục **Kiểm tra**, commit và `git push origin main`; Vercel tự tạo bản Production mới. Database `ca-si-giau-mat-quiz-db` dùng gói Turso Starter miễn phí, vùng Tokyo. Đã chuyển 4 quiz và 12 bài hát từ máy lên database này. Các lần deploy tiếp theo tiếp tục dùng database hiện tại.
+Bản đang chạy: https://nghe-va-doan.vercel.app (dự án `ca-si-giau-mat-quiz` trong tài khoản Vercel Kong Hau Chan; tên miền cũ `ca-si-giau-mat-quiz.vercel.app` chuyển hướng tới đây). Mã nguồn nằm trong repo GitHub riêng tư `konghauchan/ca-si-giau-mat-quiz`, nhánh `main` được kết nối với dự án Vercel. Sau khi sửa, kiểm tra bằng các lệnh ở mục **Kiểm tra**, commit và `git push origin main`; Vercel tự tạo bản Production mới. Database `ca-si-giau-mat-quiz-db` dùng gói Turso Starter miễn phí, vùng Tokyo. Đã chuyển 4 quiz và 12 bài hát từ máy lên database này. Các lần deploy tiếp theo tiếp tục dùng database hiện tại.
 
 Bản online dùng Turso Cloud làm SQLite bền vững. Tích hợp Turso từ Vercel Marketplace để dự án nhận `TURSO_DATABASE_URL` và `TURSO_AUTH_TOKEN` cho Production và Preview. Dự án chạy Node.js 24.x. Chạy `npm run migrate-quizzes` với hai biến kết nối này để chuyển quiz local sang Turso trước khi mở bản online. Script bỏ qua quiz mẫu có URL giữ chỗ và dữ liệu kiểm thử có tên bắt đầu bằng `Smoke`; chỉ chuyển quiz, bài hát và đáp án, không chuyển các phòng chơi cũ.
 
