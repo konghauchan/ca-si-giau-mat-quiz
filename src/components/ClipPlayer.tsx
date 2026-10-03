@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { youtubeId } from '@/lib/core';
-import { formatStartTime } from '@/lib/time';
 
 type YTPlayer = { seekTo: (seconds: number, allowSeekAhead: boolean) => void; playVideo: () => void; pauseVideo: () => void; destroy: () => void };
 type YTWindow = Window & { YT?: { Player: new (element: HTMLElement, config: object) => YTPlayer }; onYouTubeIframeAPIReady?: () => void };
@@ -82,9 +81,9 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
     player.current.seekTo(start, true); player.current.playVideo();
   }
   if (!videoId) return <div className="notice error">Đường dẫn YouTube không hợp lệ.</div>;
-  return <div className="clip-player">
-    <div className={`video-frame ${preview || reveal ? '' : 'concealed'}`}><div ref={mount} />{!preview && !reveal && <div className="video-mask" aria-label="Video YouTube được che để giữ bí mật đáp án"><span className="video-mask-icon">♫</span><strong>{playing ? 'Đang phát đoạn nhạc' : played ? 'Đã nghe đoạn nhạc' : 'Đoạn nhạc bí mật'}</strong><small>{duration} giây từ mốc {formatStartTime(start)}</small></div>}</div>
-    <div className="clip-actions"><button className="button primary" type="button" disabled={paused || !ready || playing || (!preview && played)} onClick={play}>{paused ? 'Đã tạm dừng' : playing ? 'Đang phát đoạn nhạc…' : played && !preview ? 'Đã phát đoạn nhạc' : `▶ Phát ${duration} giây`}</button><span className="muted">Bắt đầu tại {formatStartTime(start)}{start < 60 ? 's' : ''}</span></div>
+  return <div className={`clip-player ${reveal ? 'clip-player-reveal' : ''}`}>
+    <div className={`video-frame ${preview || reveal ? '' : 'concealed'}`}><div ref={mount} />{!preview && !reveal && <div className="video-mask" aria-label="Video YouTube được che để giữ bí mật đáp án"><span className="video-mask-icon">♫</span><strong>{playing ? 'Đang phát đoạn nhạc' : played ? 'Đã nghe đoạn nhạc' : 'Đoạn nhạc bí mật'}</strong><small>{duration} giây nghe</small></div>}</div>
+    {!reveal && <div className="clip-actions"><button className="button primary" type="button" disabled={paused || !ready || playing || (!preview && played)} onClick={play}>{paused ? 'Đã tạm dừng' : playing ? 'Đang phát đoạn nhạc…' : played && !preview ? 'Đã phát đoạn nhạc' : `▶ Phát ${duration} giây`}</button></div>}
     {error && <div className="notice error">{error}</div>}
   </div>;
 }

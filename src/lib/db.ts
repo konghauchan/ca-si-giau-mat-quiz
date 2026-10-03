@@ -31,6 +31,8 @@ async function initialize(): Promise<Client> {
   await addColumn('questions', 'result_seconds', 'INTEGER');
   await addColumn('rooms', 'paused_at', 'INTEGER');
   await addColumn('players', 'avatar_id', 'INTEGER NOT NULL DEFAULT 1');
+  await client.execute(`INSERT OR IGNORE INTO answer_attempts(id,room_id,question_index,player_id,amount,text,correct,created_at)
+    SELECT room_id || ':' || question_index || ':' || player_id,room_id,question_index,player_id,amount,text,correct,created_at FROM answers`);
   return client;
 }
 

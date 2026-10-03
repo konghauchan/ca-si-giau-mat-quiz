@@ -9,7 +9,7 @@ const now = () => Date.now();
 const id = () => crypto.randomUUID();
 const token = () => crypto.randomBytes(24).toString('hex');
 const RESULT_MS = 4000;
-const resultDuration = (q: Row) => q.result_seconds === null || q.result_seconds === undefined ? RESULT_MS : Math.max(RESULT_MS, (Number(q.result_seconds) + 6) * 1000);
+const resultDuration = (q: Row) => q.media_type === 'youtube' ? Math.max(RESULT_MS, (Number(q.result_seconds ?? 4) + 6) * 1000) : RESULT_MS;
 const SCOREBOARD_MS = 4000;
 const TURN_TRANSITION_MS = 3000;
 function fail(message: string): never { throw new Error(message); }
@@ -64,22 +64,25 @@ async function moveToNextQuestion(r: Row) {
 }
 async function resolveAnswers(r: Row) {
   const roomId = String(r.id); const index = Number(r.question_index); const amount = Number(r.active_bid);
-  const attempts = await all('SELECT * FROM answers WHERE room_id=? AND question_index=? AND amount=? ORDER BY created_at, rowid', roomId, index, amount);
+  const attempts = await all('SELECT * FROM answer_attempts WHERE room_id=? AND question_index=? AND amount=? ORDER BY created_at, rowid', roomId, index, amount);
   const q = await question(String(r.quiz_id), index);
   let correct = false; let correctRank = 0;
-  for (const a of attempts) {
-    if (a.correct === 1) {
-      correct = true;
-      correctRank++;
-      const basePoints = scoreForBid(amount, Number(q.reveal_min), Number(q.reveal_max), Number(q.reveal_step));
-      const points = scoreForCorrectRank(basePoints, correctRank);
-      await run('UPDATE players SET score=score+? WHERE id=?', points, String(a.player_id));
-      await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, String(a.player_id), points, 'CORRECT', now());
-      await event(roomId, 'SCORE_AWARDED', { playerId: a.player_id, points, correctRank });
-    } else if (Number(r.wrong_penalty_percentage) > 0) {
+  for (const a of attempts.filter(attempt => attempt.correct === 1)) {
+    correct = true;
+    correctRank++;
+    const basePoints = scoreForBid(amount, Number(q.reveal_min), Number(q.reveal_max), Number(q.reveal_step));
+    const points = scoreForCorrectRank(basePoints, correctRank);
+    await run('UPDATE players SET score=score+? WHERE id=?', points, String(a.player_id));
+    await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, String(a.player_id), points, 'CORRECT', now());
+    await event(roomId, 'SCORE_AWARDED', { playerId: a.player_id, points, correctRank });
+  }
+  if (Number(r.wrong_penalty_percentage) > 0) {
+    const correctPlayers = new Set(attempts.filter(a => a.correct === 1).map(a => String(a.player_id)));
+    const wrongPlayers = new Set(attempts.filter(a => a.correct !== 1 && !correctPlayers.has(String(a.player_id))).map(a => String(a.player_id)));
+    for (const playerId of wrongPlayers) {
       const penalty = Math.floor(scoreForBid(amount, Number(q.reveal_min), Number(q.reveal_max), Number(q.reveal_step)) * Number(r.wrong_penalty_percentage) / 100);
-      await run('UPDATE players SET score=score-? WHERE id=?', penalty, String(a.player_id));
-      await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, String(a.player_id), -penalty, 'WRONG', now());
+      await run('UPDATE players SET score=score-? WHERE id=?', penalty, playerId);
+      await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, playerId, -penalty, 'WRONG', now());
     }
   }
   await event(roomId, 'ANSWER_RESOLVED', { amount, correct });
@@ -89,7 +92,7 @@ async function resolveAnswers(r: Row) {
 async function resolveOpenAnswers(r: Row) {
   const roomId = String(r.id); const index = Number(r.question_index);
   const q = await question(String(r.quiz_id), index);
-  const attempts = await all('SELECT * FROM answers WHERE room_id=? AND question_index=? AND amount=0 ORDER BY created_at, rowid', roomId, index);
+  const attempts = await all('SELECT * FROM answer_attempts WHERE room_id=? AND question_index=? AND amount=0 ORDER BY created_at, rowid', roomId, index);
   let correctRank = 0;
   for (const answer of attempts) {
     if (answer.correct !== 1) continue;
@@ -302,17 +305,20 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
       } else if (action === 'answer') {
         if (!['OPEN_ANSWERING', 'ANSWERING'].includes(String(r.phase)) || (r.phase_ends_at !== null && Number(r.phase_ends_at) <= now())) fail('Đã hết thời gian trả lời.');
         if (!(await challengers(r)).includes(String(p.id))) fail('Chưa đến lượt bạn trả lời.');
-        if (await one('SELECT 1 FROM answers WHERE room_id=? AND question_index=? AND player_id=?', roomId, index, String(p.id))) fail('Bạn đã khóa đáp án.');
+        if (await one('SELECT 1 FROM answer_attempts WHERE room_id=? AND question_index=? AND player_id=? AND correct=1', roomId, index, String(p.id))) fail('Bạn đã trả lời đúng.');
         const text = String(value ?? '').trim().slice(0, 120);
         if (!text) fail('Nhập đáp án.');
+        const previous = await all('SELECT text,created_at FROM answer_attempts WHERE room_id=? AND question_index=? AND player_id=? ORDER BY created_at DESC,rowid DESC', roomId, index, String(p.id));
+        if (previous.length >= 30) fail('Bạn đã dùng hết 30 lần thử cho câu này.');
+        if (previous.some(attempt => normalizeAnswer(String(attempt.text)) === normalizeAnswer(text))) fail('Bạn đã thử đáp án này. Hãy nhập tên khác.');
         const q = await question(String(r.quiz_id), index);
         const accepted = [String(q.primary_answer), ...(await all('SELECT answer FROM accepted_answers WHERE question_id=?', String(q.id))).map(x => String(x.answer))];
         const correct = answerMatches(text, accepted) ? 1 : 0;
         const amount = r.phase === 'OPEN_ANSWERING' ? 0 : Number(r.active_bid);
-        await run('INSERT INTO answers VALUES(?,?,?,?,?,?,?)', roomId, index, String(p.id), amount, text, correct, now());
+        await run('INSERT INTO answer_attempts(id,room_id,question_index,player_id,amount,text,correct,created_at) VALUES(?,?,?,?,?,?,?,?)', id(), roomId, index, String(p.id), amount, text, correct, now());
         await event(roomId, 'ANSWER_SUBMITTED', { playerId: p.id });
-        const answerCount = Number((await one('SELECT COUNT(*) AS count FROM answers WHERE room_id=? AND question_index=? AND amount=?', roomId, index, amount))?.count);
-        if (answerCount === (await challengers(r)).length) {
+        const correctCount = Number((await one('SELECT COUNT(*) AS count FROM answer_attempts WHERE room_id=? AND question_index=? AND amount=? AND correct=1', roomId, index, amount))?.count);
+        if (correctCount === (await challengers(r)).length) {
           if (r.phase === 'OPEN_ANSWERING') await resolveOpenAnswers(r);
           else await resolveAnswers(r);
         }
@@ -337,8 +343,9 @@ export async function getState(roomId: string, auth: string) {
   const canHear = r.phase === 'OPEN_MEDIA_PLAYING' || (r.phase === 'MEDIA_PLAYING' && (host || (await challengers(r)).includes(String(me?.id))));
   const showBids = !['LOBBY', 'BIDDING'].includes(String(r.phase));
   const bidRows = await bids(roomId, index);
-  const answerRows = await all('SELECT player_id,amount,text,correct FROM answers WHERE room_id=? AND question_index=? ORDER BY created_at, rowid', roomId, index);
-  const myAnswerRow = me ? answerRows.find(a => a.player_id === me.id) : undefined;
+  const answerRows = await all('SELECT player_id,amount,text,correct FROM answer_attempts WHERE room_id=? AND question_index=? ORDER BY created_at, rowid', roomId, index);
+  const latestAnswer = (playerId: unknown) => answerRows.filter(a => a.player_id === playerId).at(-1);
+  const myAnswerRow = me ? latestAnswer(me.id) : undefined;
   const correctRows = answerRows.filter(a => a.correct === 1);
   const scores = await all('SELECT player_id,COALESCE(SUM(delta),0) AS delta FROM score_events WHERE room_id=? AND question_index=? GROUP BY player_id', roomId, index);
   const seatOrder = (await all('SELECT id FROM players WHERE room_id=? ORDER BY joined_at,rowid', roomId)).map(p => String(p.id));
@@ -347,9 +354,9 @@ export async function getState(roomId: string, auth: string) {
     bidLocked: bidRows.some(b => b.player_id === p.id),
     bid: showBids ? bidRows.find(b => b.player_id === p.id)?.amount ?? null : undefined,
     autoBid: showBids ? !!bidRows.find(b => b.player_id === p.id)?.auto_assigned : undefined,
-    answerLocked: answerRows.some(a => a.player_id === p.id),
-    answer: reveal ? answerRows.find(a => a.player_id === p.id)?.text ?? null : undefined,
-    correct: reveal ? answerRows.find(a => a.player_id === p.id)?.correct === 1 : undefined,
+    answerLocked: correctRows.some(a => a.player_id === p.id),
+    answer: reveal ? correctRows.find(a => a.player_id === p.id)?.text ?? latestAnswer(p.id)?.text ?? null : undefined,
+    correct: reveal ? correctRows.some(a => a.player_id === p.id) : undefined,
     correctRank: reveal && correctRows.some(a => a.player_id === p.id) ? correctRows.findIndex(a => a.player_id === p.id) + 1 : undefined,
     roundDelta: reveal ? scores.find(s => s.player_id === p.id)?.delta ?? 0 : undefined
   }));
@@ -359,7 +366,7 @@ export async function getState(roomId: string, auth: string) {
   const turnNotice = previousGroup && previousAttempts.length > 0 && ['TURN_TRANSITION', 'MEDIA_PLAYING', 'ANSWERING'].includes(String(r.phase)) ? {
     previousNames: players.filter(p => previousGroup.playerIds.includes(String(p.id))).map(p => String(p.nickname)),
     nextNames: players.filter(p => bidGroups.find(group => group.amount === Number(r.active_bid))?.playerIds.includes(String(p.id))).map(p => String(p.nickname)),
-    previousAllWrong: previousAttempts.length === previousGroup.playerIds.length && previousAttempts.every(a => a.correct !== 1),
+    previousAllWrong: previousGroup.playerIds.every(playerId => previousAttempts.some(attempt => attempt.player_id === playerId)) && previousAttempts.every(a => a.correct !== 1),
     nextBid: Number(r.active_bid)
   } : null;
   return {
@@ -382,6 +389,7 @@ export async function getState(roomId: string, auth: string) {
     myBid: me ? bidRows.find(b => b.player_id === me.id)?.amount ?? null : null,
     myAnswer: myAnswerRow?.text ?? null,
     myAnswerCorrect: myAnswerRow ? myAnswerRow.correct === 1 : null,
+    myAttemptCount: me ? answerRows.filter(a => a.player_id === me.id).length : 0,
     lastEventId: (await one('SELECT MAX(id) AS id FROM game_events WHERE room_id=?', roomId))?.id ?? 0
   };
   });

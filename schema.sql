@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS answers (
   amount INTEGER NOT NULL, text TEXT NOT NULL, correct INTEGER NOT NULL, created_at INTEGER NOT NULL,
   PRIMARY KEY(room_id, question_index, player_id)
 );
+CREATE TABLE IF NOT EXISTS answer_attempts (
+  id TEXT PRIMARY KEY, room_id TEXT NOT NULL, question_index INTEGER NOT NULL,
+  player_id TEXT NOT NULL REFERENCES players(id), amount INTEGER NOT NULL,
+  text TEXT NOT NULL, correct INTEGER NOT NULL, created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_answer_attempts_room ON answer_attempts(room_id, question_index, amount, created_at);
 CREATE TABLE IF NOT EXISTS score_events (
   id TEXT PRIMARY KEY, room_id TEXT NOT NULL, question_index INTEGER NOT NULL,
   player_id TEXT NOT NULL REFERENCES players(id), delta INTEGER NOT NULL, reason TEXT NOT NULL,
