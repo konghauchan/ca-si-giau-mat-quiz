@@ -1,0 +1,11 @@
+node_modules
+.next
+.next-verify
+.npm-cache
+.vercel
+.vercel-cli
+.tools/
+data/
+.env*
+!.env.example
+*.tsbuildinfo

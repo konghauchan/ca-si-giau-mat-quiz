@@ -1,0 +1,5 @@
+data/
+.npm-cache/
+.vercel-cli/
+.next-verify/
+*.tsbuildinfo
