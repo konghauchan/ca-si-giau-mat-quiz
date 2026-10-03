@@ -28,6 +28,7 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [played, setPlayed] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
@@ -38,7 +39,7 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
       player.current = new (window as YTWindow).YT!.Player(mount.current, {
         videoId,
         width: '100%', height: '100%',
-        playerVars: { controls: preview ? 1 : 0, disablekb: preview ? 0 : 1, fs: preview ? 1 : 0, rel: 0, playsinline: 1, start: Math.floor(start) },
+        playerVars: { autoplay: preview || pausedRef.current ? 0 : 1, controls: preview ? 1 : 0, disablekb: preview ? 0 : 1, fs: preview ? 1 : 0, iv_load_policy: 3, rel: 0, playsinline: 1, start: Math.floor(start) },
         events: {
           onReady: () => {
             if (!active) return;
@@ -52,6 +53,7 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
             if (!active) return;
             if (event.data === 1) {
               if (pausedRef.current || (endedRef.current && !preview)) { player.current?.pauseVideo(); return; }
+              setAutoplayBlocked(false);
               playedRef.current = true; setPlaying(true); setPlayed(true);
               playStartedAt.current = Date.now();
               if (stopTimer.current) clearTimeout(stopTimer.current);
@@ -63,6 +65,7 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
               setPlaying(false);
             }
           },
+          onAutoplayBlocked: () => { if (active && !preview) setAutoplayBlocked(true); },
           onError: () => { if (active) setError('Video không thể phát. Người tạo phòng có thể bỏ qua câu hỏi.'); }
         }
       });
@@ -78,12 +81,14 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
   function play() {
     if (!player.current || paused || (!preview && playedRef.current)) return;
     if (stopTimer.current) clearTimeout(stopTimer.current);
+    setAutoplayBlocked(false);
     player.current.seekTo(start, true); player.current.playVideo();
   }
   if (!videoId) return <div className="notice error">Đường dẫn YouTube không hợp lệ.</div>;
   return <div className={`clip-player ${reveal ? 'clip-player-reveal' : ''}`}>
     <div className={`video-frame ${preview || reveal ? '' : 'concealed'}`}><div ref={mount} />{!preview && !reveal && <div className="video-mask" aria-label="Video YouTube được che để giữ bí mật đáp án"><span className="video-mask-icon">♫</span><strong>{playing ? 'Đang phát đoạn nhạc' : played ? 'Đã nghe đoạn nhạc' : 'Đoạn nhạc bí mật'}</strong><small>{duration} giây nghe</small></div>}</div>
     {!reveal && <div className="clip-actions"><button className="button primary" type="button" disabled={paused || !ready || playing || (!preview && played)} onClick={play}>{paused ? 'Đã tạm dừng' : playing ? 'Đang phát đoạn nhạc…' : played && !preview ? 'Đã phát đoạn nhạc' : `▶ Phát ${duration} giây`}</button></div>}
+    {reveal && autoplayBlocked && !played && <div className="clip-actions"><button className="button primary" type="button" disabled={paused || !ready} onClick={play}>▶ Phát video kết quả</button><p className="muted">Trình duyệt đã chặn tự phát. Bấm một lần để xem video.</p></div>}
     {error && <div className="notice error">{error}</div>}
   </div>;
 }
