@@ -10,7 +10,7 @@ const question = z.object({
   revealMax: z.number().int().min(1).max(30), revealStep: z.number().int().min(1).max(30)
 });
 const topic = z.object({ key: z.string().min(1).max(80), gameRound: z.union([z.literal(1), z.literal(2)]), title: z.string().min(1).max(80), songCount: z.number().int().min(1).max(30) });
-const quiz = z.object({ id: z.string().uuid().optional(), ownerToken: z.string().optional(), title: z.string().min(1).max(100), description: z.string().max(500), visibility: z.enum(['private', 'public']), topics: z.array(topic).min(2).max(30), questions: z.array(question).min(2).max(30) });
+const quiz = z.object({ id: z.string().uuid().optional(), ownerToken: z.string().optional(), coverSourceId: z.string().uuid().optional(), coverSourceToken: z.string().optional(), title: z.string().min(1).max(100), description: z.string().max(500), visibility: z.enum(['private', 'public']), topics: z.array(topic).min(2).max(30), questions: z.array(question).min(2).max(30) });
 export async function GET(req: NextRequest) {
   try {
     const id = req.nextUrl.searchParams.get('id'); const auth = req.headers.get('x-quiz-token') || undefined;

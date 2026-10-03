@@ -3,12 +3,13 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Disc3, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, quizToken } from '@/lib/client';
 import { AvatarPicker } from '@/components/AvatarPicker';
 
-type Quiz = { id: string; title: string; description: string; visibility: string; question_count: number; round_one_count: number; round_two_count: number; own: boolean };
-type OwnedQuiz = { id: string; title: string; description: string; visibility: string; own: boolean; questions: { game_round: number }[] };
+type Quiz = { id: string; title: string; description: string; visibility: string; cover_url: string | null; question_count: number; round_one_count: number; round_two_count: number; own: boolean };
+type OwnedQuiz = { id: string; title: string; description: string; visibility: string; coverUrl: string | null; own: boolean; questions: { game_round: number }[] };
 
 function Library() {
   const router = useRouter();
@@ -30,7 +31,7 @@ function Library() {
         const ids = JSON.parse(localStorage.getItem('myQuizzes') || '[]') as string[];
         const mine = (await Promise.all(ids.filter(id => quizToken(id)).map(id =>
           api<OwnedQuiz>(`/api/quiz?id=${encodeURIComponent(id)}`, { token: quizToken(id) })
-            .then(q => q.own ? ({ id: q.id, title: q.title, description: q.description, visibility: q.visibility, own: true, question_count: q.questions.length, round_one_count: q.questions.filter(item => item.game_round === 1).length, round_two_count: q.questions.filter(item => item.game_round === 2).length }) : null)
+            .then(q => q.own ? ({ id: q.id, title: q.title, description: q.description, visibility: q.visibility, cover_url: q.coverUrl, own: true, question_count: q.questions.length, round_one_count: q.questions.filter(item => item.game_round === 1).length, round_two_count: q.questions.filter(item => item.game_round === 2).length }) : null)
             .catch(() => null)
         ))).filter((item): item is Quiz => item !== null);
         setQuizzes([...mine, ...publicItems.filter(item => !mine.some(owned => owned.id === item.id)).map(item => ({ ...item, own: false }))]);
@@ -73,7 +74,7 @@ function Library() {
     {loading ? <div className="panel empty">Đang tải bộ câu hỏi…</div> : quizzes.length === 0 ? <div className="panel empty"><Disc3 size={43} /><h2>Chưa có bộ câu hỏi nào</h2><p>Hãy tạo bộ câu hỏi đầu tiên.</p><Link className="button primary" href="/create">Tạo bộ câu hỏi</Link></div> : <div className="quiz-grid">{quizzes.map(quiz => {
       const ready = quiz.round_one_count > 0 && quiz.round_two_count > 0;
       return <article className="quiz-card" key={quiz.id}>
-        <div className="quiz-cover">♫</div>
+        <div className="quiz-cover">{quiz.cover_url ? <Image unoptimized width={1200} height={900} src={quiz.cover_url} alt={`Ảnh bìa ${quiz.title}`} loading="lazy" /> : '♫'}</div>
         <div className="quiz-card-body">
           {quiz.own && <span className="quiz-owner-tag">Của bạn</span>}
           <h2>{quiz.title}</h2><p>{quiz.description || 'Thử thách nghe nhạc cùng bạn bè.'}</p>

@@ -4,6 +4,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS quizzes (
   id TEXT PRIMARY KEY, owner_token TEXT NOT NULL, title TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '', visibility TEXT NOT NULL DEFAULT 'private',
+  cover_url TEXT,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
   deleted_at INTEGER
 );

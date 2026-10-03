@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { one, all, run, tx } from './db';
 import { answerMatches, groupBids, nextGroup, normalizeAnswer, scoreForBid, scoreForCorrectRank, youtubeId, type Phase } from './core';
 import { storedAssetExists } from './media';
+import { removeUnusedCover } from './coverStorage';
 
 type Row = Record<string, unknown>;
 const now = () => Date.now();
@@ -127,7 +128,7 @@ async function tick(roomId: string) {
 
 export type QuestionInput = { prompt: string; gameRound: 1 | 2; topicKey: string; listenSeconds: number; answerSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number };
 export type TopicInput = { key: string; gameRound: 1 | 2; title: string; songCount: number };
-export async function saveQuiz(input: { id?: string; ownerToken?: string; title: string; description: string; visibility: string; topics: TopicInput[]; questions: QuestionInput[] }) {
+export async function saveQuiz(input: { id?: string; ownerToken?: string; coverSourceId?: string; coverSourceToken?: string; title: string; description: string; visibility: string; topics: TopicInput[]; questions: QuestionInput[] }) {
   return await tx(async () => {
     let quizId = input.id || id(); let ownerToken = input.ownerToken || token();
     if (!input.title.trim()) fail('Nhập tên bộ câu hỏi.');
@@ -144,6 +145,8 @@ export async function saveQuiz(input: { id?: string; ownerToken?: string; title:
     if (input.questions.some(q => !input.topics.some(topic => topic.key === q.topicKey && topic.gameRound === q.gameRound))) fail('Có bài hát chưa thuộc chủ đề hợp lệ.');
     const existing = input.id ? await one('SELECT * FROM quizzes WHERE id=?', quizId) ?? fail('Không tìm thấy bộ câu hỏi.') : undefined;
     if (existing && (existing.owner_token !== ownerToken || existing.deleted_at !== null)) fail('Bạn không có quyền sửa bộ câu hỏi này.');
+    const coverSource = !existing && input.coverSourceId ? await one('SELECT cover_url FROM quizzes WHERE id=? AND owner_token=? AND deleted_at IS NULL', input.coverSourceId, input.coverSourceToken || '') : undefined;
+    if (input.coverSourceId && !coverSource) fail('Bạn không có quyền sao chép ảnh bìa của bộ câu hỏi này.');
     const songIds = new Set<string>();
     const songNames = new Set<string>();
     for (const q of input.questions) {
@@ -174,7 +177,7 @@ export async function saveQuiz(input: { id?: string; ownerToken?: string; title:
       quizId = id(); ownerToken = token();
     }
     if (existing && !replacedId) { await run('UPDATE quizzes SET title=?,description=?,visibility=?,updated_at=? WHERE id=?', input.title.trim(), input.description.trim(), input.visibility, now(), quizId); await run('DELETE FROM questions WHERE quiz_id=?', quizId); await run('DELETE FROM topics WHERE quiz_id=?', quizId); }
-    else await run('INSERT INTO quizzes(id,owner_token,title,description,visibility,created_at,updated_at) VALUES(?,?,?,?,?,?,?)', quizId, ownerToken, input.title.trim(), input.description.trim(), input.visibility, now(), now());
+    else await run('INSERT INTO quizzes(id,owner_token,title,description,visibility,cover_url,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)', quizId, ownerToken, input.title.trim(), input.description.trim(), input.visibility, existing?.cover_url ? String(existing.cover_url) : coverSource?.cover_url ? String(coverSource.cover_url) : null, now(), now());
     const topicIds = new Map<string, string>();
     for (const round of [1, 2]) {
       for (const [index, topic] of input.topics.filter(topic => topic.gameRound === round).entries()) {
@@ -192,13 +195,15 @@ export async function saveQuiz(input: { id?: string; ownerToken?: string; title:
   });
 }
 export async function deleteQuiz(quizId: string, ownerToken?: string) {
-  return await tx(async () => {
-    const quiz = await one('SELECT owner_token,deleted_at FROM quizzes WHERE id=?', quizId) ?? fail('Không tìm thấy bộ câu hỏi.');
+  const coverUrl = await tx(async () => {
+    const quiz = await one('SELECT owner_token,deleted_at,cover_url FROM quizzes WHERE id=?', quizId) ?? fail('Không tìm thấy bộ câu hỏi.');
     if (!ownerToken || quiz.owner_token !== ownerToken) fail('Bạn không có quyền xóa bộ câu hỏi này.');
     if (quiz.deleted_at !== null) fail('Bộ câu hỏi này đã được xóa.');
     await run('UPDATE quizzes SET deleted_at=? WHERE id=?', now(), quizId);
-    return { deleted: true };
+    return quiz.cover_url ? String(quiz.cover_url) : null;
   });
+  await removeUnusedCover(coverUrl);
+  return { deleted: true };
 }
 export async function getQuiz(quizId: string, ownerToken?: string) {
   const q = await one('SELECT * FROM quizzes WHERE id=? AND deleted_at IS NULL', quizId) ?? fail('Không tìm thấy bộ câu hỏi.');
@@ -209,13 +214,13 @@ export async function getQuiz(quizId: string, ownerToken?: string) {
     accepted_answers: own ? (await all('SELECT answer FROM accepted_answers WHERE question_id=?', String(question.id))).map(row => row.answer) : undefined
   })));
   const topics = await all('SELECT id,game_round,order_index,title,song_count FROM topics WHERE quiz_id=? ORDER BY game_round,order_index', quizId);
-  return { id: q.id, title: q.title, description: q.description, visibility: q.visibility, topics, questions, own, usedInRoom: own && Boolean(await one('SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1', quizId)) };
+  return { id: q.id, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, topics, questions, own, usedInRoom: own && Boolean(await one('SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1', quizId)) };
 }
 export async function listQuizzes(ownerToken?: string) {
   const counts = '(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id) AS question_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id AND game_round=1) AS round_one_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id AND game_round=2) AS round_two_count';
-  const publicQuizzes = await all(`SELECT id,title,description,visibility,${counts} FROM quizzes WHERE visibility='public' AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 50`);
+  const publicQuizzes = await all(`SELECT id,title,description,visibility,cover_url,${counts} FROM quizzes WHERE visibility='public' AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 50`);
   if (!ownerToken) return publicQuizzes;
-  const owned = await all(`SELECT id,title,description,visibility,${counts} FROM quizzes WHERE owner_token=? AND deleted_at IS NULL ORDER BY updated_at DESC`, ownerToken);
+  const owned = await all(`SELECT id,title,description,visibility,cover_url,${counts} FROM quizzes WHERE owner_token=? AND deleted_at IS NULL ORDER BY updated_at DESC`, ownerToken);
   return [...owned, ...publicQuizzes.filter(q => !owned.some(o => o.id === q.id))];
 }
 export async function createRoom(quizId: string, ownerToken: string, nickname: string, avatarId = 1) {

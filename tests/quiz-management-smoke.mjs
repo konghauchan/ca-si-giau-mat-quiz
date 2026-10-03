@@ -36,6 +36,8 @@ assert.ok(saved.body.questions.every(song => song.topic_id));
 assert.equal(saved.body.questions[0].media_start, 0);
 assert.equal(saved.body.questions[0].result_start, 0);
 assert.equal(saved.body.questions[0].result_seconds, 3);
+assert.equal(saved.body.coverUrl, null);
+assert.equal((await request(`/api/quiz/cover?id=${id}`, { method: 'DELETE', token: 'not-the-owner' })).status, 400);
 
 const rejected = await request(`/api/quiz?id=${id}`, { method: 'DELETE', token: 'not-the-owner' });
 assert.equal(rejected.status, 400);

@@ -14,7 +14,7 @@ npm run dev
 
 Mở `http://localhost:3000`. Trên Windows có thể tạo `.env.local` bằng cách sao chép file trong Explorer; biến môi trường không bắt buộc vì mặc định dùng `./data/game.sqlite`.
 
-1. Vào **Tạo bộ câu hỏi**. Trong mỗi tab vòng chơi, thêm một hoặc nhiều chủ đề, đặt tên và số bài hát cần có. Mỗi chủ đề phải đủ đúng số bài trước khi lưu; một video YouTube không thể dùng lại ở chủ đề hay vòng khác. Vòng 1 chọn thời lượng nghe chung; vòng 2 nhập gợi ý trước khi đấu giá. Mỗi bài chọn thời gian trả lời từ 5 đến 60 giây, nhập đường dẫn YouTube, thời điểm bắt đầu từ 0 giây trở đi và đáp án. Bấm **Xem như người chơi** để kiểm tra từng bước của câu hỏi trước khi lưu.
+1. Vào **Tạo bộ câu hỏi**. Có thể chọn ảnh bìa JPG, PNG, WebP hoặc AVIF tối đa 8 MB; trình duyệt và máy chủ sẽ cắt giữa thành 4:3, nén WebP tối đa 300 KB. Trong mỗi tab vòng chơi, thêm một hoặc nhiều chủ đề, đặt tên và số bài hát cần có. Mỗi chủ đề phải đủ đúng số bài trước khi lưu; một video YouTube không thể dùng lại ở chủ đề hay vòng khác. Vòng 1 chọn thời lượng nghe chung; vòng 2 nhập gợi ý trước khi đấu giá. Mỗi bài chọn thời gian trả lời từ 5 đến 60 giây, nhập đường dẫn YouTube, thời điểm bắt đầu từ 0 giây trở đi và đáp án. Bấm **Xem như người chơi** để kiểm tra từng bước của câu hỏi trước khi lưu.
 2. Tại **Thư viện**, bấm **Tạo phòng**, nhập tên hiển thị và chọn một trong 20 avatar. Người tạo phòng chiếm một trong bốn vị trí chơi và nhận mã phòng 6 số.
 3. Mở thêm 1–3 thẻ trình duyệt (hoặc thiết bị cùng mạng), vào `/join`, nhập mã phòng, tên hiển thị và chọn avatar. Không cần đăng nhập. Mỗi vị trí có màu riêng xuyên suốt trận đấu.
 4. Người tạo bắt đầu vòng 1: chủ đề mới hiện 3 giây trước bài đầu tiên, sau đó tất cả cùng nghe rồi trả lời. Các chủ đề chạy lần lượt trong từng vòng; hết vòng 1, vòng 2 tự bắt đầu. Nếu nhóm trước không đoán đúng, cả phòng thấy thông báo và tên người nghe tiếp theo trong 3 giây.
@@ -42,6 +42,8 @@ Bản đang chạy: https://nghe-va-doan.vercel.app (dự án `ca-si-giau-mat-qu
 Bản online dùng Turso Cloud làm SQLite bền vững. Tích hợp Turso từ Vercel Marketplace để dự án nhận `TURSO_DATABASE_URL` và `TURSO_AUTH_TOKEN` cho Production và Preview. Dự án chạy Node.js 24.x. Chạy `npm run migrate-quizzes` với hai biến kết nối này để chuyển quiz local sang Turso trước khi mở bản online. Script bỏ qua quiz mẫu có URL giữ chỗ và dữ liệu kiểm thử có tên bắt đầu bằng `Smoke`; chỉ chuyển quiz, bài hát và đáp án, không chuyển các phòng chơi cũ.
 
 Quiz mới được tạo trực tiếp trên website online và lưu trong Turso. Chưa có tài khoản đăng nhập; quyền sửa quiz hiện được nhận diện bằng mã sở hữu lưu trong localStorage của trình duyệt đã tạo quiz. Đổi thiết bị hoặc xóa dữ liệu trình duyệt sẽ mất quyền quản lý quiz trên giao diện, dù nội dung vẫn còn trong database. Muốn quản lý quiz theo tài khoản và dùng trên nhiều thiết bị cần bổ sung đăng nhập và gắn quiz với tài khoản.
+
+Ảnh bìa quiz được lưu trong Vercel Blob public store `ca-si-giau-mat-quiz-blob` tại Singapore; Turso chỉ giữ URL. Dự án Vercel đã được kết nối với store cho Production và Preview bằng `BLOB_READ_WRITE_TOKEN`. Muốn thử tải ảnh lên khi chạy local, cần cung cấp token này trong `.env.local`; không có token vẫn tạo và chơi quiz không ảnh bìa được. Chỉ người sở hữu quiz mới có thể thay hoặc xóa ảnh qua API.
 
 Quiz online chỉ hỗ trợ đường dẫn YouTube. Tệp âm thanh lưu trên máy local không được chuyển lên Vercel.
 
