@@ -41,7 +41,7 @@ Bản đang chạy: https://nghe-va-doan.vercel.app (dự án `ca-si-giau-mat-qu
 
 Bản online dùng Turso Cloud làm SQLite bền vững. Tích hợp Turso từ Vercel Marketplace để dự án nhận `TURSO_DATABASE_URL` và `TURSO_AUTH_TOKEN` cho Production và Preview. Dự án chạy Node.js 24.x. Chạy `npm run migrate-quizzes` với hai biến kết nối này để chuyển quiz local sang Turso trước khi mở bản online. Script bỏ qua quiz mẫu có URL giữ chỗ và dữ liệu kiểm thử có tên bắt đầu bằng `Smoke`; chỉ chuyển quiz, bài hát và đáp án, không chuyển các phòng chơi cũ.
 
-Quyền sửa quiz nằm trong localStorage theo từng tên miền. Sau khi chuyển database, tại trang `/quizzes` trên localhost bấm **Sao chép mã quản lý**; trên trang online bấm **Nhập mã quản lý** và dán mã. Mã chứa token sở hữu nên không chia sẻ cho người khác. Quiz mới tạo trực tiếp trên online không cần bước này.
+Quiz mới được tạo trực tiếp trên website online và lưu trong Turso. Chưa có tài khoản đăng nhập; quyền sửa quiz hiện được nhận diện bằng mã sở hữu lưu trong localStorage của trình duyệt đã tạo quiz. Đổi thiết bị hoặc xóa dữ liệu trình duyệt sẽ mất quyền quản lý quiz trên giao diện, dù nội dung vẫn còn trong database. Muốn quản lý quiz theo tài khoản và dùng trên nhiều thiết bị cần bổ sung đăng nhập và gắn quiz với tài khoản.
 
 Quiz online chỉ hỗ trợ đường dẫn YouTube. Tệp âm thanh lưu trên máy local không được chuyển lên Vercel.
 
