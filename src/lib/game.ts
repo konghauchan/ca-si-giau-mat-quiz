@@ -330,11 +330,12 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
       } else if (action === 'answer') {
         if (!['OPEN_ANSWERING', 'ANSWERING'].includes(String(r.phase)) || (r.phase_ends_at !== null && Number(r.phase_ends_at) <= now())) fail('Đã hết thời gian trả lời.');
         if (!(await challengers(r)).includes(String(p.id))) fail('Chưa đến lượt bạn trả lời.');
-        if (await one('SELECT 1 FROM answer_attempts WHERE room_id=? AND question_index=? AND player_id=? AND correct=1', roomId, index, String(p.id))) fail('Bạn đã trả lời đúng.');
         const text = String(value ?? '').trim().slice(0, 120);
         if (!text) fail('Nhập đáp án.');
         const previous = await all('SELECT text,created_at FROM answer_attempts WHERE room_id=? AND question_index=? AND player_id=? ORDER BY created_at DESC,rowid DESC', roomId, index, String(p.id));
-        if (previous.length >= 30) fail('Bạn đã dùng hết 30 lần thử cho câu này.');
+        if (r.phase === 'ANSWERING' && previous.length > 0) fail('Vòng 2 chỉ được trả lời một lần.');
+        if (r.phase === 'OPEN_ANSWERING' && previous.some(attempt => attempt.correct === 1)) fail('Bạn đã trả lời đúng.');
+        if (r.phase === 'OPEN_ANSWERING' && previous.length >= 30) fail('Bạn đã dùng hết 30 lần thử cho câu này.');
         if (previous.some(attempt => normalizeAnswer(String(attempt.text)) === normalizeAnswer(text))) fail('Bạn đã thử đáp án này. Hãy nhập tên khác.');
         const q = await question(String(r.quiz_id), index);
         const accepted = [String(q.primary_answer), ...(await all('SELECT answer FROM accepted_answers WHERE question_id=?', String(q.id))).map(x => String(x.answer))];
@@ -342,8 +343,8 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
         const amount = r.phase === 'OPEN_ANSWERING' ? 0 : Number(r.active_bid);
         await run('INSERT INTO answer_attempts(id,room_id,question_index,player_id,amount,text,correct,created_at) VALUES(?,?,?,?,?,?,?,?)', id(), roomId, index, String(p.id), amount, text, correct, now());
         await event(roomId, 'ANSWER_SUBMITTED', { playerId: p.id });
-        const correctCount = Number((await one('SELECT COUNT(*) AS count FROM answer_attempts WHERE room_id=? AND question_index=? AND amount=? AND correct=1', roomId, index, amount))?.count);
-        if (correctCount === (await challengers(r)).length) {
+        const settledCount = Number((await one(`SELECT COUNT(DISTINCT player_id) AS count FROM answer_attempts WHERE room_id=? AND question_index=? AND amount=?${r.phase === 'OPEN_ANSWERING' ? ' AND correct=1' : ''}`, roomId, index, amount))?.count);
+        if (settledCount === (await challengers(r)).length) {
           if (r.phase === 'OPEN_ANSWERING') await resolveOpenAnswers(r);
           else await resolveAnswers(r);
         }
@@ -379,7 +380,7 @@ export async function getState(roomId: string, auth: string) {
     bidLocked: bidRows.some(b => b.player_id === p.id),
     bid: showBids ? bidRows.find(b => b.player_id === p.id)?.amount ?? null : undefined,
     autoBid: showBids ? !!bidRows.find(b => b.player_id === p.id)?.auto_assigned : undefined,
-    answerLocked: correctRows.some(a => a.player_id === p.id),
+    answerLocked: currentRound === 1 ? correctRows.some(a => a.player_id === p.id) : answerRows.some(a => a.player_id === p.id),
     answer: reveal ? correctRows.find(a => a.player_id === p.id)?.text ?? latestAnswer(p.id)?.text ?? null : undefined,
     correct: reveal ? correctRows.some(a => a.player_id === p.id) : undefined,
     correctRank: reveal && correctRows.some(a => a.player_id === p.id) ? correctRows.findIndex(a => a.player_id === p.id) + 1 : undefined,
