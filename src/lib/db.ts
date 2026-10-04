@@ -14,6 +14,15 @@ async function initialize(): Promise<Client> {
   if (!remoteUrl) fs.mkdirSync(path.dirname(filename), { recursive: true });
   if (remoteUrl && !process.env.TURSO_AUTH_TOKEN) throw new Error('Thiếu TURSO_AUTH_TOKEN cho database online.');
   const client = createClient({ url: remoteUrl || `file:${filename}`, authToken: remoteUrl ? process.env.TURSO_AUTH_TOKEN : undefined });
+  if (remoteUrl) {
+    try {
+      // A deployed function should not run DDL on every cold start. Check the
+      // columns it needs with one read, and migrate only an older database.
+      await client.execute(`SELECT q.deleted_at,q.replacement_id,q.cover_url,s.game_round,s.listen_seconds,s.answer_seconds,s.topic_id,s.result_start,s.result_seconds,r.paused_at,p.avatar_id,a.id
+        FROM quizzes q,questions s,rooms r,players p,answer_attempts a LIMIT 0`);
+      return client;
+    } catch { /* A new or older database still needs the schema below. */ }
+  }
   const schema = fs.readFileSync(path.join(process.cwd(), 'schema.sql'), 'utf8').replace(/^PRAGMA journal_mode\s*=\s*WAL;\s*/mi, '');
   await client.executeMultiple(schema);
 
