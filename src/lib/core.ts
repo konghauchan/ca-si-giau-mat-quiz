@@ -22,6 +22,12 @@ export function scoreForCorrectRank(basePoints: number, correctRank: number): nu
   return Math.round(basePoints * (5 - correctRank) / 4);
 }
 
+export function scoreForTimedAnswer(maxPoints: number, startedAt: number, endsAt: number, answeredAt: number): number {
+  const duration = Math.max(1, endsAt - startedAt);
+  const remaining = Math.max(0, Math.min(duration, endsAt - answeredAt));
+  return Math.max(0, Math.round(maxPoints * remaining / duration));
+}
+
 export function normalizeAnswer(value: string): string {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }

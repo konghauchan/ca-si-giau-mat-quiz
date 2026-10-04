@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { one, all, run, tx, batchRead } from './db';
-import { answerMatches, groupBids, nextGroup, normalizeAnswer, scoreForBid, scoreForCorrectRank, youtubeId, type Phase } from './core';
+import { answerMatches, groupBids, nextGroup, normalizeAnswer, scoreForBid, scoreForCorrectRank, scoreForTimedAnswer, youtubeId, type Phase } from './core';
 import { storedAssetExists } from './media';
 import { removeUnusedCover } from './coverStorage';
 
@@ -85,7 +85,8 @@ async function resolveAnswers(r: Row) {
     correct = true;
     correctRank++;
     const basePoints = scoreForBid(amount, Number(q.reveal_min), Number(q.reveal_max), Number(q.reveal_step));
-    const points = scoreForCorrectRank(basePoints, correctRank);
+    const rankedPoints = scoreForCorrectRank(basePoints, correctRank);
+    const points = scoreForTimedAnswer(rankedPoints, Number(r.phase_started_at), Number(r.phase_ends_at), Number(a.created_at));
     await run('UPDATE players SET score=score+? WHERE id=?', points, String(a.player_id));
     await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, String(a.player_id), points, 'CORRECT', now());
     await event(roomId, 'SCORE_AWARDED', { playerId: a.player_id, points, correctRank });
@@ -111,7 +112,8 @@ async function resolveOpenAnswers(r: Row) {
   for (const answer of attempts) {
     if (answer.correct !== 1) continue;
     correctRank++;
-    const points = scoreForCorrectRank(500, correctRank);
+    const rankedPoints = scoreForCorrectRank(500, correctRank);
+    const points = scoreForTimedAnswer(rankedPoints, Number(r.phase_started_at), Number(r.phase_ends_at), Number(answer.created_at));
     await run('UPDATE players SET score=score+? WHERE id=?', points, String(answer.player_id));
     await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, String(answer.player_id), points, 'OPEN_CORRECT', now());
     await event(roomId, 'SCORE_AWARDED', { playerId: answer.player_id, points, correctRank, gameRound: 1 });
@@ -324,6 +326,9 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
         if (r.paused_at === null) fail('Trò chơi chưa tạm dừng.');
         const elapsed = now() - Number(r.paused_at);
         await run('UPDATE rooms SET paused_at=NULL,phase_started_at=phase_started_at+?,phase_ends_at=CASE WHEN phase_ends_at IS NULL THEN NULL ELSE phase_ends_at+? END WHERE id=?', elapsed, elapsed, roomId);
+        if (['OPEN_ANSWERING', 'ANSWERING'].includes(String(r.phase))) {
+          await run('UPDATE answer_attempts SET created_at=created_at+? WHERE room_id=? AND question_index=? AND amount=?', elapsed, roomId, index, r.phase === 'OPEN_ANSWERING' ? 0 : Number(r.active_bid));
+        }
         await event(roomId, 'GAME_RESUMED');
       } else if (action === 'endGame') {
         if (r.phase === 'GAME_FINISHED') fail('Trò chơi đã kết thúc.');
