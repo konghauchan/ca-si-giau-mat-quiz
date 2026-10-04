@@ -50,4 +50,20 @@ npm run performance
 
 SSE hiện dùng database probe, chưa có dịch vụ pub/sub. Nhiều phòng/instance sẽ tăng số lượt đọc; cần đo tải thực tế trước khi mở quy mô lớn. Khi tất cả client ngắt kết nối, không có worker nền: lần truy cập tiếp theo bắt kịp các deadline đã lưu, không bắt đầu lại bộ đếm. Cold start, đường truyền và vùng người chơi vẫn ảnh hưởng độ trễ; số đo local không chứng minh mục tiêu dưới 500 ms online.
 
-Kết quả đo trước/sau deployment được ghi riêng ở phần dưới sau khi xác minh Production.
+## Số đo ngày 04/10/2026
+
+Đo từ máy tại Việt Nam, cùng script và 4 người gửi request đồng thời. Baseline `341726b` ở iad1; bản mới `4daaa94` ở hnd1, được xác minh bằng header `x-vercel-id`. Mẫu nhỏ, gồm cả những request đầu tiên; không phải kiểm tra tải nhiều phòng.
+
+| HTTP thao tác | Trước p50 / p95 (ms) | Sau p50 / p95 (ms) | Số mẫu mỗi bản |
+| --- | ---: | ---: | ---: |
+| Vào phòng | 2931 / 9649 | 421 / 490 | 3 |
+| Đọc trạng thái 4 người | 3823 / 5761 | 201 / 1091 | 12 |
+| Tạo phòng | 1739 / 1739 | 283 / 283 | 1 |
+| Bắt đầu | 4805 / 4805 | 360 / 360 | 1 |
+| Lưu quiz | 2764 / 2764 | 1330 / 1330 | 1 |
+
+Trận gợi ý online chạy hết 3 câu với 4 HTTP/SSE client: tất cả nhận holder sau **418 ms**, tất cả nhận kết quả đúng/điểm sau **438 ms** ở lần đo cuối. Đồng hồ đo SSE chạy độc lập với response của các thao tác thua cuộc, tránh tính thời gian chờ người thua thành độ trễ broadcast. HTTP answer thành công p50 267 ms / p95 433 ms (4 mẫu). Các thao tác khác vẫn có spike: join 1266 ms, ready 903 ms, buzz 707 ms trong trận này. Do đó chưa cam kết mọi thao tác dưới 500 ms.
+
+Local production: 17 unit tests, smoke hai vòng nghe nhạc, smoke gợi ý rút ngắn deadline và smoke gợi ý deadline thật đều qua. Snapshot local p50 35 ms / p95 114 ms; baseline 34 / 92 ms, nên không kết luận cải thiện local từ mẫu này. SSE gợi ý local 212 ms ở bài kiểm tra race. Migration trên bản sao schema cũ giữ quiz và thêm index thành công. UI được chơi trên 4 tab riêng và kiểm tra ở 390 px; không phải 4 thiết bị vật lý.
+
+Các file báo cáo đầy đủ trong `data/performance-online-before.json`, `data/performance-online-after.json`, `data/clue-online-performance.json`, `data/clue-performance.json` (gitignore). Không chứa token người chơi; fixture seed có token nằm trong file riêng bị gitignore.
