@@ -47,7 +47,7 @@ const streamAbort = new AbortController();
 const stream = await fetch(`${base}/api/events?roomId=${room.roomId}`, { headers: { 'x-game-token': a.playerToken }, signal: streamAbort.signal });
 assert.equal(stream.status, 200);
 const firstEvent = new TextDecoder().decode((await stream.body.getReader().read()).value);
-assert.match(firstEvent, /data: \d+/);
+assert.match(firstEvent, /event: state/);
 streamAbort.abort();
 await command(room.roomId, room.hostToken, 'start');
 assert.equal((await state(room.roomId, a.playerToken)).phase, 'TOPIC_INTRO');

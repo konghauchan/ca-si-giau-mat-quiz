@@ -1,8 +1,10 @@
+import { timedResponse } from '@/lib/timing';
 import { NextRequest, NextResponse } from 'next/server';
 import { getState } from '@/lib/game';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export async function GET(req: NextRequest) {
+export async function GET(req: NextRequest) { return timedResponse(() => handle(req)); }
+async function handle(req: NextRequest) {
   try {
     const roomId = req.nextUrl.searchParams.get('roomId') || '';
     const auth = req.headers.get('x-game-token') || '';

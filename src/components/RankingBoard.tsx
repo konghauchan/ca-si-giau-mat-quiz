@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { PlayerAvatar } from './PlayerAvatar';
 import { PLAYER_COLORS } from '@/lib/playerAppearance';
 
-type RankedPlayer = { id: string; nickname: string; avatarId: number; colorIndex: number; score: number; roundDelta?: number; correctRank?: number };
+type RankedPlayer = { id: string; nickname: string; avatarId: number; colorIndex: number; score: number; rank?: number; roundDelta?: number; correctRank?: number };
 
 export function RankingBoard({ players, finished }: { players: RankedPlayer[]; finished: boolean }) {
   const [progress, setProgress] = useState(finished ? 1 : 0);
@@ -33,7 +33,7 @@ export function RankingBoard({ players, finished }: { players: RankedPlayer[]; f
       const previousIndex = previousOrder.findIndex(item => item.id === player.id);
       const oldScore = player.score - (player.roundDelta ?? 0);
       const shownScore = Math.round(oldScore + (player.score - oldScore) * progress);
-      const rank = progress >= .8 ? finalIndex + 1 : previousIndex + 1;
+      const rank = progress >= .8 ? player.rank ?? finalIndex + 1 : previousIndex + 1;
       const position = previousIndex + (finalIndex - previousIndex) * positionProgress;
       const barWidth = Math.max(3, shownScore / maxScore * 100);
       return <div className={`ranking-card ${finalIndex === 0 ? 'leader' : ''}`} key={player.id} style={{ transform: `translateY(${position * 70}px)`, '--player-color': PLAYER_COLORS[player.colorIndex] ?? PLAYER_COLORS[0] } as CSSProperties}>

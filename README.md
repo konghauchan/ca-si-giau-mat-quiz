@@ -53,7 +53,7 @@ Quiz online chỉ hỗ trợ đường dẫn YouTube. Tệp âm thanh lưu trên
 - `src/lib/core.ts`: grouping bid, chọn nhóm tiếp theo, công thức điểm, chuẩn hóa đáp án, xác thực YouTube URL. Không phụ thuộc React hay database.
 - `src/lib/game.ts`: game engine và server authority. API chỉ gọi intents đã xác thực bằng token host/player. Mọi thay đổi room/bid/answer/score/event nằm trong transaction SQLite.
 - `src/lib/db.ts`, `schema.sql`: truy vấn SQLite bất đồng bộ qua libSQL; local lưu tại `data/game.sqlite`, online lưu trên Turso. `schema.sql` được áp dụng khi khởi tạo kết nối; các bảng gồm quizzes, topics, questions, accepted_answers, rooms, players, bids, answers, score_events, game_events. Quiz cũ không có chủ đề vẫn mở được và khi chỉnh sửa sẽ dùng chủ đề chung cho mỗi vòng.
-- `src/app/api`: HTTP command/state và event stream SSE. SSE gửi version của event log; client fetch state với token. Fallback poll 5 giây.
+- `src/app/api`: HTTP command/state và event stream SSE. SSE gửi snapshot ban đầu và patch theo version/deadline; chia sẻ probe 250 ms trong từng instance, tự reconnect và fallback tuần tự khi lỗi.
 - `src/components/AudioClipPlayer.tsx`, `src/lib/media.ts`: adapter audio tải lên. File gốc nằm tại `MEDIA_DIR`, ngoài thư mục public. API xác thực challenger và dùng FFmpeg để chỉ gửi đoạn từ `mediaStart` với độ dài bid; client không nhận cả bài hoặc thanh tua. Creator preview đoạn tối đa 10 giây bằng token upload.
 - `src/components/ClipPlayer.tsx`: YouTube IFrame adapter. Trong lúc đoán, lớp che phủ player giữ tiêu đề và ảnh bìa khỏi màn hình; đoạn công bố đáp án hiển thị video, tự phát và dừng theo thời lượng đã lưu.
 - `src/components/QuestionReview.tsx`: bản xem thử giao diện người chơi cho câu hỏi đang chỉnh sửa, gồm đấu giá, nghe, trả lời và kết quả.
@@ -77,3 +77,7 @@ Phản hồi gameplay không gửi `primary_answer`/`accepted_answers` trước 
 - Lớp che YouTube đáp ứng yêu cầu giao diện nhưng trái với mục “Overlays and frames” trong [YouTube Required Minimum Functionality](https://developers.google.com/youtube/terms/required-minimum-functionality). YouTube có thể hạn chế player; cần cân nhắc trước khi phát hành công khai. Lớp che chỉ ngăn lộ thông tin trên giao diện, không thể ngăn người chơi mở video gốc bằng URL hoặc công cụ trình duyệt.
 - Guest token lưu localStorage; nếu xóa dữ liệu trình duyệt sẽ mất quyền host/player/quiz. Chưa có tài khoản, rate limiting, moderation, tự động rời phòng, hay xử lý YouTube lỗi theo từng player.
 - Giao diện hỗ trợ sắp xếp câu hỏi bằng nút lên/xuống; chưa hỗ trợ kéo thả.
+
+## Đoán bài hát qua gợi ý
+
+Chọn chế độ **Đoán bài hát qua gợi ý** ở trang tạo quiz. Thêm 5 gợi ý cho mỗi bài, sửa điểm/thời gian và xem thử; có nút dùng 3 câu mẫu. Phòng bắt đầu tự động khi đủ 4 người bấm sẵn sàng. Xem [PERFORMANCE.md](PERFORMANCE.md) để biết luật, migration, số đo và cách chạy test.

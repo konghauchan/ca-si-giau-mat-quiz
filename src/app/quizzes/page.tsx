@@ -8,8 +8,8 @@ import { Copy, Disc3, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import { api, quizToken } from '@/lib/client';
 import { AvatarPicker } from '@/components/AvatarPicker';
 
-type Quiz = { id: string; title: string; description: string; visibility: string; cover_url: string | null; question_count: number; round_one_count: number; round_two_count: number; own: boolean };
-type OwnedQuiz = { id: string; title: string; description: string; visibility: string; coverUrl: string | null; own: boolean; questions: { game_round: number }[] };
+type Quiz = { game_type: string; id: string; title: string; description: string; visibility: string; cover_url: string | null; question_count: number; round_one_count: number; round_two_count: number; own: boolean };
+type OwnedQuiz = { gameType: string; id: string; title: string; description: string; visibility: string; coverUrl: string | null; own: boolean; questions: { game_round: number }[] };
 
 function Library() {
   const router = useRouter();
@@ -34,7 +34,7 @@ function Library() {
         const ids = JSON.parse(localStorage.getItem('myQuizzes') || '[]') as string[];
         const mine = (await Promise.all(ids.filter(id => quizToken(id)).map(id =>
           api<OwnedQuiz>(`/api/quiz?id=${encodeURIComponent(id)}`, { token: quizToken(id) })
-            .then(q => q.own ? ({ id: q.id, title: q.title, description: q.description, visibility: q.visibility, cover_url: q.coverUrl, own: true, question_count: q.questions.length, round_one_count: q.questions.filter(item => item.game_round === 1).length, round_two_count: q.questions.filter(item => item.game_round === 2).length }) : null)
+            .then(q => q.own ? ({ game_type: q.gameType, id: q.id, title: q.title, description: q.description, visibility: q.visibility, cover_url: q.coverUrl, own: true, question_count: q.questions.length, round_one_count: q.questions.filter(item => item.game_round === 1).length, round_two_count: q.questions.filter(item => item.game_round === 2).length }) : null)
             .catch(() => null)
         ))).filter((item): item is Quiz => item !== null);
         setQuizzes([...mine, ...publicItems.filter(item => !mine.some(owned => owned.id === item.id)).map(item => ({ ...item, own: false }))]);
@@ -49,6 +49,8 @@ function Library() {
     try {
       const result = await api<{ roomId: string; hostToken: string }>('/api/room', { method: 'POST', body: { action: 'create', quizId: quiz.id, ownerToken: quizToken(quiz.id), nickname: hostName.trim(), avatarId } });
       localStorage.setItem(`host:${result.roomId}`, result.hostToken);
+      sessionStorage.setItem(`host:${result.roomId}`, result.hostToken);
+      sessionStorage.setItem(`player:${result.roomId}`, result.hostToken);
       localStorage.setItem(`player:${result.roomId}`, result.hostToken);
       router.push(`/host/${result.roomId}`);
     } catch (e) { setError((e as Error).message); } finally { setBusyId(''); }
@@ -101,13 +103,13 @@ function Library() {
     {notice && <div className="notice success" role="status">{notice}</div>}
     {error && <div className="notice error" role="alert">{error}</div>}
     {loading ? <div className="panel empty">Đang tải bộ câu hỏi…</div> : quizzes.length === 0 ? <div className="panel empty"><Disc3 size={43} /><h2>Chưa có bộ câu hỏi nào</h2><p>Hãy tạo bộ câu hỏi đầu tiên.</p><Link className="button primary" href="/create">Tạo bộ câu hỏi</Link></div> : <div className="quiz-grid">{quizzes.map(quiz => {
-      const ready = quiz.round_one_count > 0 && quiz.round_two_count > 0;
+      const ready = quiz.game_type === 'SONG_CLUE' || (quiz.round_one_count > 0 && quiz.round_two_count > 0);
       return <article className="quiz-card" key={quiz.id}>
         <div className="quiz-cover">{quiz.cover_url ? <Image unoptimized width={1200} height={900} src={quiz.cover_url} alt={`Ảnh bìa ${quiz.title}`} loading="lazy" /> : '♫'}</div>
         <div className="quiz-card-body">
           {quiz.own && <span className="quiz-owner-tag">Của bạn</span>}
           <h2>{quiz.title}</h2><p>{quiz.description || 'Thử thách nghe nhạc cùng bạn bè.'}</p>
-          <div className="quiz-card-meta"><span>{quiz.question_count} câu hỏi</span><span>Vòng 1: {quiz.round_one_count} · Vòng 2: {quiz.round_two_count}</span><span>{quiz.visibility === 'public' ? 'Công khai' : quiz.visibility === 'unlisted' ? 'Ai có liên kết' : 'Riêng tư'}</span></div>
+          <div className="quiz-card-meta"><span>{quiz.question_count} câu hỏi</span><span>{quiz.game_type === 'SONG_CLUE' ? 'Đoán bằng gợi ý · 4 người' : `Vòng 1: ${quiz.round_one_count} · Vòng 2: ${quiz.round_two_count}`}</span><span>{quiz.visibility === 'public' ? 'Công khai' : quiz.visibility === 'unlisted' ? 'Ai có liên kết' : 'Riêng tư'}</span></div>
           {!ready && <p>Bộ câu hỏi cần ít nhất một bài hát cho mỗi vòng. {quiz.own ? 'Bấm “Chỉnh sửa” để bổ sung.' : 'Hãy chọn bộ câu hỏi khác.'}</p>}
           <div className="quiz-card-actions">
             <button className="button primary" disabled={busyId === quiz.id || !ready} onClick={() => { setDeleteId(''); setHostQuizId(hostQuizId === quiz.id ? '' : quiz.id); }}>{hostQuizId === quiz.id ? 'Đóng' : 'Tạo phòng'}</button>

@@ -1,0 +1,6 @@
+export const clueQuestions=[
+ {title:'Nơi Này Có Anh',artist:'Sơn Tùng M-TP',aliases:['nnca'],texts:['Một ca khúc về tình yêu.','Người hát là một nam ca sĩ.','Nghệ sĩ có tên viết tắt M-TP.','Tên bài hát có bốn từ.','Hai từ cuối là “Có Anh”.']},
+ {title:'Bông Hoa Đẹp Nhất',artist:'Quân A.P',aliases:[],texts:['Một ca khúc pop Việt.','Tên bài gợi một hình ảnh thiên nhiên.','Người hát là Quân A.P.','Tên bài có bốn từ.','Tên bài bắt đầu bằng “Bông Hoa”.']},
+ {title:'Một Nhà',artist:'Da LAB',aliases:['mot nha'],texts:['Một ca khúc về sự gắn bó.','Do một nhóm nhạc thể hiện.','Nhóm nhạc là Da LAB.','Tên bài có hai từ.','Từ cuối là “Nhà”.']}
+];
+export const clueFixture={gameType:'SONG_CLUE',title:'Đoán bài hát qua gợi ý · Bộ mẫu',description:'3 câu mẫu để kiểm tra chế độ 4 người tự động.',visibility:'unlisted',topics:[{key:'clue',gameRound:1,title:'Nhạc Việt',songCount:3}],questions:clueQuestions.map(q=>({prompt:'Bài hát bí ẩn',gameRound:1,topicKey:'clue',listenSeconds:15,answerSeconds:8,mediaType:'youtube',mediaUrl:'',mediaStart:0,primaryAnswer:q.title,acceptedAnswers:q.aliases,artist:q.artist,hint:'',revealMin:1,revealMax:10,revealStep:1,clues:q.texts.map((text,i)=>({id:`clue-${i}`,text,category:'OTHER',score:[1000,800,600,400,200][i]}))}))};

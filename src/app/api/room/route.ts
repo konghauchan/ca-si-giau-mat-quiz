@@ -1,8 +1,10 @@
+import { timedResponse } from '@/lib/timing';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createRoom, joinRoom } from '@/lib/game';
 export const runtime = 'nodejs';
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest) { return timedResponse(() => handle(req)); }
+async function handle(req: NextRequest) {
   try {
     const body = await req.json();
     if (body.action === 'create') {

@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
-import { one, all, run, tx } from './db';
+import { one, all, run, tx, batchRead } from './db';
 import { answerMatches, groupBids, nextGroup, normalizeAnswer, scoreForBid, scoreForCorrectRank, youtubeId, type Phase } from './core';
 import { storedAssetExists } from './media';
 import { removeUnusedCover } from './coverStorage';
 
+import { clueCommand, getClueState } from './clueGame';
+import type { Clue } from './clueRules';
 type Row = Record<string, unknown>;
 const now = () => Date.now();
 const id = () => crypto.randomUUID();
@@ -141,15 +143,17 @@ async function tick(roomId: string) {
   }
 }
 
-export type QuestionInput = { prompt: string; gameRound: 1 | 2; topicKey: string; listenSeconds: number; answerSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number };
+export type QuestionInput = { prompt: string; gameRound: 1 | 2; topicKey: string; listenSeconds: number; answerSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number; clues?: Clue[] };
 export type TopicInput = { key: string; gameRound: 1 | 2; title: string; songCount: number };
-export async function saveQuiz(input: { id?: string; ownerToken?: string; coverSourceId?: string; coverSourceToken?: string; title: string; description: string; visibility: string; topics: TopicInput[]; questions: QuestionInput[] }) {
+export async function saveQuiz(input: { id?: string; ownerToken?: string; coverSourceId?: string; coverSourceToken?: string; title: string; description: string; visibility: string; gameType?: 'MUSIC_BID' | 'SONG_CLUE'; topics: TopicInput[]; questions: QuestionInput[] }) {
   return await tx(async () => {
+    const clueMode = input.gameType === 'SONG_CLUE';
     let quizId = input.id || id(); let ownerToken = input.ownerToken || token();
     if (!input.title.trim()) fail('Nhập tên bộ câu hỏi.');
-    if (input.questions.length < 2 || !input.questions.some(q => q.gameRound === 1) || !input.questions.some(q => q.gameRound === 2)) fail('Bộ câu hỏi cần ít nhất một câu cho mỗi vòng.');
+    if (!clueMode && (input.questions.length < 2 || !input.questions.some(q => q.gameRound === 1) || !input.questions.some(q => q.gameRound === 2))) fail('Bộ câu hỏi cần ít nhất một câu cho mỗi vòng.');
+    if (input.questions.length < 1) fail('Cần ít nhất một bài hát.');
     if (input.questions.length > 30) fail('Tối đa 30 câu hỏi.');
-    if (![1, 2].every(round => input.topics.some(topic => topic.gameRound === round))) fail('Mỗi vòng cần ít nhất một chủ đề.');
+    if (!clueMode && ![1, 2].every(round => input.topics.some(topic => topic.gameRound === round))) fail('Mỗi vòng cần ít nhất một chủ đề.');
     const topicKeys = new Set<string>();
     for (const topic of input.topics) {
       if (topicKeys.has(topic.key)) fail('Mã chủ đề bị trùng.');
@@ -169,6 +173,11 @@ export async function saveQuiz(input: { id?: string; ownerToken?: string; coverS
       const songName = normalizeAnswer(q.primaryAnswer);
       if (songNames.has(songName)) fail('Tên bài hát không được lặp lại giữa các chủ đề hoặc hai vòng.');
       songNames.add(songName);
+      if (clueMode) {
+        if (q.clues?.length !== 5 || q.clues.some(c => !c.text.trim() || c.text.length > 500 || !Number.isInteger(c.score) || c.score < 1 || c.score > 10000)) fail('Mỗi bài cần 5 gợi ý, điểm từ 1 đến 10000.');
+        if (!Number.isInteger(q.listenSeconds) || q.listenSeconds < 5 || q.listenSeconds > 60 || !Number.isInteger(q.answerSeconds) || q.answerSeconds < 5 || q.answerSeconds > 60) fail('Thời gian gợi ý và trả lời phải từ 5 đến 60 giây.');
+        continue;
+      }
       if (q.gameRound === 2 && !q.hint.trim()) fail('Câu ở vòng 2 cần có gợi ý trước khi đấu giá.');
       if (![1, 2].includes(q.gameRound)) fail('Vòng chơi không hợp lệ.');
       if (!Number.isInteger(q.listenSeconds) || q.listenSeconds < 1 || q.listenSeconds > 10) fail('Thời lượng nghe vòng 1 phải từ 1 đến 10 giây.');
@@ -191,8 +200,8 @@ export async function saveQuiz(input: { id?: string; ownerToken?: string; coverS
       quizId = id(); ownerToken = token();
       await run('UPDATE quizzes SET deleted_at=?,replacement_id=? WHERE id=?', now(), quizId, replacedId);
     }
-    if (existing && !replacedId) { await run('UPDATE quizzes SET title=?,description=?,visibility=?,updated_at=? WHERE id=?', input.title.trim(), input.description.trim(), input.visibility, now(), quizId); await run('DELETE FROM questions WHERE quiz_id=?', quizId); await run('DELETE FROM topics WHERE quiz_id=?', quizId); }
-    else await run('INSERT INTO quizzes(id,owner_token,title,description,visibility,cover_url,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)', quizId, ownerToken, input.title.trim(), input.description.trim(), input.visibility, existing?.cover_url ? String(existing.cover_url) : coverSource?.cover_url ? String(coverSource.cover_url) : null, now(), now());
+    if (existing && !replacedId) { await run('UPDATE quizzes SET title=?,description=?,visibility=?,game_type=?,updated_at=? WHERE id=?', input.title.trim(), input.description.trim(), input.visibility, input.gameType || 'MUSIC_BID', now(), quizId); await run('DELETE FROM questions WHERE quiz_id=?', quizId); await run('DELETE FROM topics WHERE quiz_id=?', quizId); }
+    else await run('INSERT INTO quizzes(id,owner_token,title,description,visibility,game_type,cover_url,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)', quizId, ownerToken, input.title.trim(), input.description.trim(), input.visibility, input.gameType || 'MUSIC_BID', existing?.cover_url ? String(existing.cover_url) : coverSource?.cover_url ? String(coverSource.cover_url) : null, now(), now());
     const topicIds = new Map<string, string>();
     for (const round of [1, 2]) {
       for (const [index, topic] of input.topics.filter(topic => topic.gameRound === round).entries()) {
@@ -203,7 +212,7 @@ export async function saveQuiz(input: { id?: string; ownerToken?: string; coverS
     const sorted = [1, 2].flatMap(round => input.topics.filter(topic => topic.gameRound === round).flatMap(topic => input.questions.filter(q => q.topicKey === topic.key)));
     for (const [index, q] of sorted.entries()) {
       const questionId = id();
-      await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null);
+      await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds,clues_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, clueMode ? 'song_clue' : 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null, JSON.stringify(q.clues || []));
       for (const answer of new Set(q.acceptedAnswers.map(x => x.trim()).filter(Boolean))) await run('INSERT OR IGNORE INTO accepted_answers VALUES(?,?)', questionId, answer);
     }
     return { id: quizId, ownerToken, replacedId };
@@ -234,20 +243,21 @@ export async function getQuiz(quizId: string, ownerToken?: string) {
   const own = ownerToken === q.owner_token;
   if (!own && q.visibility === 'private') fail('Bộ câu hỏi này chưa được chia sẻ.');
   const counts = await one('SELECT COUNT(*) AS question_count,SUM(CASE WHEN game_round=1 THEN 1 ELSE 0 END) AS round_one_count,SUM(CASE WHEN game_round=2 THEN 1 ELSE 0 END) AS round_two_count FROM questions WHERE quiz_id=?', quizId);
-  if (!own) return { id: q.id, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, own: false };
-  const questions = await Promise.all((await all('SELECT * FROM questions WHERE quiz_id=? ORDER BY order_index', quizId)).map(async question => ({
-    ...question,
-    primary_answer: own ? question.primary_answer : undefined,
-    accepted_answers: own ? (await all('SELECT answer FROM accepted_answers WHERE question_id=?', String(question.id))).map(row => row.answer) : undefined
-  })));
-  const topics = await all('SELECT id,game_round,order_index,title,song_count FROM topics WHERE quiz_id=? ORDER BY game_round,order_index', quizId);
-  return { id: q.id, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, topics, questions, own, usedInRoom: Boolean(await one('SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1', quizId)) };
+  if (!own) return { id: q.id, gameType: q.game_type, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, own: false };
+  const [questionRows,aliases,topics,rooms] = await batchRead([
+    {sql:'SELECT * FROM questions WHERE quiz_id=? ORDER BY order_index',args:[quizId]},
+    {sql:'SELECT accepted_answers.* FROM accepted_answers JOIN questions ON questions.id=accepted_answers.question_id WHERE questions.quiz_id=?',args:[quizId]},
+    {sql:'SELECT id,game_round,order_index,title,song_count FROM topics WHERE quiz_id=? ORDER BY game_round,order_index',args:[quizId]},
+    {sql:'SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1',args:[quizId]}
+  ]);
+  const questions=questionRows.map(question=>({...question,accepted_answers:aliases.filter(a=>a.question_id===question.id).map(a=>a.answer)}));
+  return { id: q.id, gameType: q.game_type, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, topics, questions, own, usedInRoom: rooms.length > 0 };
 }
 export async function listQuizzes(ownerToken?: string) {
   const counts = '(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id) AS question_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id AND game_round=1) AS round_one_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id AND game_round=2) AS round_two_count';
-  const publicQuizzes = await all(`SELECT id,title,description,visibility,cover_url,${counts} FROM quizzes WHERE visibility='public' AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 50`);
+  const publicQuizzes = await all(`SELECT id,title,description,visibility,cover_url,game_type,${counts} FROM quizzes WHERE visibility='public' AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 50`);
   if (!ownerToken) return publicQuizzes;
-  const owned = await all(`SELECT id,title,description,visibility,cover_url,${counts} FROM quizzes WHERE owner_token=? AND deleted_at IS NULL ORDER BY updated_at DESC`, ownerToken);
+  const owned = await all(`SELECT id,title,description,visibility,cover_url,game_type,${counts} FROM quizzes WHERE owner_token=? AND deleted_at IS NULL ORDER BY updated_at DESC`, ownerToken);
   return [...owned, ...publicQuizzes.filter(q => !owned.some(o => o.id === q.id))];
 }
 export async function createRoom(quizId: string, ownerToken: string, nickname: string, avatarId = 1) {
@@ -257,7 +267,7 @@ export async function createRoom(quizId: string, ownerToken: string, nickname: s
     if (quiz.owner_token !== ownerToken && !['public', 'unlisted'].includes(String(quiz.visibility))) fail('Bộ câu hỏi này được đặt ở chế độ riêng tư.');
     if (!await one('SELECT 1 FROM questions WHERE quiz_id=?', quizId)) fail('Bộ câu hỏi chưa có câu hỏi nào.');
     const rounds = await all('SELECT game_round,COUNT(*) AS count FROM questions WHERE quiz_id=? GROUP BY game_round', quizId);
-    if (!rounds.some(item => Number(item.game_round) === 1) || !rounds.some(item => Number(item.game_round) === 2)) fail('Bộ câu hỏi cần có bài hát cho cả hai vòng. Hãy lưu bản mới và phân bài vào từng vòng.');
+    if (quiz.game_type !== 'SONG_CLUE' && (!rounds.some(item => Number(item.game_round) === 1) || !rounds.some(item => Number(item.game_round) === 2))) fail('Bộ câu hỏi cần có bài hát cho cả hai vòng. Hãy lưu bản mới và phân bài vào từng vòng.');
     const hostName = nickname.trim().slice(0, 24);
     if (hostName.length < 2) fail('Tên hiển thị cần ít nhất 2 ký tự.');
     const roomId = id(); const hostToken = token(); let pin = '';
@@ -299,7 +309,9 @@ export async function joinRoom(pin: string, nickname: string, avatarId = 1, clie
   });
 }
 export async function gameCommand(roomId: string, auth: string, action: string, value?: string | number) {
-  return await tx(async () => {
+  const mode = await one('SELECT game_type FROM quizzes JOIN rooms ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', roomId);
+  if (mode?.game_type === 'SONG_CLUE') { await clueCommand(roomId, auth, action, value); return getClueState(roomId, auth); }
+  await tx(async () => {
     await tick(roomId);
     const r = await room(roomId); const index = Number(r.question_index);
     if (['start', 'endBidding', 'showScoreboard', 'nextQuestion', 'skipQuestion', 'endGame', 'pause', 'resume'].includes(action)) {
@@ -346,7 +358,7 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
         if (!(await challengers(r)).includes(String(p.id))) fail('Chưa đến lượt bạn trả lời.');
         const text = String(value ?? '').trim().slice(0, 120);
         if (!text) fail('Nhập đáp án.');
-        const previous = await all('SELECT text,created_at FROM answer_attempts WHERE room_id=? AND question_index=? AND player_id=? ORDER BY created_at DESC,rowid DESC', roomId, index, String(p.id));
+        const previous = await all('SELECT text,correct,created_at FROM answer_attempts WHERE room_id=? AND question_index=? AND player_id=? ORDER BY created_at DESC,rowid DESC', roomId, index, String(p.id));
         if (r.phase === 'ANSWERING' && previous.length > 0) fail('Vòng 2 chỉ được trả lời một lần.');
         if (r.phase === 'OPEN_ANSWERING' && previous.some(attempt => attempt.correct === 1)) fail('Bạn đã trả lời đúng.');
         if (r.phase === 'OPEN_ANSWERING' && previous.length >= 30) fail('Bạn đã dùng hết 30 lần thử cho câu này.');
@@ -364,36 +376,37 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
         }
       } else fail('Thao tác không hợp lệ.');
     }
-    return await getState(roomId, auth);
   });
+  return getState(roomId, auth);
 }
 export async function getState(roomId: string, auth: string) {
-  const current = await room(roomId);
-  if (current.paused_at === null && current.phase_ends_at !== null && Number(current.phase_ends_at) <= now()) {
-    await tx(() => tick(roomId));
-  }
-  let heartbeatPlayerId: string | null = null;
-  const snapshot = await tx(async () => {
-  const r = await room(roomId); const host = r.host_token === auth;
-  // Older rooms may have a host without a player row. Newly created rooms use
-  // the host token for both host controls and that person's one player seat.
-  const me = host ? await one('SELECT * FROM players WHERE room_id=? AND token=?', roomId, auth) ?? null : await player(r, auth);
-  if (me && now() - Number(me.last_seen_at) >= 10000) heartbeatPlayerId = String(me.id);
-  const index = Number(r.question_index); const q = await question(String(r.quiz_id), index);
-  const topic = q.topic_id ? await one('SELECT title,song_count FROM topics WHERE id=?', String(q.topic_id)) : undefined;
-  const currentRound = gameRound(q);
-  const nextQuestion = await one('SELECT game_round FROM questions WHERE quiz_id=? AND order_index=?', String(r.quiz_id), index + 1);
+  const mode = await one('SELECT rooms.*,quizzes.game_type FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', roomId) ?? fail('Không tìm thấy phòng.');
+  if (mode.game_type === 'SONG_CLUE') return getClueState(roomId, auth);
+  if (mode.paused_at === null && mode.phase_ends_at !== null && Number(mode.phase_ends_at) <= now()) await tx(() => tick(roomId));
+  const [rs, ps, qs, ts, bs, ans, scores, versions] = await batchRead([
+    { sql: 'SELECT rooms.*,quizzes.title AS quiz_title FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', args:[roomId] },
+    { sql: 'SELECT *,rowid AS seat FROM players WHERE room_id=? ORDER BY score DESC,joined_at,rowid', args:[roomId] },
+    { sql: 'SELECT questions.* FROM questions JOIN rooms ON rooms.quiz_id=questions.quiz_id WHERE rooms.id=? ORDER BY order_index', args:[roomId] },
+    { sql: 'SELECT topics.* FROM topics JOIN rooms ON rooms.quiz_id=topics.quiz_id WHERE rooms.id=?', args:[roomId] },
+    { sql: 'SELECT player_id,amount,auto_assigned FROM bids WHERE room_id=? AND question_index=(SELECT question_index FROM rooms WHERE id=?) ORDER BY amount,created_at', args:[roomId,roomId] },
+    { sql: 'SELECT player_id,amount,text,correct FROM answer_attempts WHERE room_id=? AND question_index=(SELECT question_index FROM rooms WHERE id=?) ORDER BY created_at,rowid', args:[roomId,roomId] },
+    { sql: 'SELECT player_id,SUM(delta) AS delta FROM score_events WHERE room_id=? AND question_index=(SELECT question_index FROM rooms WHERE id=?) GROUP BY player_id', args:[roomId,roomId] },
+    { sql: 'SELECT COALESCE(MAX(id),0) AS id FROM game_events WHERE room_id=?', args:[roomId] }
+  ]);
+  const r = rs[0]; const host = r.host_token === auth; const me = ps.find(p => p.token === auth) ?? null;
+  if (!host && !me) fail('Phiên người chơi không hợp lệ.');
+  const index = Number(r.question_index); const q = qs[index]; const topic = ts.find(t => t.id === q.topic_id);
+  const currentRound = gameRound(q); const nextQuestion = qs[index + 1];
   const reveal = ['ROUND_RESULT', 'SCOREBOARD', 'GAME_FINISHED'].includes(String(r.phase));
-  const canHear = r.phase === 'OPEN_MEDIA_PLAYING' || (r.phase === 'MEDIA_PLAYING' && (host || (await challengers(r)).includes(String(me?.id))));
+  const bidRows = bs; const answerRows = ans;
+  const challengerIds = currentRound === 1 ? ps.map(p => String(p.id)) : bs.filter(b => b.amount === r.active_bid).map(b => String(b.player_id));
+  const canHear = r.phase === 'OPEN_MEDIA_PLAYING' || (r.phase === 'MEDIA_PLAYING' && (host || challengerIds.includes(String(me?.id))));
   const showBids = !['LOBBY', 'BIDDING'].includes(String(r.phase));
-  const bidRows = await bids(roomId, index);
-  const answerRows = await all('SELECT player_id,amount,text,correct FROM answer_attempts WHERE room_id=? AND question_index=? ORDER BY created_at, rowid', roomId, index);
   const latestAnswer = (playerId: unknown) => answerRows.filter(a => a.player_id === playerId).at(-1);
   const myAnswerRow = me ? latestAnswer(me.id) : undefined;
   const correctRows = answerRows.filter(a => a.correct === 1);
-  const scores = await all('SELECT player_id,COALESCE(SUM(delta),0) AS delta FROM score_events WHERE room_id=? AND question_index=? GROUP BY player_id', roomId, index);
-  const seatOrder = (await all('SELECT id FROM players WHERE room_id=? ORDER BY joined_at,rowid', roomId)).map(p => String(p.id));
-  const players = (await all('SELECT id,nickname,avatar_id,score,last_seen_at FROM players WHERE room_id=? ORDER BY score DESC,joined_at', roomId)).map(p => ({
+  const seatOrder = [...ps].sort((a,b) => Number(a.seat)-Number(b.seat)).map(p => String(p.id));
+  const players = ps.map(p => ({
     id: p.id, nickname: p.nickname, avatarId: p.avatar_id, colorIndex: seatOrder.indexOf(String(p.id)), score: p.score, connected: p.id === me?.id || now() - Number(p.last_seen_at) < 15000,
     bidLocked: bidRows.some(b => b.player_id === p.id),
     bid: showBids ? bidRows.find(b => b.player_id === p.id)?.amount ?? null : undefined,
@@ -413,31 +426,31 @@ export async function getState(roomId: string, auth: string) {
     previousAllWrong: previousGroup.playerIds.every(playerId => previousAttempts.some(attempt => attempt.player_id === playerId)) && previousAttempts.every(a => a.correct !== 1),
     nextBid: Number(r.active_bid)
   } : null;
-  return {
+  const snapshot = {
+    serverNow: now(), gameType: 'MUSIC_BID' as const,
     roomId, pin: r.pin, phase: r.phase, phaseStartedAt: r.phase_started_at, phaseEndsAt: r.phase_ends_at, pausedAt: r.paused_at,
-    questionIndex: index, questionCount: Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=?', String(r.quiz_id)))?.count),
+    questionIndex: index, questionCount: qs.length,
     gameRound: currentRound, nextGameRound: nextQuestion ? Number(nextQuestion.game_round) : null,
-    roundQuestionIndex: Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=? AND game_round=? AND order_index<=?', String(r.quiz_id), currentRound, index))?.count),
-    roundQuestionCount: Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=? AND game_round=?', String(r.quiz_id), currentRound))?.count),
-    quizTitle: (await one('SELECT title FROM quizzes WHERE id=?', String(r.quiz_id)))?.title,
+    roundQuestionIndex: qs.filter(item => gameRound(item) === currentRound && Number(item.order_index) <= index).length,
+    roundQuestionCount: qs.filter(item => gameRound(item) === currentRound).length,
+    quizTitle: r.quiz_title,
     topicName: topic?.title ?? 'Chủ đề chung',
-    topicQuestionIndex: q.topic_id ? Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=? AND topic_id=? AND order_index<=?', String(r.quiz_id), String(q.topic_id), index))?.count) : Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=? AND game_round=? AND order_index<=?', String(r.quiz_id), currentRound, index))?.count),
-    topicQuestionCount: topic?.song_count ?? Number((await one('SELECT COUNT(*) AS count FROM questions WHERE quiz_id=? AND game_round=?', String(r.quiz_id), currentRound))?.count),
+    topicQuestionIndex: q.topic_id ? qs.filter(item => item.topic_id === q.topic_id && Number(item.order_index) <= index).length : qs.filter(item => gameRound(item) === currentRound && Number(item.order_index) <= index).length,
+    topicQuestionCount: topic?.song_count ?? qs.filter(item => gameRound(item) === currentRound).length,
     question: { id: q.id, prompt: q.prompt, type: q.type, revealType: q.reveal_type, revealUnit: q.reveal_unit, revealMin: q.reveal_min, revealMax: q.reveal_max, revealStep: q.reveal_step,
       mediaType: q.media_type, mediaUrl: canHear || reveal ? q.media_url : undefined,
       mediaStart: canHear || reveal ? q.media_start : undefined,
       listenSeconds: q.listen_seconds, answerSeconds: q.answer_seconds, primaryAnswer: reveal ? q.primary_answer : undefined, artist: reveal ? q.artist : undefined, hint: q.hint, resultStart: reveal ? q.result_start : undefined, resultSeconds: reveal ? q.result_seconds : undefined },
-    activeBid: r.active_bid, activeChallengerIds: (currentRound === 1 && r.phase !== 'LOBBY') || r.active_bid !== null ? await challengers(r) : [],
+    activeBid: r.active_bid, activeChallengerIds: (currentRound === 1 && r.phase !== 'LOBBY') || r.active_bid !== null ? challengerIds : [],
     turnNotice,
     players, me: me ? { id: me.id, nickname: me.nickname } : null, isHost: host,
     myBid: me ? bidRows.find(b => b.player_id === me.id)?.amount ?? null : null,
     myAnswer: myAnswerRow?.text ?? null,
     myAnswerCorrect: myAnswerRow ? myAnswerRow.correct === 1 : null,
     myAttemptCount: me ? answerRows.filter(a => a.player_id === me.id).length : 0,
-    lastEventId: (await one('SELECT MAX(id) AS id FROM game_events WHERE room_id=?', roomId))?.id ?? 0
+    lastEventId: versions[0].id
   };
-  }, 'read');
-  if (heartbeatPlayerId) await run('UPDATE players SET last_seen_at=? WHERE id=? AND last_seen_at<?', now(), heartbeatPlayerId, now() - 10000);
+  if (me && now() - Number(me.last_seen_at) >= 10000) await tx(() => run('UPDATE players SET last_seen_at=? WHERE id=? AND last_seen_at<?', now(), String(me.id), now() - 10000));
   return snapshot;
 }
 export async function eventVersion(roomId: string) { return Number((await one('SELECT MAX(id) AS id FROM game_events WHERE room_id=?', roomId))?.id ?? 0); }

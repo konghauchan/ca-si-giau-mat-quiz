@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { CLUE_CATEGORIES } from '@/lib/clueRules';
 import { deleteQuiz, getQuiz, listQuizzes, saveQuiz, setQuizVisibility } from '@/lib/game';
 export const runtime = 'nodejs';
 
 const question = z.object({
-  prompt: z.string().min(1).max(300), gameRound: z.union([z.literal(1), z.literal(2)]), topicKey: z.string().min(1).max(80), listenSeconds: z.number().int().min(1).max(10), answerSeconds: z.number().int().min(5).max(60).default(12), mediaType: z.enum(['youtube', 'uploaded_audio']), mediaUrl: z.string().min(1), mediaStart: z.number().min(0), resultStart: z.number().min(0).max(36000).nullable().optional(), resultSeconds: z.number().int().min(1).max(60).nullable().optional(),
+  clues: z.array(z.object({ id: z.string().min(1).max(80), text: z.string().min(1).max(500), score: z.number().int().min(1).max(10000), category: z.enum(CLUE_CATEGORIES) })).length(5).optional(),
+  prompt: z.string().min(1).max(300), gameRound: z.union([z.literal(1), z.literal(2)]), topicKey: z.string().min(1).max(80), listenSeconds: z.number().int().min(1).max(60), answerSeconds: z.number().int().min(5).max(60).default(12), mediaType: z.enum(['youtube', 'uploaded_audio']), mediaUrl: z.string(), mediaStart: z.number().min(0), resultStart: z.number().min(0).max(36000).nullable().optional(), resultSeconds: z.number().int().min(1).max(60).nullable().optional(),
   primaryAnswer: z.string().min(1).max(120), acceptedAnswers: z.array(z.string().max(120)).max(20),
   artist: z.string().max(120), hint: z.string().max(200), revealMin: z.number().int().min(1).max(30),
   revealMax: z.number().int().min(1).max(30), revealStep: z.number().int().min(1).max(30)
 });
 const topic = z.object({ key: z.string().min(1).max(80), gameRound: z.union([z.literal(1), z.literal(2)]), title: z.string().min(1).max(80), songCount: z.number().int().min(1).max(30) });
-const quiz = z.object({ id: z.string().uuid().optional(), ownerToken: z.string().optional(), coverSourceId: z.string().uuid().optional(), coverSourceToken: z.string().optional(), title: z.string().min(1).max(100), description: z.string().max(500), visibility: z.enum(['private', 'unlisted', 'public']), topics: z.array(topic).min(2).max(30), questions: z.array(question).min(2).max(30) });
+const quiz = z.object({ id: z.string().uuid().optional(), ownerToken: z.string().optional(), coverSourceId: z.string().uuid().optional(), coverSourceToken: z.string().optional(), gameType: z.enum(['MUSIC_BID','SONG_CLUE']).default('MUSIC_BID'), title: z.string().min(1).max(100), description: z.string().max(500), visibility: z.enum(['private', 'unlisted', 'public']), topics: z.array(topic).min(1).max(30), questions: z.array(question).min(1).max(30) });
 export async function GET(req: NextRequest) {
   try {
     const id = req.nextUrl.searchParams.get('id'); const auth = req.headers.get('x-quiz-token') || undefined;

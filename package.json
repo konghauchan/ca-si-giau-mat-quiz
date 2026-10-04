@@ -15,7 +15,11 @@
     "seed": "node scripts/seed.mjs",
     "smoke": "node tests/smoke.mjs",
     "media-smoke": "node tests/media-smoke.mjs",
-    "migrate-quizzes": "node scripts/migrate-quizzes.mjs"
+    "migrate-quizzes": "node scripts/migrate-quizzes.mjs",
+    "clue-smoke": "node tests/clue-smoke.mjs",
+    "seed-clue": "node scripts/seed-clue.mjs",
+    "performance": "node scripts/performance.mjs",
+    "clue-online-smoke": "node tests/clue-online-smoke.mjs"
   },
   "dependencies": {
     "@fontsource/be-vietnam-pro": "^5.3.0",

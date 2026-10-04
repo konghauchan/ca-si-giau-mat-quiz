@@ -23,6 +23,7 @@ export default function JoinPage() {
       }
       if (!result) throw new Error('Không thể kết nối phòng lúc này. Hãy thử lại.');
       localStorage.setItem(`player:${result.roomId}`, result.playerToken);
+      sessionStorage.setItem(`player:${result.roomId}`, result.playerToken);
       sessionStorage.removeItem(requestKey);
       router.push(`/play/${result.roomId}`);
     } catch (error) {
