@@ -59,10 +59,10 @@ export async function run(sql: string, ...args: Args): Promise<void> {
   await execute(sql, args);
 }
 
-export async function tx<T>(action: () => Promise<T>): Promise<T> {
+export async function tx<T>(action: () => Promise<T>, mode: 'read' | 'write' = 'write'): Promise<T> {
   if (transactionContext.getStore()) return action();
   const connection = await db();
-  const transaction = await connection.transaction('write');
+  const transaction = await connection.transaction(mode);
   try {
     const result = await transactionContext.run(transaction, action);
     await transaction.commit();

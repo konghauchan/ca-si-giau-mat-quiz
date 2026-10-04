@@ -28,30 +28,18 @@ export function GameRoom({ kind }: { kind: 'host' | 'player' }) {
   const token = gameToken(roomId, kind);
   const refresh = useCallback(async () => {
     if (!token) { setError('Không tìm thấy phiên chơi trên trình duyệt này. Hãy vào phòng lại.'); return; }
-    try { const result = await api<GameState>(`/api/state?roomId=${roomId}`, { token }); setState(result); setError(''); }
-    catch (e) { setError((e as Error).message); }
+    try { const result = await api<GameState>(`/api/state?roomId=${roomId}`, { token, signal: AbortSignal.timeout(12000) }); setState(result); setError(''); }
+    catch (e) { setError(e instanceof DOMException ? 'Kết nối phòng chậm. Hệ thống đang thử lại…' : (e as Error).message); }
   }, [roomId, token]);
   useEffect(() => {
-    let active = true; const abort = new AbortController();
-    async function stream() {
-      while (active && token) {
-        try {
-          const response = await fetch(`/api/events?roomId=${roomId}`, { headers: { 'x-game-token': token }, signal: abort.signal, cache: 'no-store' });
-          if (!response.ok || !response.body) throw new Error('Stream unavailable');
-          const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = '';
-          while (active) {
-            const { done, value } = await reader.read(); if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const chunks = buffer.split('\n\n'); buffer = chunks.pop() || '';
-            if (chunks.some(chunk => chunk.startsWith('data:'))) await refresh();
-          }
-        } catch { /* Fallback poll below handles disconnected streams. */ }
-        if (active) await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-    refresh(); stream(); const fallback = setInterval(refresh, 1500);
-    return () => { active = false; abort.abort(); clearInterval(fallback); };
-  }, [refresh, roomId, token]);
+    let active = true; let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      await refresh();
+      if (active) timer = setTimeout(poll, 2500);
+    };
+    void poll();
+    return () => { active = false; clearTimeout(timer); };
+  }, [refresh]);
   useEffect(() => { setSelectedBid(null); setAnswer(''); }, [state?.questionIndex]);
   async function command(action: string, value?: string | number) {
     if (!token) return;

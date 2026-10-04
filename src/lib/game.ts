@@ -270,15 +270,29 @@ export async function createRoom(quizId: string, ownerToken: string, nickname: s
     return { roomId, pin, hostToken, hostPlayerId };
   });
 }
-export async function joinRoom(pin: string, nickname: string, avatarId = 1) {
+export async function joinRoom(pin: string, nickname: string, avatarId = 1, clientToken?: string) {
+  const name = nickname.trim().slice(0, 24);
+  if (name.length < 2) fail('Tên hiển thị cần ít nhất 2 ký tự.');
+  if (clientToken) {
+    const existing = await one('SELECT rooms.id AS room_id,players.id AS player_id,players.token,players.nickname FROM players JOIN rooms ON rooms.id=players.room_id WHERE rooms.pin=? AND players.token=?', pin, clientToken);
+    if (existing) {
+      if (String(existing.nickname).toLowerCase() !== name.toLowerCase()) fail('Phiên tham gia đã được dùng với tên khác.');
+      return { roomId: existing.room_id, playerId: existing.player_id, playerToken: existing.token };
+    }
+  }
   return await tx(async () => {
     const r = await one('SELECT * FROM rooms WHERE pin=?', pin) ?? fail('Mã phòng không đúng.');
+    if (clientToken) {
+      const existing = await one('SELECT id,token,nickname FROM players WHERE room_id=? AND token=?', String(r.id), clientToken);
+      if (existing) {
+        if (String(existing.nickname).toLowerCase() !== name.toLowerCase()) fail('Phiên tham gia đã được dùng với tên khác.');
+        return { roomId: r.id, playerId: existing.id, playerToken: existing.token };
+      }
+    }
     if (r.phase !== 'LOBBY') fail('Trò chơi đã bắt đầu.');
-    const name = nickname.trim().slice(0, 24);
-    if (name.length < 2) fail('Tên hiển thị cần ít nhất 2 ký tự.');
     if (Number((await one('SELECT COUNT(*) AS count FROM players WHERE room_id=?', String(r.id)))?.count) >= 4) fail('Phòng đã đủ 4 người.');
     if (await one('SELECT 1 FROM players WHERE room_id=? AND lower(nickname)=lower(?)', String(r.id), name)) fail('Tên hiển thị đã được dùng.');
-    const playerId = id(); const playerToken = token();
+    const playerId = id(); const playerToken = clientToken || token();
     await run('INSERT INTO players(id,room_id,token,nickname,avatar_id,score,joined_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?)', playerId, String(r.id), playerToken, name, avatarId, 0, now(), now());
     await event(String(r.id), 'PLAYER_JOINED', { playerId, nickname: name });
     return { roomId: r.id, playerId, playerToken };
@@ -354,13 +368,17 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
   });
 }
 export async function getState(roomId: string, auth: string) {
-  return tx(async () => {
-  await tick(roomId);
+  const current = await room(roomId);
+  if (current.paused_at === null && current.phase_ends_at !== null && Number(current.phase_ends_at) <= now()) {
+    await tx(() => tick(roomId));
+  }
+  let heartbeatPlayerId: string | null = null;
+  const snapshot = await tx(async () => {
   const r = await room(roomId); const host = r.host_token === auth;
   // Older rooms may have a host without a player row. Newly created rooms use
   // the host token for both host controls and that person's one player seat.
   const me = host ? await one('SELECT * FROM players WHERE room_id=? AND token=?', roomId, auth) ?? null : await player(r, auth);
-  if (me) await run('UPDATE players SET last_seen_at=? WHERE id=?', now(), String(me.id));
+  if (me && now() - Number(me.last_seen_at) >= 10000) heartbeatPlayerId = String(me.id);
   const index = Number(r.question_index); const q = await question(String(r.quiz_id), index);
   const topic = q.topic_id ? await one('SELECT title,song_count FROM topics WHERE id=?', String(q.topic_id)) : undefined;
   const currentRound = gameRound(q);
@@ -376,7 +394,7 @@ export async function getState(roomId: string, auth: string) {
   const scores = await all('SELECT player_id,COALESCE(SUM(delta),0) AS delta FROM score_events WHERE room_id=? AND question_index=? GROUP BY player_id', roomId, index);
   const seatOrder = (await all('SELECT id FROM players WHERE room_id=? ORDER BY joined_at,rowid', roomId)).map(p => String(p.id));
   const players = (await all('SELECT id,nickname,avatar_id,score,last_seen_at FROM players WHERE room_id=? ORDER BY score DESC,joined_at', roomId)).map(p => ({
-    id: p.id, nickname: p.nickname, avatarId: p.avatar_id, colorIndex: seatOrder.indexOf(String(p.id)), score: p.score, connected: now() - Number(p.last_seen_at) < 15000,
+    id: p.id, nickname: p.nickname, avatarId: p.avatar_id, colorIndex: seatOrder.indexOf(String(p.id)), score: p.score, connected: p.id === me?.id || now() - Number(p.last_seen_at) < 15000,
     bidLocked: bidRows.some(b => b.player_id === p.id),
     bid: showBids ? bidRows.find(b => b.player_id === p.id)?.amount ?? null : undefined,
     autoBid: showBids ? !!bidRows.find(b => b.player_id === p.id)?.auto_assigned : undefined,
@@ -418,6 +436,8 @@ export async function getState(roomId: string, auth: string) {
     myAttemptCount: me ? answerRows.filter(a => a.player_id === me.id).length : 0,
     lastEventId: (await one('SELECT MAX(id) AS id FROM game_events WHERE room_id=?', roomId))?.id ?? 0
   };
-  });
+  }, 'read');
+  if (heartbeatPlayerId) await run('UPDATE players SET last_seen_at=? WHERE id=? AND last_seen_at<?', now(), heartbeatPlayerId, now() - 10000);
+  return snapshot;
 }
 export async function eventVersion(roomId: string) { return Number((await one('SELECT MAX(id) AS id FROM game_events WHERE room_id=?', roomId))?.id ?? 0); }

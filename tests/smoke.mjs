@@ -27,7 +27,11 @@ assert.equal((await call('/api/quiz')).some(item => item.id === quiz.id), false)
 const sharedRoom = await call('/api/room', { action: 'create', quizId: quiz.id, nickname: 'Anonymous' });
 assert.equal((await state(sharedRoom.roomId, sharedRoom.hostToken)).players.length, 1);
 const room = await call('/api/room', { action: 'create', quizId: quiz.id, ownerToken: quiz.ownerToken, nickname: 'Hosty', avatarId: 17 });
-const a = await call('/api/room', { action: 'join', pin: room.pin, nickname: 'Alpha', avatarId: 2 });
+const joinToken = crypto.randomUUID();
+const a = await call('/api/room', { action: 'join', pin: room.pin, nickname: 'Alpha', avatarId: 2, clientToken: joinToken });
+const retriedA = await call('/api/room', { action: 'join', pin: room.pin, nickname: 'Alpha', avatarId: 2, clientToken: joinToken });
+assert.equal(retriedA.playerId, a.playerId);
+assert.equal(retriedA.playerToken, a.playerToken);
 const b = await call('/api/room', { action: 'join', pin: room.pin, nickname: 'Beta', avatarId: 11 });
 const c = await call('/api/room', { action: 'join', pin: room.pin, nickname: 'Gamma', avatarId: 20 });
 const lobby = await state(room.roomId, room.hostToken);
@@ -185,4 +189,4 @@ assert.notEqual(revised.id, quiz.id);
 assert.equal((await call(`/api/quiz?id=${quiz.id}`)).id, revised.id);
 const redirectedRoom = await call('/api/room', { action: 'create', quizId: quiz.id, nickname: 'LinkVisitor' });
 assert.equal((await state(redirectedRoom.roomId, redirectedRoom.hostToken)).quizTitle, 'Updated shared quiz');
-console.log('Smoke test passed: private sharing, anonymous room creation, stable links after edits, four-player play, and repeated guesses.');
+console.log('Smoke test passed: private sharing, idempotent joining, stable links after edits, four-player play, and repeated guesses.');

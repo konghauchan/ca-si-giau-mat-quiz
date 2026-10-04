@@ -1,9 +1,10 @@
-export async function api<T>(path: string, options: { method?: string; body?: unknown; token?: string } = {}): Promise<T> {
+export async function api<T>(path: string, options: { method?: string; body?: unknown; token?: string; signal?: AbortSignal } = {}): Promise<T> {
   const response = await fetch(path, {
     method: options.method || 'GET',
     headers: { 'Content-Type': 'application/json', ...(options.token ? { 'x-game-token': options.token, 'x-quiz-token': options.token } : {}) },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    cache: 'no-store'
+    cache: 'no-store',
+    signal: options.signal
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Có lỗi xảy ra.');
