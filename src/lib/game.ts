@@ -10,10 +10,10 @@ type Row = Record<string, unknown>;
 const now = () => Date.now();
 const id = () => crypto.randomUUID();
 const token = () => crypto.randomBytes(24).toString('hex');
-const RESULT_MS = 4000;
-const resultDuration = (q: Row) => q.media_type === 'youtube' ? Math.max(RESULT_MS, (Number(q.result_seconds ?? 4) + 6) * 1000) : RESULT_MS;
-const SCOREBOARD_MS = 4000;
-const TURN_TRANSITION_MS = 3000;
+const RESULT_MS = 3000;
+const resultDuration = (q: Row) => q.media_type === 'youtube' ? Math.max(6000, (Number(q.result_seconds ?? 4) + 3) * 1000) : RESULT_MS;
+const SCOREBOARD_MS = 3000;
+const TURN_TRANSITION_MS = 2000;
 function fail(message: string): never { throw new Error(message); }
 async function event(roomId: string, type: string, payload: Row = {}) { await run('INSERT INTO game_events(room_id,type,payload,created_at) VALUES(?,?,?,?)', roomId, type, JSON.stringify(payload), now()); }
 async function room(roomId: string): Promise<Row> { return await one('SELECT * FROM rooms WHERE id=?', roomId) ?? fail('Không tìm thấy phòng.'); }
@@ -45,13 +45,13 @@ async function challengers(r: Row): Promise<string[]> {
 async function startQuestion(r: Row, index: number) {
   const q = await question(String(r.quiz_id), index);
   const previous = index > 0 ? await question(String(r.quiz_id), index - 1) : undefined;
-  if (!previous || previous.topic_id !== q.topic_id || gameRound(previous) !== gameRound(q)) await setPhase(String(r.id), 'TOPIC_INTRO', 3000);
+  if (!previous || previous.topic_id !== q.topic_id || gameRound(previous) !== gameRound(q)) await setPhase(String(r.id), 'TOPIC_INTRO', 2000);
   else await beginQuestion(r, q);
   await event(String(r.id), 'QUESTION_CHANGED', { index, gameRound: gameRound(q) });
 }
 async function beginQuestion(r: Row, q: Row) {
   if (gameRound(q) === 1) await setPhase(String(r.id), 'OPEN_MEDIA_PLAYING', (Number(q.listen_seconds) + 5) * 1000);
-  else await setPhase(String(r.id), 'BIDDING', 30000);
+  else await setPhase(String(r.id), 'BIDDING', Number(q.bid_seconds ?? 30) * 1000);
 }
 async function finishBidding(r: Row) {
   const q = await question(String(r.quiz_id), Number(r.question_index));
@@ -60,7 +60,7 @@ async function finishBidding(r: Row) {
       await run('INSERT INTO bids VALUES(?,?,?,?,?,?)', String(r.id), Number(r.question_index), String(p.id), Number(q.reveal_max), 1, now());
     }
   }
-  await setPhase(String(r.id), 'BID_REVEAL', 3000);
+  await setPhase(String(r.id), 'BID_REVEAL', 2000);
   await event(String(r.id), 'BIDDING_ENDED');
 }
 async function startNextGroup(r: Row, announce = false) {
@@ -145,7 +145,7 @@ async function tick(roomId: string) {
   }
 }
 
-export type QuestionInput = { prompt: string; gameRound: 1 | 2; topicKey: string; listenSeconds: number; answerSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number; clues?: Clue[] };
+export type QuestionInput = { prompt: string; gameRound: 1 | 2; topicKey: string; listenSeconds: number; answerSeconds: number; bidSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number; clues?: Clue[] };
 export type TopicInput = { key: string; gameRound: 1 | 2; title: string; songCount: number };
 export async function saveQuiz(input: { id?: string; coverSourceId?: string; title: string; description: string; visibility: string; gameType?: 'MUSIC_BID' | 'SONG_CLUE'; topics: TopicInput[]; questions: QuestionInput[] }, userId: string) {
   return await tx(async () => {
@@ -181,6 +181,7 @@ export async function saveQuiz(input: { id?: string; coverSourceId?: string; tit
         continue;
       }
       if (q.gameRound === 2 && !q.hint.trim()) fail('Câu ở vòng 2 cần có gợi ý trước khi đấu giá.');
+      if (q.gameRound === 2 && (!Number.isInteger(q.bidSeconds) || q.bidSeconds < 5 || q.bidSeconds > 90)) fail('Thời gian đọc gợi ý và đấu giá phải từ 5 đến 90 giây.');
       if (![1, 2].includes(q.gameRound)) fail('Vòng chơi không hợp lệ.');
       if (!Number.isInteger(q.listenSeconds) || q.listenSeconds < 1 || q.listenSeconds > 10) fail('Thời lượng nghe vòng 1 phải từ 1 đến 10 giây.');
       if (!Number.isInteger(q.answerSeconds) || q.answerSeconds < 5 || q.answerSeconds > 60) fail('Thời gian trả lời phải từ 5 đến 60 giây.');
@@ -214,7 +215,7 @@ export async function saveQuiz(input: { id?: string; coverSourceId?: string; tit
     const sorted = [1, 2].flatMap(round => input.topics.filter(topic => topic.gameRound === round).flatMap(topic => input.questions.filter(q => q.topicKey === topic.key)));
     for (const [index, q] of sorted.entries()) {
       const questionId = id();
-      await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds,clues_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, clueMode ? 'song_clue' : 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null, JSON.stringify(q.clues || []));
+      await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,bid_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds,clues_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, clueMode ? 'song_clue' : 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.bidSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null, JSON.stringify(q.clues || []));
       for (const answer of new Set(q.acceptedAnswers.map(x => x.trim()).filter(Boolean))) await run('INSERT OR IGNORE INTO accepted_answers VALUES(?,?)', questionId, answer);
     }
     return { id: quizId, replacedId };
@@ -445,7 +446,7 @@ export async function getState(roomId: string, auth: string) {
     question: { id: q.id, prompt: q.prompt, type: q.type, revealType: q.reveal_type, revealUnit: q.reveal_unit, revealMin: q.reveal_min, revealMax: q.reveal_max, revealStep: q.reveal_step,
       mediaType: q.media_type, mediaUrl: canHear || reveal ? q.media_url : undefined,
       mediaStart: canHear || reveal ? q.media_start : undefined,
-      listenSeconds: q.listen_seconds, answerSeconds: q.answer_seconds, primaryAnswer: reveal ? q.primary_answer : undefined, artist: reveal ? q.artist : undefined, hint: q.hint, resultStart: reveal ? q.result_start : undefined, resultSeconds: reveal ? q.result_seconds : undefined },
+      listenSeconds: q.listen_seconds, answerSeconds: q.answer_seconds, bidSeconds: q.bid_seconds, primaryAnswer: reveal ? q.primary_answer : undefined, artist: reveal ? q.artist : undefined, hint: q.hint, resultStart: reveal ? q.result_start : undefined, resultSeconds: reveal ? q.result_seconds : undefined },
     activeBid: r.active_bid, activeChallengerIds: (currentRound === 1 && r.phase !== 'LOBBY') || r.active_bid !== null ? challengerIds : [],
     turnNotice,
     players, me: me ? { id: me.id, nickname: me.nickname } : null, isHost: host,

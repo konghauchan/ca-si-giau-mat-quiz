@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS questions (
   reveal_step INTEGER NOT NULL DEFAULT 1, media_type TEXT NOT NULL DEFAULT 'youtube',
   media_url TEXT NOT NULL, media_start REAL NOT NULL DEFAULT 0,
   game_round INTEGER NOT NULL DEFAULT 2, listen_seconds INTEGER NOT NULL DEFAULT 5,
-  answer_seconds INTEGER NOT NULL DEFAULT 12,
+  answer_seconds INTEGER NOT NULL DEFAULT 12, bid_seconds INTEGER NOT NULL DEFAULT 30,
   primary_answer TEXT NOT NULL, artist TEXT NOT NULL DEFAULT '', hint TEXT NOT NULL DEFAULT '',
   topic_id TEXT REFERENCES topics(id), result_start REAL, result_seconds INTEGER,
   UNIQUE(quiz_id, order_index)

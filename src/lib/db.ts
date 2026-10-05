@@ -19,7 +19,7 @@ async function initialize(): Promise<Client> {
     try {
       // A deployed function should not run DDL on every cold start. Check the
       // columns it needs with one read, and migrate only an older database.
-      await client.execute(`SELECT q.deleted_at,q.replacement_id,q.cover_url,q.game_type,q.owner_user_id,s.clues_json,s.game_round,s.listen_seconds,s.answer_seconds,s.topic_id,s.result_start,s.result_seconds,r.paused_at,r.clue_state,p.ready,p.avatar_id,a.id,u.id,us.token_hash
+      await client.execute(`SELECT q.deleted_at,q.replacement_id,q.cover_url,q.game_type,q.owner_user_id,s.clues_json,s.game_round,s.listen_seconds,s.answer_seconds,s.bid_seconds,s.topic_id,s.result_start,s.result_seconds,r.paused_at,r.clue_state,p.ready,p.avatar_id,a.id,u.id,us.token_hash
         FROM quizzes q,questions s,rooms r,players p,answer_attempts a,users u,user_sessions us LIMIT 0`);
       return client;
     } catch (error) {
@@ -48,6 +48,7 @@ async function initialize(): Promise<Client> {
     await addColumn('questions', 'game_round', 'INTEGER NOT NULL DEFAULT 2');
     await addColumn('questions', 'listen_seconds', 'INTEGER NOT NULL DEFAULT 5');
     await addColumn('questions', 'answer_seconds', 'INTEGER NOT NULL DEFAULT 12');
+    await addColumn('questions', 'bid_seconds', 'INTEGER NOT NULL DEFAULT 30');
     await addColumn('questions', 'topic_id', 'TEXT REFERENCES topics(id)');
     await addColumn('questions', 'result_start', 'REAL');
     await addColumn('questions', 'result_seconds', 'INTEGER');

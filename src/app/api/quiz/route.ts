@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 const question = z.object({
   clues: z.array(z.object({ id: z.string().min(1).max(80), text: z.string().min(1).max(500), score: z.number().int().min(1).max(10000), category: z.enum(CLUE_CATEGORIES) })).length(5).optional(),
-  prompt: z.string().min(1).max(300), gameRound: z.union([z.literal(1), z.literal(2)]), topicKey: z.string().min(1).max(80), listenSeconds: z.number().int().min(1).max(60), answerSeconds: z.number().int().min(5).max(60).default(12), mediaType: z.enum(['youtube', 'uploaded_audio']), mediaUrl: z.string(), mediaStart: z.number().min(0), resultStart: z.number().min(0).max(36000).nullable().optional(), resultSeconds: z.number().int().min(1).max(60).nullable().optional(),
+  prompt: z.string().min(1).max(300), gameRound: z.union([z.literal(1), z.literal(2)]), topicKey: z.string().min(1).max(80), listenSeconds: z.number().int().min(1).max(60), answerSeconds: z.number().int().min(5).max(60).default(12), bidSeconds: z.number().int().min(5).max(90).default(30), mediaType: z.enum(['youtube', 'uploaded_audio']), mediaUrl: z.string(), mediaStart: z.number().min(0), resultStart: z.number().min(0).max(36000).nullable().optional(), resultSeconds: z.number().int().min(1).max(60).nullable().optional(),
   primaryAnswer: z.string().min(1).max(120), acceptedAnswers: z.array(z.string().max(120)).max(20),
   artist: z.string().max(120), hint: z.string().max(200), revealMin: z.number().int().min(1).max(30),
   revealMax: z.number().int().min(1).max(30), revealStep: z.number().int().min(1).max(30)
