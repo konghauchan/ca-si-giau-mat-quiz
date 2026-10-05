@@ -1,3 +1,6 @@
+export class ApiError extends Error {
+  constructor(message: string, public issues?: Array<{ path: Array<string | number>; message: string }>) { super(message); }
+}
 export async function api<T>(path: string, options: { method?: string; body?: unknown; token?: string; signal?: AbortSignal } = {}): Promise<T> {
   const response = await fetch(path, {
     method: options.method || 'GET',
@@ -7,7 +10,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
     signal: options.signal
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Có lỗi xảy ra.');
+  if (!response.ok) throw new ApiError(data.error || 'Có lỗi xảy ra.', data.issues);
   return data as T;
 }
 export function quizToken(id: string) { return typeof window === 'undefined' ? '' : localStorage.getItem(`quiz:${id}`) || ''; }
