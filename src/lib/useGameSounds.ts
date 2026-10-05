@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-type Cue = 'submit' | 'correct' | 'wrong' | 'score' | 'rank';
+type Cue = 'submit' | 'correct' | 'wrong' | 'score' | 'rank' | 'clock' | 'tick' | 'finalTick' | 'transition' | 'reveal';
 const patterns: Record<Cue, Array<[number, number, number, number]>> = {
-  submit: [[520, 0, .07, .018], [690, .08, .09, .016]],
-  correct: [[523, 0, .13, .027], [659, .1, .13, .027], [784, .21, .24, .032]],
-  wrong: [[330, 0, .13, .018], [247, .12, .22, .02]],
-  score: [[440, 0, .07, .012], [554, .08, .07, .014], [659, .16, .07, .016], [880, .24, .2, .022]],
-  rank: [[392, 0, .12, .017], [523, .12, .12, .019], [659, .24, .12, .021], [784, .36, .28, .024]],
+  submit: [[520, 0, .07, .024], [690, .08, .09, .022]],
+  correct: [[523, 0, .13, .037], [659, .1, .13, .037], [784, .21, .25, .043], [1047, .28, .2, .027]],
+  wrong: [[370, 0, .12, .03], [294, .12, .16, .032], [220, .27, .22, .025]],
+  score: [[440, 0, .07, .025], [554, .08, .07, .027], [659, .16, .07, .03], [880, .24, .25, .038]],
+  rank: [[392, 0, .12, .026], [523, .12, .12, .03], [659, .24, .12, .032], [784, .36, .28, .038]],
+  clock: [[460, 0, .055, .012]],
+  tick: [[740, 0, .065, .022]],
+  finalTick: [[1047, 0, .19, .037], [784, .11, .16, .018]],
+  transition: [[392, 0, .08, .018], [587, .1, .11, .024]],
+  reveal: [[440, 0, .08, .024], [659, .09, .11, .028], [880, .2, .16, .032]],
 };
 
 export function useGameSounds() {
@@ -31,11 +36,11 @@ export function useGameSounds() {
       const audio = context.current ?? new AudioContext();
       context.current = audio;
       if (audio.state === 'suspended') void audio.resume();
-      const start = audio.currentTime + .01;
+      const start = audio.currentTime + (cue === 'score' ? .48 : .01);
       for (const [frequency, delay, duration, volume] of patterns[cue]) {
         const oscillator = audio.createOscillator();
         const gain = audio.createGain();
-        oscillator.type = cue === 'wrong' ? 'triangle' : 'sine';
+        oscillator.type = cue === 'wrong' ? 'triangle' : cue === 'clock' || cue === 'tick' || cue === 'finalTick' ? 'square' : 'sine';
         oscillator.frequency.setValueAtTime(frequency, start + delay);
         gain.gain.setValueAtTime(.0001, start + delay);
         gain.gain.exponentialRampToValueAtTime(volume, start + delay + .015);
