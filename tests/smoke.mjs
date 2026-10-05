@@ -155,7 +155,7 @@ const hostWrong = await state(room.roomId, room.hostToken);
 assert.equal(hostWrong.myAnswerCorrect, false);
 assert.equal((await state(room.roomId, a.playerToken)).myAnswerCorrect, null);
 assert.equal(hostWrong.players.find(p => p.nickname === 'Hosty').correct, undefined);
-await assert.rejects(command(room.roomId, room.hostToken, 'answer', 'Sai lần hai'), /Vòng 2 chỉ được trả lời một lần/);
+await assert.rejects(command(room.roomId, room.hostToken, 'answer', 'Sai lần hai'), /Luật đấu giá chỉ cho trả lời một lần/);
 await command(room.roomId, a.playerToken, 'answer', 'Sai 1');
 assert.equal((await state(room.roomId, a.playerToken)).myAttemptCount, 1);
 const second = await state(room.roomId, b.playerToken);
@@ -202,7 +202,7 @@ assert.equal((await state(tiedRoom.roomId, tiedA.playerToken)).activeChallengerI
 await sleep(7200);
 assert.equal((await state(tiedRoom.roomId, tiedA.playerToken)).phase, 'ANSWERING');
 await command(tiedRoom.roomId, tiedRoom.hostToken, 'answer', 'Sai trước');
-await assert.rejects(command(tiedRoom.roomId, tiedRoom.hostToken, 'answer', 'chung ta cua hien tai'), /Vòng 2 chỉ được trả lời một lần/);
+await assert.rejects(command(tiedRoom.roomId, tiedRoom.hostToken, 'answer', 'chung ta cua hien tai'), /Luật đấu giá chỉ cho trả lời một lần/);
 await command(tiedRoom.roomId, tiedA.playerToken, 'answer', 'Chúng Ta Của Hiện Tại');
 await command(tiedRoom.roomId, tiedB.playerToken, 'answer', 'chung ta cua hien tai');
 const tiedResult = await state(tiedRoom.roomId, tiedRoom.hostToken);
