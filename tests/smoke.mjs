@@ -19,6 +19,27 @@ const quiz = await call('/api/quiz', { title: `Smoke ${Date.now()}`, description
 const invalidSave = await fetch(`${base}/api/quiz`, { method: 'POST', headers: { 'content-type': 'application/json', origin: base, cookie: accountCookie }, body: JSON.stringify({ title: 'Invalid timer', description: '', visibility: 'private', topics: [{ key: 'open', gameRound: 1, title: 'Mở màn', songCount: 1 }, { key: 'bid', gameRound: 2, title: 'Đấu giá', songCount: 1 }], questions: [{ ...openingQuestion, answerSeconds: 3 }, bidQuestion] }) });
 assert.equal(invalidSave.status, 400);
 assert.deepEqual((await invalidSave.json()).issues[0].path, ['questions', 0, 'answerSeconds']);
+const largeQuestions = Array.from({ length: 60 }, (_, index) => ({
+  ...(index === 59 ? bidQuestion : openingQuestion),
+  mediaUrl: `https://www.youtube.com/watch?v=Q${String(index).padStart(10, '0')}`,
+  primaryAnswer: `Bài thử giới hạn ${index + 1}`
+}));
+const largeQuizPayload = {
+  title: `Smoke 60 songs ${Date.now()}`,
+  description: 'Kiểm tra giới hạn 60 bài',
+  visibility: 'private',
+  topics: [{ key: 'open', gameRound: 1, title: 'Mở màn', songCount: 59 }, { key: 'bid', gameRound: 2, title: 'Đấu giá', songCount: 1 }],
+  questions: largeQuestions
+};
+const largeQuiz = await call('/api/quiz', largeQuizPayload, '', undefined, true);
+assert.equal((await call(`/api/quiz?id=${largeQuiz.id}`, null, '', undefined, true)).questions.length, 60);
+const tooLarge = await fetch(`${base}/api/quiz`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', origin: base, cookie: accountCookie },
+  body: JSON.stringify({ ...largeQuizPayload, topics: [{ ...largeQuizPayload.topics[0], songCount: 60 }, largeQuizPayload.topics[1]], questions: [...largeQuestions.slice(0, 59), { ...openingQuestion, topicKey: 'open', mediaUrl: 'https://www.youtube.com/watch?v=Q0000000060', primaryAnswer: 'Bài thử giới hạn 61' }, largeQuestions[59]] })
+});
+assert.equal(tooLarge.status, 400);
+assert.deepEqual((await tooLarge.json()).issues[0].path, ['questions']);
 assert.equal((await call(`/api/quiz?id=${quiz.id}`, null, '', undefined, true)).questions[1].bid_seconds, 8);
 await assert.rejects(call(`/api/quiz?id=${quiz.id}`), /chưa được chia sẻ/);
 await assert.rejects(call('/api/room', { action: 'create', quizId: quiz.id, nickname: 'Anonymous' }), /riêng tư/);

@@ -36,7 +36,7 @@ export const topicSchema = z.object({
   key: z.string().min(1).max(80),
   gameRound: z.union([z.literal(1), z.literal(2)]),
   title: z.string().min(1).max(80),
-  songCount: z.number().int().min(1).max(30)
+  songCount: z.number().int().min(1).max(60)
 });
 
 export const quizSchema = z.object({
@@ -47,5 +47,5 @@ export const quizSchema = z.object({
   description: z.string().max(500),
   visibility: z.enum(['private', 'unlisted', 'public']),
   topics: z.array(topicSchema).min(1).max(30),
-  questions: z.array(questionSchema).min(1).max(30)
+  questions: z.array(questionSchema).min(1).max(60)
 });
