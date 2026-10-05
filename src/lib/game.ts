@@ -154,7 +154,7 @@ export async function saveQuiz(input: { id?: string; coverSourceId?: string; tit
     if (!input.title.trim()) fail('Nhập tên bộ câu hỏi.');
     if (!clueMode && (input.questions.length < 2 || !input.questions.some(q => q.gameRound === 1) || !input.questions.some(q => q.gameRound === 2))) fail('Bộ câu hỏi cần ít nhất một câu cho mỗi vòng.');
     if (input.questions.length < 1) fail('Cần ít nhất một bài hát.');
-    if (input.questions.length > 30) fail('Tối đa 30 câu hỏi.');
+    if (input.questions.length > 60) fail('Tối đa 60 câu hỏi.');
     if (!clueMode && ![1, 2].every(round => input.topics.some(topic => topic.gameRound === round))) fail('Mỗi vòng cần ít nhất một chủ đề.');
     const topicKeys = new Set<string>();
     for (const topic of input.topics) {
