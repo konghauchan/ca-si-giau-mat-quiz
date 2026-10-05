@@ -68,12 +68,16 @@ export async function getClueState(roomId: string, auth: string, currentOnly = f
     { sql:'SELECT player_id,delta FROM score_events WHERE room_id=? AND question_index=(SELECT question_index FROM rooms WHERE id=?)',args:[roomId,roomId] },
     { sql:'SELECT COALESCE(MAX(id),0) AS version FROM game_events WHERE room_id=?',args:[roomId] }
   ]);
-  const r=rr[0]; if(!r) throw new Error('Không tìm thấy phòng.'); const me=pp.find(p=>p.token===auth); if(!me) throw new Error('Phiên người chơi không hợp lệ.');
+  return clueSnapshot(roomId,auth,rr[0],pp,qq,ss,Number(vv[0].version),currentOnly);
+}
+// Reuse the shared engine's atomic read batch when a room switches rules.
+export async function clueSnapshot(roomId: string, auth: string, r: Row, pp: Row[], qq: Row[], ss: Row[], version: number, currentOnly = false) {
+  if(!r) throw new Error('Không tìm thấy phòng.'); const me=pp.find(p=>p.token===auth); if(!me) throw new Error('Phiên người chơi không hợp lệ.');
   const s=parse(r); const q=qq[s.questionIndex]; const reveal=['CLUE_RESULT','GAME_FINISHED'].includes(s.phase); const clues: Clue[]=JSON.parse(String(q.clues_json));
   const seats=[...pp].sort((a,b)=>Number(a.joined_at)-Number(b.joined_at));
   if(Date.now()-Number(me.last_seen_at)>10000) await tx(()=>run('UPDATE players SET last_seen_at=? WHERE id=? AND last_seen_at<?',Date.now(),String(me.id),Date.now()-10000));
   const players=ranks(pp.map(p=>({id:String(p.id),nickname:String(p.nickname),avatarId:Number(p.avatar_id),colorIndex:seats.findIndex(seat=>seat.id===p.id),score:Number(p.score),ready:Number(p.ready)===1,connected:p.id===me.id || Date.now()-Number(p.last_seen_at)<20000,eliminated:s.eliminated.includes(String(p.id)),roundDelta:ss.filter(e=>e.player_id===p.id).reduce((sum,e)=>sum+Number(e.delta),0)})));
-  return {roomId,pin:String(r.pin),gameType:'SONG_CLUE' as const,playMode:'CLUE' as const,mixed:currentOnly,gameRound:Number(q.game_round),roundCount:new Set(qq.map(q=>q.game_round)).size,pausedAt:r.paused_at,quizTitle:String(r.title),phase:s.phase,phaseStartedAt:s.startedAt,phaseEndsAt:s.endsAt,serverNow:Date.now(),lastEventId:Number(vv[0].version),questionIndex:s.questionIndex,questionCount:qq.length,me:{id:String(me.id),nickname:String(me.nickname)},players,isHost:r.host_token===auth,
+  return {roomId,pin:String(r.pin),gameType:'SONG_CLUE' as const,playMode:'CLUE' as const,mixed:currentOnly,gameRound:Number(q.game_round),roundCount:new Set(qq.map(q=>q.game_round)).size,pausedAt:r.paused_at,quizTitle:String(r.title),phase:s.phase,phaseStartedAt:s.startedAt,phaseEndsAt:s.endsAt,serverNow:Date.now(),lastEventId:version,questionIndex:s.questionIndex,questionCount:qq.length,me:{id:String(me.id),nickname:String(me.nickname)},players,isHost:r.host_token===auth,
     clue:{index:s.clueIndex,items:s.phase==='QUESTION_INTRO'||s.phase==='LOBBY'?[]:clues.slice(0,s.clueIndex+1),value:clues[s.clueIndex].score,votes:s.votes.length,hasVoted:s.votes.includes(String(me.id)),requiredVotes:requiredVotes(pp.length-s.eliminated.length),holder:s.holder,lockedScore:s.lockedScore,outcome:s.outcome,submittedAnswer:s.holder===me.id?s.answer:undefined,eliminated:s.eliminated.includes(String(me.id))},
     question:{id:String(q.id),primaryAnswer:reveal?String(q.primary_answer):undefined,artist:reveal?String(q.artist):undefined,answerSeconds:Number(q.answer_seconds)}};
 }

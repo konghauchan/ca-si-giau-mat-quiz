@@ -5,7 +5,7 @@ import { storedAssetExists } from './media';
 import { removeUnusedCover } from './coverStorage';
 
 import { inputPlayMode, storedPlayMode, type PlayMode } from './playModes';
-import { clueCommand, getClueState, advanceCurrentClue, startCurrentClue, shiftClueClock } from './clueGame';
+import { clueCommand, getClueState, clueSnapshot, advanceCurrentClue, startCurrentClue, shiftClueClock } from './clueGame';
 import type { Clue } from './clueRules';
 type Row = Record<string, unknown>;
 const now = () => Date.now();
@@ -420,7 +420,7 @@ export async function getState(roomId: string, auth: string) {
   const r = rs[0]; const host = r.host_token === auth; const me = ps.find(p => p.token === auth) ?? null;
   if (!host && !me) fail('Phiên người chơi không hợp lệ.');
   const index = Number(r.question_index); const q = qs[index]; const topic = ts.find(t => t.id === q.topic_id);
-  if (['QUESTION_INTRO','CLUE_ACTIVE','CLUE_ANSWERING','CLUE_FEEDBACK','CLUE_RESULT'].includes(String(r.phase))) return getClueState(roomId,auth,true);
+  if (['QUESTION_INTRO','CLUE_ACTIVE','CLUE_ANSWERING','CLUE_FEEDBACK','CLUE_RESULT'].includes(String(r.phase))) return clueSnapshot(roomId,auth,{...r,title:r.quiz_title},ps,qs,scores,Number(versions[0].id),true);
   const playMode = storedPlayMode(q);
   const currentRound = gameRound(q); const nextQuestion = qs[index + 1];
   const reveal = ['ROUND_RESULT', 'SCOREBOARD', 'GAME_FINISHED'].includes(String(r.phase));
