@@ -5,17 +5,17 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Copy, Disc3, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
-import { api, quizToken } from '@/lib/client';
+import { api, claimLegacyQuizzes } from '@/lib/client';
 import { AvatarPicker } from '@/components/AvatarPicker';
 
 type Quiz = { game_type: string; id: string; title: string; description: string; visibility: string; cover_url: string | null; question_count: number; round_one_count: number; round_two_count: number; own: boolean };
-type OwnedQuiz = { gameType: string; id: string; title: string; description: string; visibility: string; coverUrl: string | null; own: boolean; questions: { game_round: number }[] };
 
 function Library() {
   const router = useRouter();
   const params = useSearchParams();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busyId, setBusyId] = useState('');
@@ -30,14 +30,10 @@ function Library() {
     setShareOrigin(location.origin);
     async function load() {
       try {
-        const publicItems = await api<Omit<Quiz, 'own'>[]>('/api/quiz');
-        const ids = JSON.parse(localStorage.getItem('myQuizzes') || '[]') as string[];
-        const mine = (await Promise.all(ids.filter(id => quizToken(id)).map(id =>
-          api<OwnedQuiz>(`/api/quiz?id=${encodeURIComponent(id)}`, { token: quizToken(id) })
-            .then(q => q.own ? ({ game_type: q.gameType, id: q.id, title: q.title, description: q.description, visibility: q.visibility, cover_url: q.coverUrl, own: true, question_count: q.questions.length, round_one_count: q.questions.filter(item => item.game_round === 1).length, round_two_count: q.questions.filter(item => item.game_round === 2).length }) : null)
-            .catch(() => null)
-        ))).filter((item): item is Quiz => item !== null);
-        setQuizzes([...mine, ...publicItems.filter(item => !mine.some(owned => owned.id === item.id)).map(item => ({ ...item, own: false }))]);
+        const auth = await api<{ user: { id: string } | null }>('/api/auth');
+        setSignedIn(!!auth.user);
+        if (auth.user) await claimLegacyQuizzes().catch(() => undefined);
+        setQuizzes(await api<Quiz[]>('/api/quiz'));
       } catch (e) { setError((e as Error).message); }
       finally { setLoading(false); }
     }
@@ -47,7 +43,7 @@ function Library() {
   async function host(quiz: Quiz) {
     setError(''); setBusyId(quiz.id);
     try {
-      const result = await api<{ roomId: string; hostToken: string }>('/api/room', { method: 'POST', body: { action: 'create', quizId: quiz.id, ownerToken: quizToken(quiz.id), nickname: hostName.trim(), avatarId } });
+      const result = await api<{ roomId: string; hostToken: string }>('/api/room', { method: 'POST', body: { action: 'create', quizId: quiz.id, nickname: hostName.trim(), avatarId } });
       localStorage.setItem(`host:${result.roomId}`, result.hostToken);
       sessionStorage.setItem(`host:${result.roomId}`, result.hostToken);
       sessionStorage.setItem(`player:${result.roomId}`, result.hostToken);
@@ -59,10 +55,7 @@ function Library() {
   async function remove(quiz: Quiz) {
     setError(''); setBusyId(quiz.id);
     try {
-      await api(`/api/quiz?id=${encodeURIComponent(quiz.id)}`, { method: 'DELETE', token: quizToken(quiz.id) });
-      localStorage.removeItem(`quiz:${quiz.id}`);
-      const ids = JSON.parse(localStorage.getItem('myQuizzes') || '[]') as string[];
-      localStorage.setItem('myQuizzes', JSON.stringify(ids.filter(id => id !== quiz.id)));
+      await api(`/api/quiz?id=${encodeURIComponent(quiz.id)}`, { method: 'DELETE' });
       setQuizzes(previous => previous.filter(item => item.id !== quiz.id));
       setDeleteId(''); setHostQuizId('');
       setNotice(`Đã xóa “${quiz.title}” khỏi thư viện.`);
@@ -75,7 +68,7 @@ function Library() {
     try {
       if (quiz.visibility === 'private') {
         if (!quiz.own) throw new Error('Chỉ chủ sở hữu mới có thể chia sẻ bộ câu hỏi riêng tư.');
-        await api('/api/quiz', { method: 'PATCH', token: quizToken(quiz.id), body: { id: quiz.id, visibility: 'unlisted' } });
+        await api('/api/quiz', { method: 'PATCH', body: { id: quiz.id, visibility: 'unlisted' } });
         setQuizzes(previous => previous.map(item => item.id === quiz.id ? { ...item, visibility: 'unlisted' } : item));
       }
       const link = `${location.origin}/quiz/${quiz.id}`;
@@ -89,7 +82,7 @@ function Library() {
   async function stopSharing(quiz: Quiz) {
     setError(''); setBusyId(quiz.id);
     try {
-      await api('/api/quiz', { method: 'PATCH', token: quizToken(quiz.id), body: { id: quiz.id, visibility: 'private' } });
+      await api('/api/quiz', { method: 'PATCH', body: { id: quiz.id, visibility: 'private' } });
       setQuizzes(previous => previous.map(item => item.id === quiz.id ? { ...item, visibility: 'private' } : item));
       setShareId(''); setNotice('Đã tắt liên kết chia sẻ cho bộ câu hỏi này.');
     } catch (e) { setError((e as Error).message); }
@@ -97,7 +90,8 @@ function Library() {
   }
 
   return <main className="page">
-    <div className="page-head"><div><span className="kicker">THƯ VIỆN</span><h1>Chọn bộ câu hỏi để bắt đầu</h1><p>Bộ câu hỏi của bạn trên thiết bị này và các bộ câu hỏi công khai.</p></div><Link className="button primary" href="/create"><Plus size={17} /> Tạo bộ câu hỏi</Link></div>
+    <div className="page-head"><div><span className="kicker">THƯ VIỆN</span><h1>Chọn bộ câu hỏi để bắt đầu</h1><p>Bộ câu hỏi trong tài khoản của bạn và các bộ câu hỏi công khai.</p></div><Link className="button primary" href="/create"><Plus size={17} /> Tạo bộ câu hỏi</Link></div>
+    {!signedIn && !loading && <div className="notice info">Đăng nhập để tạo, chỉnh sửa và xem quiz riêng của bạn trên mọi thiết bị. <Link href="/login?next=%2Fquizzes">Đăng nhập hoặc đăng ký</Link></div>}
     {params.get('created') && <div className="notice success">Bộ câu hỏi đã được lưu. Bấm “Tạo phòng” để chơi.</div>}
     {params.get('updated') && <div className="notice success">Đã lưu bản chỉnh sửa. Các phòng đã tạo tiếp tục dùng nội dung cũ.</div>}
     {notice && <div className="notice success" role="status">{notice}</div>}

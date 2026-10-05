@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { CLUE_CATEGORIES } from '@/lib/clueRules';
 import { deleteQuiz, getQuiz, listQuizzes, saveQuiz, setQuizVisibility } from '@/lib/game';
+import { assertSameOrigin, currentUser, requireUser } from '@/lib/auth';
 export const runtime = 'nodejs';
 
 const question = z.object({
@@ -12,27 +13,29 @@ const question = z.object({
   revealMax: z.number().int().min(1).max(30), revealStep: z.number().int().min(1).max(30)
 });
 const topic = z.object({ key: z.string().min(1).max(80), gameRound: z.union([z.literal(1), z.literal(2)]), title: z.string().min(1).max(80), songCount: z.number().int().min(1).max(30) });
-const quiz = z.object({ id: z.string().uuid().optional(), ownerToken: z.string().optional(), coverSourceId: z.string().uuid().optional(), coverSourceToken: z.string().optional(), gameType: z.enum(['MUSIC_BID','SONG_CLUE']).default('MUSIC_BID'), title: z.string().min(1).max(100), description: z.string().max(500), visibility: z.enum(['private', 'unlisted', 'public']), topics: z.array(topic).min(1).max(30), questions: z.array(question).min(1).max(30) });
+const quiz = z.object({ id: z.string().uuid().optional(), coverSourceId: z.string().uuid().optional(), gameType: z.enum(['MUSIC_BID','SONG_CLUE']).default('MUSIC_BID'), title: z.string().min(1).max(100), description: z.string().max(500), visibility: z.enum(['private', 'unlisted', 'public']), topics: z.array(topic).min(1).max(30), questions: z.array(question).min(1).max(30) });
 export async function GET(req: NextRequest) {
   try {
-    const id = req.nextUrl.searchParams.get('id'); const auth = req.headers.get('x-quiz-token') || undefined;
-    return NextResponse.json(id ? await getQuiz(id, auth) : await listQuizzes(auth));
+    const id = req.nextUrl.searchParams.get('id'); const user = await currentUser(req);
+    return NextResponse.json(id ? await getQuiz(id, user?.id) : await listQuizzes(user?.id), { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 400 }); }
 }
 export async function POST(req: NextRequest) {
-  try { return NextResponse.json(await saveQuiz(quiz.parse(await req.json()))); }
+  try { assertSameOrigin(req); const user = await requireUser(req); return NextResponse.json(await saveQuiz(quiz.parse(await req.json()), user.id)); }
   catch (e) { return NextResponse.json({ error: e instanceof z.ZodError ? 'Thông tin bộ câu hỏi không hợp lệ. Hãy kiểm tra các trường bắt buộc và thời gian đã chọn.' : (e as Error).message }, { status: 400 }); }
 }
 export async function PATCH(req: NextRequest) {
   try {
+    assertSameOrigin(req); const user = await requireUser(req);
     const data = z.object({ id: z.string().uuid(), visibility: z.enum(['private', 'unlisted', 'public']) }).parse(await req.json());
-    return NextResponse.json(await setQuizVisibility(data.id, req.headers.get('x-quiz-token') || undefined, data.visibility));
+    return NextResponse.json(await setQuizVisibility(data.id, user.id, data.visibility));
   } catch (e) { return NextResponse.json({ error: e instanceof z.ZodError ? 'Chế độ chia sẻ không hợp lệ.' : (e as Error).message }, { status: 400 }); }
 }
 export async function DELETE(req: NextRequest) {
   try {
+    assertSameOrigin(req); const user = await requireUser(req);
     const id = z.string().uuid().parse(req.nextUrl.searchParams.get('id'));
-    return NextResponse.json(await deleteQuiz(id, req.headers.get('x-quiz-token') || undefined));
+    return NextResponse.json(await deleteQuiz(id, user.id));
   } catch (e) {
     return NextResponse.json({ error: e instanceof z.ZodError ? 'Mã bộ câu hỏi không hợp lệ.' : (e as Error).message }, { status: 400 });
   }

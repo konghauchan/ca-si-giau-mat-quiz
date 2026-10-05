@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { clueFixture, clueQuestions } from '../scripts/clue-fixture.mjs';
+import { registerTestAccount } from './register-test-account.mjs';
 const base=process.env.SMOKE_BASE_URL||'http://localhost:3210';
+const accountCookie=await registerTestAccount(base);
 const samples=[];const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function call(path,body,token='',allowError=false){const start=performance.now();const response=await fetch(base+path,{method:body?'POST':'GET',headers:{'content-type':'application/json','x-game-token':token},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(20000)});const data=await response.json();samples.push({action:body?.action||path.split('?')[0],ms:Math.round(performance.now()-start),ok:response.ok,serverTiming:response.headers.get('server-timing'),region:response.headers.get('x-vercel-id')});if(!response.ok&&!allowError)throw new Error(JSON.stringify(data));return {ok:response.ok,data};}
+async function call(path,body,token='',allowError=false){const start=performance.now();const response=await fetch(base+path,{method:body?'POST':'GET',headers:{'content-type':'application/json',origin:base,'x-game-token':token,...(path==='/api/quiz'||body?.action==='create'?{cookie:accountCookie}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(20000)});const data=await response.json();samples.push({action:body?.action||path.split('?')[0],ms:Math.round(performance.now()-start),ok:response.ok,serverTiming:response.headers.get('server-timing'),region:response.headers.get('x-vercel-id')});if(!response.ok&&!allowError)throw new Error(JSON.stringify(data));return {ok:response.ok,data};}
 const quiz=(await call('/api/quiz',{...clueFixture,title:'Smoke online · gợi ý',questions:clueFixture.questions.map(q=>({...q,listenSeconds:30,answerSeconds:15}))})).data;
 const room=(await call('/api/room',{action:'create',quizId:quiz.id,nickname:'Alpha'})).data;
 const joined=await Promise.all(['Beta','Gamma','Delta'].map(nickname=>call('/api/room',{action:'join',pin:room.pin,nickname,clientToken:crypto.randomUUID()})));

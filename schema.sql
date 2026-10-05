@@ -1,8 +1,20 @@
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS user_sessions (
+  token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id, expires_at);
+CREATE TABLE IF NOT EXISTS auth_rate_limits (
+  key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, reset_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS quizzes (
-  id TEXT PRIMARY KEY, owner_token TEXT NOT NULL, title TEXT NOT NULL,
+  id TEXT PRIMARY KEY, owner_token TEXT NOT NULL, owner_user_id TEXT REFERENCES users(id), title TEXT NOT NULL,
   game_type TEXT NOT NULL DEFAULT 'MUSIC_BID',
   description TEXT NOT NULL DEFAULT '', visibility TEXT NOT NULL DEFAULT 'private',
   cover_url TEXT,
@@ -80,3 +92,4 @@ CREATE INDEX IF NOT EXISTS idx_scores_room_question ON score_events(room_id, que
 CREATE UNIQUE INDEX IF NOT EXISTS idx_clue_score_once ON score_events(room_id, question_index, player_id) WHERE reason='CLUE_CORRECT';
 CREATE INDEX IF NOT EXISTS idx_players_room ON players(room_id, joined_at);
 CREATE INDEX IF NOT EXISTS idx_questions_round ON questions(quiz_id, game_round, order_index);
+CREATE INDEX IF NOT EXISTS idx_quizzes_owner_user ON quizzes(owner_user_id, updated_at);

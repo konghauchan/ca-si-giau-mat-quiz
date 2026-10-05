@@ -14,6 +14,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "seed": "node scripts/seed.mjs",
     "smoke": "node tests/smoke.mjs",
+    "auth-smoke": "node tests/auth-smoke.mjs",
     "media-smoke": "node tests/media-smoke.mjs",
     "migrate-quizzes": "node scripts/migrate-quizzes.mjs",
     "clue-smoke": "node tests/clue-smoke.mjs",

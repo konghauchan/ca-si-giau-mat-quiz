@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { writeFileSync } from 'node:fs';
 import { clueFixture } from '../scripts/clue-fixture.mjs';
+import { registerTestAccount } from './register-test-account.mjs';
 const base=process.env.SMOKE_BASE_URL||'http://localhost:3210';
 if(!/^http:\/\/localhost:\d+$/.test(base))throw new Error('Clue smoke clock acceleration is local only.');
+const accountCookie=await registerTestAccount(base);
 const timings={};const samples=[];
-async function call(path,body,token='',allowError=false){const t=performance.now();const r=await fetch(base+path,{method:body?'POST':'GET',headers:{'content-type':'application/json','x-game-token':token},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(15000)});const data=await r.json();const key=body?.action||path.split('?')[0];(timings[key]??=[]).push(performance.now()-t);samples.push({action:key,serverTiming:r.headers.get('server-timing')});if(!r.ok&&!allowError)throw new Error(JSON.stringify(data));return {ok:r.ok,data};}
+async function call(path,body,token='',allowError=false){const t=performance.now();const r=await fetch(base+path,{method:body?'POST':'GET',headers:{'content-type':'application/json',origin:base,'x-game-token':token,...(path==='/api/quiz'||body?.action==='create'?{cookie:accountCookie}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(15000)});const data=await r.json();const key=body?.action||path.split('?')[0];(timings[key]??=[]).push(performance.now()-t);samples.push({action:key,serverTiming:r.headers.get('server-timing')});if(!r.ok&&!allowError)throw new Error(JSON.stringify(data));return {ok:r.ok,data};}
 const quiz=(await call('/api/quiz',clueFixture)).data;const room=(await call('/api/room',{action:'create',quizId:quiz.id,nickname:'Alpha'})).data;
 const joined=await Promise.all(['Beta','Gamma','Delta'].map(nickname=>call('/api/room',{action:'join',pin:room.pin,nickname,clientToken:crypto.randomUUID()})));
 const tokens=[room.hostToken,...joined.map(p=>p.data.playerToken)];

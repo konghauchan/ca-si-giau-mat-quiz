@@ -2,14 +2,17 @@ import { timedResponse } from '@/lib/timing';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createRoom, joinRoom } from '@/lib/game';
+import { assertSameOrigin, currentUser } from '@/lib/auth';
 export const runtime = 'nodejs';
 export async function POST(req: NextRequest) { return timedResponse(() => handle(req)); }
 async function handle(req: NextRequest) {
   try {
+    assertSameOrigin(req);
     const body = await req.json();
     if (body.action === 'create') {
-      const data = z.object({ quizId: z.string().uuid(), ownerToken: z.string().optional(), nickname: z.string().min(2).max(24), avatarId: z.number().int().min(1).max(20).optional() }).parse(body);
-      return NextResponse.json(await createRoom(data.quizId, data.ownerToken || '', data.nickname, data.avatarId ?? 1));
+      const data = z.object({ quizId: z.string().uuid(), nickname: z.string().min(2).max(24), avatarId: z.number().int().min(1).max(20).optional() }).parse(body);
+      const user = await currentUser(req);
+      return NextResponse.json(await createRoom(data.quizId, user?.id, data.nickname, data.avatarId ?? 1));
     }
     if (body.action === 'join') {
       const data = z.object({ pin: z.string().regex(/^\d{6}$/), nickname: z.string().min(2).max(24), avatarId: z.number().int().min(1).max(20).optional(), clientToken: z.string().uuid().optional() }).parse(body);

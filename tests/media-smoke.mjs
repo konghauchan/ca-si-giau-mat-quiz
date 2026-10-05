@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import ffmpegPath from 'ffmpeg-static';
+import { registerTestAccount } from './register-test-account.mjs';
 
 const base = process.env.SMOKE_BASE_URL || 'http://localhost:3210';
+const accountCookie = await registerTestAccount(base);
 async function json(path, body, token = '') {
-  const response = await fetch(`${base}${path}`, { method: body ? 'POST' : 'GET', headers: { 'content-type': 'application/json', 'x-game-token': token }, body: body ? JSON.stringify(body) : undefined });
+  const response = await fetch(`${base}${path}`, { method: body ? 'POST' : 'GET', headers: { 'content-type': 'application/json', origin: base, 'x-game-token': token, ...(path === '/api/quiz' || body?.action === 'create' ? { cookie: accountCookie } : {}) }, body: body ? JSON.stringify(body) : undefined });
   const data = await response.json(); if (!response.ok) throw new Error(`${path}: ${JSON.stringify(data)}`); return data;
 }
 const generated = spawnSync(ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=15', '-b:a', '128k', '-f', 'mp3', 'pipe:1'], { maxBuffer: 2_000_000 });
@@ -26,7 +28,7 @@ const preview = await fetch(`${base}/api/media/preview?asset=${mediaUrl}&start=3
 if (!preview.ok) throw new Error(`Preview: ${await preview.text()}`);
 const bidQuestion = { prompt: 'Đoán âm thanh vòng 2', gameRound: 2, topicKey: 'bid', answerSeconds: 12, listenSeconds: 5, mediaType: 'uploaded_audio', mediaUrl: secondMediaUrl, mediaStart: 3, primaryAnswer: 'B', acceptedAnswers: [], artist: '', hint: 'Âm đơn 440 Hz', revealMin: 1, revealMax: 10, revealStep: 1 };
 const quiz = await json('/api/quiz', { title: `Smoke media ${Date.now()}`, description: '', visibility: 'private', topics: [{ key: 'open', gameRound: 1, title: 'Âm mở màn', songCount: 1 }, { key: 'bid', gameRound: 2, title: 'Âm đấu giá', songCount: 1 }], questions: [{ ...bidQuestion, gameRound: 1, topicKey: 'open', mediaUrl, prompt: 'Đoán âm thanh vòng 1', primaryAnswer: 'A', hint: '' }, bidQuestion] });
-const room = await json('/api/room', { action: 'create', quizId: quiz.id, ownerToken: quiz.ownerToken, nickname: 'Hosty' });
+const room = await json('/api/room', { action: 'create', quizId: quiz.id, nickname: 'Hosty' });
 const guest = await json('/api/room', { action: 'join', pin: room.pin, nickname: 'Guest' });
 await json('/api/command', { roomId: room.roomId, action: 'start' }, room.hostToken);
 await new Promise(resolve => setTimeout(resolve, 3200));

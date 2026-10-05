@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import Image from 'next/image';
 import { ArrowDown, ArrowUp, Copy, Eye, Plus, Save, Trash2 } from 'lucide-react';
-import { api, quizToken } from '@/lib/client';
+import { api, claimLegacyQuizzes } from '@/lib/client';
 import { ClipPlayer } from '@/components/ClipPlayer';
 import { AudioClipPlayer } from '@/components/AudioClipPlayer';
 import { youtubeId } from '@/lib/core';
@@ -34,16 +34,27 @@ function Creator() {
   const [topics, setTopics] = useState<Topic[]>(initialTopics);
   const [questions, setQuestions] = useState<Question[]>([blank(1), blank(2)]); const [activeRound, setActiveRound] = useState<1 | 2>(1); const [selected, setSelected] = useState(0);
   const [previewDuration, setPreviewDuration] = useState(3); const [reviewOpen, setReviewOpen] = useState(false); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [usedInRoom, setUsedInRoom] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
-    if (!editId) return;
-    api<QuizResponse>(`/api/quiz?id=${encodeURIComponent(editId)}`, { token: quizToken(editId) }).then(quiz => {
+    let active = true;
+    api<{ user: { id: string } | null }>('/api/auth').then(async result => {
+      if (!active) return;
+      if (!result.user) { router.replace(`/login?next=${encodeURIComponent(`/create${editId ? `?id=${editId}` : ''}`)}`); return; }
+      await claimLegacyQuizzes().catch(() => undefined);
+      if (active) setAuthReady(true);
+    }).catch(cause => { if (active) setError((cause as Error).message); });
+    return () => { active = false; };
+  }, [router, editId]);
+  useEffect(() => {
+    if (!editId || !authReady) return;
+    api<QuizResponse>(`/api/quiz?id=${encodeURIComponent(editId)}`).then(quiz => {
       if (!quiz.own) throw new Error('Bạn không có quyền sửa bộ câu hỏi này.');
       setGameType(quiz.gameType || 'MUSIC_BID'); setTitle(quiz.title); setDescription(quiz.description); setVisibility(quiz.visibility); setCoverUrl(quiz.coverUrl); setUsedInRoom(quiz.usedInRoom);
       const loadedTopics: Topic[] = quiz.topics.length ? quiz.topics.map(t => ({ key: t.id, gameRound: t.game_round === 1 ? 1 : 2, title: t.title, songCount: t.song_count })) : ([1, 2] as const).map(round => ({ key: `round-${round}`, gameRound: round, title: `Chủ đề vòng ${round}`, songCount: quiz.questions.filter(q => q.game_round === round).length }));
       const loaded = quiz.questions.map(q => ({ clues: JSON.parse(q.clues_json || '[]'), prompt: q.prompt, gameRound: q.game_round === 1 ? 1 as const : 2 as const, topicKey: q.topic_id || `round-${q.game_round}`, listenSeconds: q.listen_seconds || 5, answerSeconds: q.answer_seconds || 12, mediaType: q.media_type, mediaUrl: q.media_url, mediaStart: formatStartTime(q.media_start), resultStart: q.result_start == null ? null : formatStartTime(q.result_start), resultSeconds: q.result_seconds ?? null, primaryAnswer: q.primary_answer, acceptedAnswers: q.accepted_answers, artist: q.artist, hint: q.hint, revealMin: q.reveal_min, revealMax: q.reveal_max, revealStep: q.reveal_step }));
       setTopics(loadedTopics); setQuestions(loaded); setActiveRound(1); setSelected(loaded.findIndex(q => q.gameRound === 1));
     }).catch(e => setError(e.message));
-  }, [editId]);
+  }, [editId, authReady]);
   useEffect(() => () => { if (coverPreview) URL.revokeObjectURL(coverPreview); }, [coverPreview]);
   async function chooseCover(file: File | undefined) {
     if (!file) return;
@@ -84,14 +95,10 @@ function Creator() {
         return { ...item, mediaStart, resultStart };
       });
       const activeId = !asCopy ? persistedId : null;
-      const result = await api<{ id: string; ownerToken: string; replacedId?: string }>('/api/quiz', { method: 'POST', body: { id: activeId || undefined, ownerToken: activeId ? quizToken(activeId) : undefined, coverSourceId: asCopy && persistedId ? persistedId : undefined, coverSourceToken: asCopy && persistedId ? quizToken(persistedId) : undefined, title: asCopy ? `${title} (bản mới)` : title, gameType, description, visibility, topics, questions: normalizedQuestions } });
-      localStorage.setItem(`quiz:${result.id}`, result.ownerToken);
+      const result = await api<{ id: string; replacedId?: string }>('/api/quiz', { method: 'POST', body: { id: activeId || undefined, coverSourceId: asCopy && persistedId ? persistedId : undefined, title: asCopy ? `${title} (bản mới)` : title, gameType, description, visibility, topics, questions: normalizedQuestions } });
       setPersistedId(result.id);
-      const ids = JSON.parse(localStorage.getItem('myQuizzes') || '[]') as string[];
-      if (result.replacedId) localStorage.removeItem(`quiz:${result.replacedId}`);
-      localStorage.setItem('myQuizzes', JSON.stringify([...new Set([result.id, ...ids.filter(id => id !== result.replacedId)])]));
       if (coverFile || removeCover) {
-        const response = await fetch(`/api/quiz/cover?id=${encodeURIComponent(result.id)}`, { method: coverFile ? 'POST' : 'DELETE', headers: { 'x-quiz-token': result.ownerToken }, body: coverFile ? (() => { const form = new FormData(); form.set('file', coverFile); return form; })() : undefined });
+        const response = await fetch(`/api/quiz/cover?id=${encodeURIComponent(result.id)}`, { method: coverFile ? 'POST' : 'DELETE', body: coverFile ? (() => { const form = new FormData(); form.set('file', coverFile); return form; })() : undefined });
         const imageResult = await response.json();
         if (!response.ok) throw new Error(`Bộ câu hỏi đã được lưu, nhưng ảnh bìa chưa lưu được: ${imageResult.error || 'Lỗi tải ảnh.'} Bấm Lưu lần nữa để thử lại.`);
         setCoverUrl(imageResult.coverUrl); setCoverFile(null); setCoverPreview(null); setRemoveCover(false);
@@ -99,6 +106,7 @@ function Creator() {
       router.push(`/quizzes?${result.replacedId ? 'updated' : 'created'}=${result.id}`);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
+  if (!authReady) return <main className="page narrow"><div className="panel center">{error || 'Đang kiểm tra tài khoản…'}</div></main>;
   return <main className="page"><div className="page-head"><div><span className="kicker">TẠO BỘ CÂU HỎI</span><h1>{editId ? 'Chỉnh sửa bộ câu hỏi' : 'Tạo bộ câu hỏi mới'}</h1><p>{clueMode?'Đoán bài hát bằng 5 gợi ý. Đủ 4 người sẵn sàng là tự chơi.':'Chia bài hát thành vòng 1 nghe chung và vòng 2 đấu giá thời gian.'}</p></div><div className="editor-save-actions">{editId && <button className="button secondary big" onClick={() => save(true)} disabled={busy || coverBusy}>Lưu bản mới</button>}<button className="button primary big" onClick={() => save()} disabled={busy || coverBusy}><Save size={18} /> {busy ? 'Đang lưu…' : 'Lưu bộ câu hỏi'}</button></div></div>
     <div className="field clue-mode-select"><label>Kiểu chơi</label><select value={gameType} disabled={!!editId} onChange={e=>{const mode=e.target.value as typeof gameType;setGameType(mode);setActiveRound(1);setSelected(0);if(mode==='SONG_CLUE'){setTopics([{key:'round-1',gameRound:1,title:'Bài hát bí ẩn',songCount:10}]);setQuestions(Array.from({length:10},()=>({...blank(1),clues:blankClues(),listenSeconds:15,answerSeconds:8})));}else{setTopics(initialTopics);setQuestions([blank(1),blank(2)]);}}}><option value="MUSIC_BID">Nghe nhạc · 2 vòng</option><option value="SONG_CLUE">Đoán bài hát qua gợi ý · 4 người</option></select></div>
     {error && <div className="notice error">{error}</div>}

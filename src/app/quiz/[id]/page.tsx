@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Copy, Headphones, Play, Share2 } from 'lucide-react';
-import { api, quizToken } from '@/lib/client';
+import { api } from '@/lib/client';
 import { AvatarPicker } from '@/components/AvatarPicker';
 
 type SharedQuiz = { gameType: string; id: string; title: string; description: string; visibility: string; coverUrl: string | null; questionCount: number; roundOneCount: number; roundTwoCount: number; own: boolean };
@@ -23,7 +23,7 @@ export default function SharedQuizPage() {
 
   useEffect(() => {
     if (!id) return;
-    api<SharedQuiz>(`/api/quiz?id=${encodeURIComponent(id)}`, { token: quizToken(id) })
+    api<SharedQuiz>(`/api/quiz?id=${encodeURIComponent(id)}`)
       .then(setQuiz).catch(e => setError((e as Error).message)).finally(() => setLoading(false));
   }, [id]);
 
@@ -31,7 +31,7 @@ export default function SharedQuizPage() {
     event.preventDefault(); if (!quiz) return;
     setError(''); setBusy(true);
     try {
-      const result = await api<{ roomId: string; hostToken: string }>('/api/room', { method: 'POST', body: { action: 'create', quizId: quiz.id, ownerToken: quizToken(quiz.id), nickname: nickname.trim(), avatarId } });
+      const result = await api<{ roomId: string; hostToken: string }>('/api/room', { method: 'POST', body: { action: 'create', quizId: quiz.id, nickname: nickname.trim(), avatarId } });
       localStorage.setItem(`host:${result.roomId}`, result.hostToken);
       sessionStorage.setItem(`host:${result.roomId}`, result.hostToken);
       sessionStorage.setItem(`player:${result.roomId}`, result.hostToken);
