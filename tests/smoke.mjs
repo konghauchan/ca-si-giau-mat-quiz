@@ -13,9 +13,12 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function state(roomId, token) { return call(`/api/state?roomId=${roomId}`, null, token); }
 async function command(roomId, token, action, value) { return call('/api/command', { roomId, action, value }, token); }
 
-const bidQuestion = { prompt: 'Tên bài hát?', gameRound: 2, topicKey: 'bid', listenSeconds: 5, answerSeconds: 12, bidSeconds: 8, mediaType: 'youtube', mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', mediaStart: 1, primaryAnswer: 'Chúng Ta Của Hiện Tại', acceptedAnswers: [], artist: 'Sơn Tùng M-TP', hint: 'Một bài hát của Sơn Tùng M-TP', revealMin: 1, revealMax: 10, revealStep: 1 };
+const bidQuestion = { prompt: 'Tên bài hát?', gameRound: 2, topicKey: 'bid', listenSeconds: 5, answerSeconds: 12, bidSeconds: 8, clues: [], mediaType: 'youtube', mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', mediaStart: 1, primaryAnswer: 'Chúng Ta Của Hiện Tại', acceptedAnswers: [], artist: 'Sơn Tùng M-TP', hint: 'Một bài hát của Sơn Tùng M-TP', revealMin: 1, revealMax: 10, revealStep: 1 };
 const openingQuestion = { ...bidQuestion, gameRound: 1, topicKey: 'open', mediaUrl: 'https://www.youtube.com/watch?v=jNQXAC9IVRw', mediaStart: 0, resultStart: 0, resultSeconds: 1, answerSeconds: 9, prompt: 'Bài hát vòng 1?', primaryAnswer: 'Bài hát khác', artist: 'Ca sĩ mở màn', hint: '' };
 const quiz = await call('/api/quiz', { title: `Smoke ${Date.now()}`, description: 'Integration test', visibility: 'private', topics: [{ key: 'open', gameRound: 1, title: 'Mở màn', songCount: 1 }, { key: 'bid', gameRound: 2, title: 'Đấu giá', songCount: 1 }], questions: [openingQuestion, bidQuestion] }, '', undefined, true);
+const invalidSave = await fetch(`${base}/api/quiz`, { method: 'POST', headers: { 'content-type': 'application/json', origin: base, cookie: accountCookie }, body: JSON.stringify({ title: 'Invalid timer', description: '', visibility: 'private', topics: [{ key: 'open', gameRound: 1, title: 'Mở màn', songCount: 1 }, { key: 'bid', gameRound: 2, title: 'Đấu giá', songCount: 1 }], questions: [{ ...openingQuestion, answerSeconds: 3 }, bidQuestion] }) });
+assert.equal(invalidSave.status, 400);
+assert.deepEqual((await invalidSave.json()).issues[0].path, ['questions', 0, 'answerSeconds']);
 assert.equal((await call(`/api/quiz?id=${quiz.id}`, null, '', undefined, true)).questions[1].bid_seconds, 8);
 await assert.rejects(call(`/api/quiz?id=${quiz.id}`), /chưa được chia sẻ/);
 await assert.rejects(call('/api/room', { action: 'create', quizId: quiz.id, nickname: 'Anonymous' }), /riêng tư/);
