@@ -1,6 +1,12 @@
-# BID//REVEAL
+# Đọ Nhạc
 
-Trò chơi đoán bài hát cho 2–4 người với hai vòng dùng hai nhóm bài hát riêng. Vòng 1 mọi người cùng nghe 3–10 giây và đoán; vòng 2 người chơi bí mật chọn số giây cần nghe. Nhóm chọn ít giây nhất nghe trước; người chọn trùng thời gian nghe và trả lời cùng lúc. Nếu cả nhóm sai hoặc hết giờ, hệ thống báo cho cả phòng và công bố người nghe tiếp theo.
+Trò chơi đoán bài hát cho 2–4 người. Quiz mới thuộc **Đọ Nhạc** và có thể thêm nhiều vòng; mỗi vòng chọn **Nghe chung**, **Đấu giá thời gian** hoặc **Đoán qua 5 gợi ý**. Có thể lặp lại luật ở nhiều vòng, tối đa 60 bài trong một quiz. Người tạo phòng cũng là một người chơi. Quiz và phòng cũ tiếp tục dùng nội dung, luật đã lưu.
+
+### Cấu hình vòng chơi
+
+Trong trang tạo/chỉnh sửa, bấm **Thêm vòng chơi**, chọn luật ở **Luật chơi vòng…**, rồi thêm chủ đề và bài hát. Xóa vòng sẽ xóa các bài trong vòng đó sau xác nhận; các vòng sau được đánh số lại. Vòng nghe chung cho thử lại đáp án sai (tối đa 30 lần/câu); đấu giá chỉ cho trả lời một lần; gợi ý loại người trả lời sai khỏi câu. Các vòng chuyển tự động qua màn kết quả và bảng điểm, điểm được cộng xuyên suốt quiz. Quiz mới do host bắt đầu; phòng gợi ý cũ vẫn dùng cơ chế 4 người sẵn sàng.
+
+Luật của quiz mới lưu bằng loại câu hỏi `music_open`, `music_bid`, `song_clue`, độc lập với số vòng. Không cần thêm cột hay chuyển dữ liệu Turso. `tests/rounds-smoke.mjs` kiểm tra 5 vòng với 4 người, lưu/mở lại, thử lại đáp án, tạm dừng và đặt lại quyền ở câu mới. Chạy với server và test cùng `DATABASE_PATH=./data/rounds-smoke.sqlite`, cổng 3210 (chỉ dùng database kiểm thử local).
 
 ## Chạy local
 
