@@ -4,15 +4,42 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import Image from 'next/image';
 import { ArrowDown, ArrowUp, Copy, Eye, Plus, Save, Trash2 } from 'lucide-react';
-import { api, claimLegacyQuizzes } from '@/lib/client';
+import { ApiError, api, claimLegacyQuizzes } from '@/lib/client';
 import { ClipPlayer } from '@/components/ClipPlayer';
 import { AudioClipPlayer } from '@/components/AudioClipPlayer';
-import { youtubeId } from '@/lib/core';
+import { normalizeAnswer, youtubeId } from '@/lib/core';
 import { formatStartTime, parseStartTime } from '@/lib/time';
 import { QuestionReview } from '@/components/QuestionReview';
 import { ClueFields, CluePreview, blankClues, clueDemo } from '@/components/ClueFields';
 import type { Clue } from '@/lib/clueRules';
 import { prepareCover } from '@/lib/clientCover';
+import { quizSchema } from '@/lib/quizSchema';
+
+type IssuePath = Array<string | number>;
+class QuizFormError extends Error {
+  constructor(public path: IssuePath, message: string) { super(message); }
+}
+const fieldLabels: Record<string, string> = {
+  title: 'Tên bộ câu hỏi', description: 'Mô tả', visibility: 'Hiển thị',
+  prompt: 'Nội dung câu hỏi', primaryAnswer: 'Đáp án chính', acceptedAnswers: 'Đáp án chấp nhận thêm',
+  artist: 'Nghệ sĩ', hint: 'Gợi ý trước khi đấu giá', bidSeconds: 'Thời gian đọc gợi ý và đấu giá',
+  listenSeconds: 'Thời lượng nghe chung', answerSeconds: 'Thời gian trả lời', mediaUrl: 'Đường dẫn YouTube',
+  mediaStart: 'Bắt đầu (giây hoặc mm:ss)', resultStart: 'Bắt đầu đoạn kết quả (giây hoặc mm:ss)',
+  resultSeconds: 'Phát trong bao lâu (giây)', revealMin: 'Nhỏ nhất', revealMax: 'Lớn nhất', revealStep: 'Bước',
+  songCount: 'Số bài cần có'
+};
+const fieldGuidance: Record<string, string> = {
+  title: 'Cần nhập tên dài tối đa 100 ký tự.', description: 'Mô tả tối đa 500 ký tự.',
+  prompt: 'Cần nhập nội dung dài tối đa 300 ký tự.', primaryAnswer: 'Cần nhập đáp án dài tối đa 120 ký tự.',
+  acceptedAnswers: 'Tối đa 20 đáp án thêm, mỗi đáp án không quá 120 ký tự.',
+  artist: 'Tên nghệ sĩ tối đa 120 ký tự.', hint: 'Cần nhập gợi ý dài tối đa 200 ký tự.',
+  bidSeconds: 'Nhập số nguyên từ 5 đến 90 giây.', listenSeconds: 'Nhập thời lượng từ 1 đến 10 giây.',
+  answerSeconds: 'Chọn thời gian từ 5 đến 60 giây.', mediaUrl: 'Nhập đường dẫn YouTube hợp lệ.',
+  mediaStart: 'Nhập số giây từ 0 hoặc định dạng mm:ss.', resultStart: 'Nhập số giây từ 0 hoặc định dạng mm:ss.',
+  resultSeconds: 'Nhập số nguyên từ 1 đến 60 giây.', revealMin: 'Nhập số nguyên từ 1 đến 30 giây.',
+  revealMax: 'Nhập số nguyên từ 1 đến 30 giây và không nhỏ hơn mức thấp nhất.',
+  revealStep: 'Nhập số nguyên từ 1 đến 30 giây.', songCount: 'Nhập số nguyên từ 1 đến 30.'
+};
 
 type Topic = { key: string; gameRound: 1 | 2; title: string; songCount: number };
 type Question = { clues?: Clue[]; prompt: string; gameRound: 1 | 2; topicKey: string; listenSeconds: number; answerSeconds: number; bidSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: string; resultStart: string | null; resultSeconds: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number };
@@ -34,6 +61,7 @@ function Creator() {
   const [topics, setTopics] = useState<Topic[]>(initialTopics);
   const [questions, setQuestions] = useState<Question[]>([blank(1), blank(2)]); const [activeRound, setActiveRound] = useState<1 | 2>(1); const [selected, setSelected] = useState(0);
   const [previewDuration, setPreviewDuration] = useState(3); const [reviewOpen, setReviewOpen] = useState(false); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [usedInRoom, setUsedInRoom] = useState(false);
+  const [focusIssue, setFocusIssue] = useState<{ path: IssuePath; key: string } | null>(null);
   const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
     let active = true;
@@ -76,27 +104,97 @@ function Creator() {
   function duplicate() { if (!q || topicIndexes.length >= selectedTopic.songCount) return; setQuestions(previous => [...previous.slice(0, selected + 1), { ...q, mediaUrl: '', primaryAnswer: '', acceptedAnswers: [...q.acceptedAnswers] }, ...previous.slice(selected + 1)]); setSelected(selected + 1); }
   function remove() { if (roundIndexes.length <= 1) return; const remaining = roundIndexes.filter(index => index !== selected); setQuestions(previous => previous.filter((_, index) => index !== selected)); const next = remaining.find(index => index > selected) ?? remaining.at(-1)!; setSelected(next > selected ? next - 1 : next); }
   function move(offset: number) { const position = topicIndexes.indexOf(selected); const target = topicIndexes[position + offset]; if (target === undefined) return; setQuestions(previous => { const next = [...previous]; [next[selected], next[target]] = [next[target], next[selected]]; return next; }); setSelected(target); }
+  function showIssue(path: IssuePath, detail?: string) {
+    const section = String(path[0] || 'title');
+    const index = Number(path[1]);
+    const field = section === 'questions' || section === 'topics' ? String(path[2] || section) : section;
+    const label = field === 'clues' ? `Nội dung gợi ý ${Number(path[3]) + 1}` : field === 'title' && section === 'topics' ? 'Tên chủ đề' : fieldLabels[field] || 'Trường này';
+    let place = '';
+    if (section === 'questions' && questions[index]) {
+      const item = questions[index]; const topic = topics.find(t => t.key === item.topicKey);
+      const number = questions.slice(0, index + 1).filter(candidate => candidate.topicKey === item.topicKey).length;
+      place = `Vòng ${item.gameRound} · ${topic?.title || 'Chủ đề'} · Bài ${number}: `;
+      setActiveRound(item.gameRound); setSelected(index);
+    } else if (section === 'topics' && topics[index]) {
+      place = `Vòng ${topics[index].gameRound} · Chủ đề “${topics[index].title}”: `;
+      setActiveRound(topics[index].gameRound);
+      setSelected(questions.findIndex(item => item.topicKey === topics[index].key));
+    }
+    const guidance = section === 'topics' && field === 'title' ? 'Nhập tên chủ đề dài tối đa 80 ký tự.' : fieldGuidance[field];
+    setError(`${place}${label}: ${detail || guidance || 'Giá trị không hợp lệ.'}`);
+    setFocusIssue({ path, key: crypto.randomUUID() });
+  }
+  useEffect(() => {
+    if (!focusIssue) return;
+    let focusedControl: HTMLElement | null = null;
+    const frame = requestAnimationFrame(() => {
+      const [section, rawIndex, rawField, rawClueIndex, rawClueField] = focusIssue.path;
+      let root: Element | null = document.querySelector('main.page > section.panel');
+      let label = fieldLabels[String(section)] || '';
+      if (section === 'questions') {
+        root = document.querySelector('.editor > section.panel');
+        const field = String(rawField);
+        label = field === 'clues' ? rawClueField === 'score' ? 'Điểm' : rawClueField === 'category' ? 'Loại gợi ý' : `Nội dung gợi ý ${Number(rawClueIndex) + 1}` : fieldLabels[field] || '';
+        if (field === 'clues') root = root?.querySelectorAll('.clue-editor-card')[Number(rawClueIndex)] || root;
+      } else if (section === 'topics') {
+        const topic = topics[Number(rawIndex)];
+        const position = topics.filter(t => t.gameRound === topic?.gameRound).findIndex(t => t.key === topic?.key);
+        root = document.querySelectorAll('.topic-editor')[position] || null;
+        label = rawField === 'title' ? 'Tên chủ đề' : fieldLabels[String(rawField)] || '';
+      }
+      const matchingLabel = [...(root?.querySelectorAll('label') || [])].find(node => node.textContent?.trim().startsWith(label));
+      const control = matchingLabel?.closest('.field')?.querySelector('input:not([disabled]),textarea,select') || matchingLabel?.querySelector('input,textarea,select');
+      if (control instanceof HTMLElement) { focusedControl = control; control.focus({ preventScroll: true }); control.scrollIntoView({ behavior: 'smooth', block: 'center' }); control.classList.add('validation-focus'); }
+    });
+    return () => { cancelAnimationFrame(frame); focusedControl?.classList.remove('validation-focus'); };
+  }, [focusIssue, topics]);
   async function save(asCopy = false) {
-    setError(''); setBusy(true);
+    setError(''); setFocusIssue(null); setBusy(true);
     try {
-      for (const topic of topics) {
+      if (!title.trim()) throw new QuizFormError(['title'], 'Hãy nhập tên bộ câu hỏi.');
+      for (const [topicIndex, topic] of topics.entries()) {
         const count = questions.filter(item => item.topicKey === topic.key).length;
-        if (!topic.title.trim()) throw new Error(`Vòng ${topic.gameRound}: hãy nhập tên chủ đề.`);
-        if (!Number.isInteger(topic.songCount) || topic.songCount < 1 || topic.songCount > 30) throw new Error(`Chủ đề “${topic.title}” cần số bài từ 1 đến 30.`);
-        if (count !== topic.songCount) throw new Error(`Chủ đề “${topic.title}” cần ${topic.songCount} bài, hiện có ${count} bài.`);
+        if (!topic.title.trim()) throw new QuizFormError(['topics', topicIndex, 'title'], 'Hãy nhập tên chủ đề.');
+        if (!Number.isInteger(topic.songCount) || topic.songCount < 1 || topic.songCount > 30) throw new QuizFormError(['topics', topicIndex, 'songCount'], 'Số bài phải từ 1 đến 30.');
+        if (count !== topic.songCount) throw new QuizFormError(['topics', topicIndex, 'songCount'], `Chủ đề cần ${topic.songCount} bài, hiện có ${count} bài.`);
       }
       const normalizedQuestions = questions.map((item, index) => {
         if (clueMode) return {...item,mediaStart:0,resultStart:null,resultSeconds:null,mediaUrl:'',clues:item.clues||blankClues()};
         const mediaStart = parseStartTime(item.mediaStart);
-        if (mediaStart === null) throw new Error(`Vòng ${item.gameRound}, bài ${questions.slice(0, index + 1).filter(other => other.gameRound === item.gameRound).length}: thời điểm bắt đầu phải từ 0 giây; nhập số giây hoặc mm:ss.`);
+        if (mediaStart === null) throw new QuizFormError(['questions', index, 'mediaStart'], 'Thời điểm bắt đầu phải từ 0 giây; nhập số giây hoặc mm:ss.');
         const resultStart = item.resultStart === null ? null : parseStartTime(item.resultStart);
-        if (item.gameRound === 2 && (!Number.isInteger(item.bidSeconds) || item.bidSeconds < 5 || item.bidSeconds > 90)) throw new Error(`Vòng 2, bài ${index + 1}: thời gian đọc gợi ý và đấu giá phải từ 5–90 giây.`);
-        if (item.resultStart !== null && resultStart === null) throw new Error(`Vòng ${item.gameRound}, bài ${index + 1}: mốc phát video công bố đáp án không hợp lệ.`);
-        if (resultStart !== null && (!Number.isInteger(item.resultSeconds) || item.resultSeconds! < 1 || item.resultSeconds! > 60)) throw new Error(`Vòng ${item.gameRound}, bài ${index + 1}: đoạn công bố đáp án phải dài 1–60 giây.`);
-        return { ...item, mediaStart, resultStart };
+        if (item.gameRound === 2 && (!Number.isInteger(item.bidSeconds) || item.bidSeconds < 5 || item.bidSeconds > 90)) throw new QuizFormError(['questions', index, 'bidSeconds'], 'Thời gian đọc gợi ý và đấu giá phải từ 5–90 giây.');
+        if (item.resultStart !== null && resultStart === null) throw new QuizFormError(['questions', index, 'resultStart'], 'Mốc phát video công bố đáp án không hợp lệ.');
+        if (resultStart !== null && (!Number.isInteger(item.resultSeconds) || item.resultSeconds! < 1 || item.resultSeconds! > 60)) throw new QuizFormError(['questions', index, 'resultSeconds'], 'Đoạn công bố đáp án phải dài 1–60 giây.');
+        const musicQuestion = { ...item }; delete musicQuestion.clues;
+        return { ...musicQuestion, mediaStart, resultStart };
       });
       const activeId = !asCopy ? persistedId : null;
-      const result = await api<{ id: string; replacedId?: string }>('/api/quiz', { method: 'POST', body: { id: activeId || undefined, coverSourceId: asCopy && persistedId ? persistedId : undefined, title: asCopy ? `${title} (bản mới)` : title, gameType, description, visibility, topics, questions: normalizedQuestions } });
+      const payload = { id: activeId || undefined, coverSourceId: asCopy && persistedId ? persistedId : undefined, title: asCopy ? `${title} (bản mới)` : title, gameType, description, visibility, topics, questions: normalizedQuestions };
+      const parsed = quizSchema.safeParse(payload);
+      if (!parsed.success) throw new QuizFormError(parsed.error.issues[0].path.map(part => typeof part === 'number' ? part : String(part)), '');
+      const songNames = new Set<string>(); const songIds = new Set<string>();
+      for (const [index, item] of parsed.data.questions.entries()) {
+        if (!item.prompt.trim()) throw new QuizFormError(['questions', index, 'prompt'], 'Hãy nhập nội dung câu hỏi.');
+        if (!item.primaryAnswer.trim()) throw new QuizFormError(['questions', index, 'primaryAnswer'], 'Hãy nhập đáp án chính.');
+        const songName = normalizeAnswer(item.primaryAnswer);
+        if (songNames.has(songName)) throw new QuizFormError(['questions', index, 'primaryAnswer'], 'Tên bài hát này đã có ở câu khác.');
+        songNames.add(songName);
+        if (clueMode) {
+          if (item.clues?.length !== 5) throw new QuizFormError(['questions', index, 'clues', 0, 'text'], 'Bài này cần đủ 5 gợi ý.');
+          for (const [clueIndex, clue] of item.clues.entries()) if (!clue.text.trim()) throw new QuizFormError(['questions', index, 'clues', clueIndex, 'text'], 'Hãy nhập nội dung gợi ý.');
+          continue;
+        }
+        if (item.gameRound === 2 && !item.hint.trim()) throw new QuizFormError(['questions', index, 'hint'], 'Hãy nhập gợi ý trước khi đấu giá.');
+        if (item.mediaType === 'youtube') {
+          const videoId = youtubeId(item.mediaUrl);
+          if (!videoId) throw new QuizFormError(['questions', index, 'mediaUrl'], 'Đường dẫn YouTube không hợp lệ.');
+          if (songIds.has(videoId)) throw new QuizFormError(['questions', index, 'mediaUrl'], 'Video YouTube này đã có ở câu khác.');
+          songIds.add(videoId);
+        }
+        if (item.revealMax < item.revealMin) throw new QuizFormError(['questions', index, 'revealMax'], 'Mức lớn nhất phải từ mức nhỏ nhất trở lên.');
+      }
+      const result = await api<{ id: string; replacedId?: string }>('/api/quiz', { method: 'POST', body: parsed.data });
       setPersistedId(result.id);
       if (coverFile || removeCover) {
         const response = await fetch(`/api/quiz/cover?id=${encodeURIComponent(result.id)}`, { method: coverFile ? 'POST' : 'DELETE', body: coverFile ? (() => { const form = new FormData(); form.set('file', coverFile); return form; })() : undefined });
@@ -105,12 +203,16 @@ function Creator() {
         setCoverUrl(imageResult.coverUrl); setCoverFile(null); setCoverPreview(null); setRemoveCover(false);
       }
       router.push(`/quizzes?${result.replacedId ? 'updated' : 'created'}=${result.id}`);
-    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    } catch (e) {
+      if (e instanceof QuizFormError) showIssue(e.path, e.message || undefined);
+      else if (e instanceof ApiError && e.issues?.length) showIssue(e.issues[0].path);
+      else setError((e as Error).message);
+    } finally { setBusy(false); }
   }
   if (!authReady) return <main className="page narrow"><div className="panel center">{error || 'Đang kiểm tra tài khoản…'}</div></main>;
   return <main className="page"><div className="page-head"><div><span className="kicker">TẠO BỘ CÂU HỎI</span><h1>{editId ? 'Chỉnh sửa bộ câu hỏi' : 'Tạo bộ câu hỏi mới'}</h1><p>{clueMode?'Đoán bài hát bằng 5 gợi ý. Đủ 4 người sẵn sàng là tự chơi.':'Chia bài hát thành vòng 1 nghe chung và vòng 2 đấu giá thời gian.'}</p></div><div className="editor-save-actions">{editId && <button className="button secondary big" onClick={() => save(true)} disabled={busy || coverBusy}>Lưu bản mới</button>}<button className="button primary big" onClick={() => save()} disabled={busy || coverBusy}><Save size={18} /> {busy ? 'Đang lưu…' : 'Lưu bộ câu hỏi'}</button></div></div>
     <div className="field clue-mode-select"><label>Kiểu chơi</label><select value={gameType} disabled={!!editId} onChange={e=>{const mode=e.target.value as typeof gameType;setGameType(mode);setActiveRound(1);setSelected(0);if(mode==='SONG_CLUE'){setTopics([{key:'round-1',gameRound:1,title:'Bài hát bí ẩn',songCount:10}]);setQuestions(Array.from({length:10},()=>({...blank(1),clues:blankClues(),listenSeconds:15,answerSeconds:8})));}else{setTopics(initialTopics);setQuestions([blank(1),blank(2)]);}}}><option value="MUSIC_BID">Nghe nhạc · 2 vòng</option><option value="SONG_CLUE">Đoán bài hát qua gợi ý · 4 người</option></select></div>
-    {error && <div className="notice error">{error}</div>}
+    {error && <div className="notice error" role="alert">{error}</div>}
     {editId && usedInRoom && <div className="notice info">Bộ câu hỏi đã được dùng trong phòng chơi. Khi lưu, hệ thống sẽ tạo bản đã sửa để các phòng cũ tiếp tục dùng nội dung trước đó.</div>}
     <section className="panel" style={{ marginBottom: 18 }}><div className="form-row"><div className="field"><label>Tên bộ câu hỏi *</label><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ví dụ: Đoán bài hát Việt" /></div><div className="field"><label>Hiển thị</label><select value={visibility} onChange={e => setVisibility(e.target.value as 'private' | 'unlisted' | 'public')}><option value="private">Riêng tư</option><option value="unlisted">Ai có liên kết</option><option value="public">Công khai</option></select><small>“Ai có liên kết” cho phép mở quiz từ link, nhưng không hiện trong thư viện công khai.</small></div></div><div className="field"><label>Mô tả</label><input value={description} onChange={e => setDescription(e.target.value)} placeholder="Một câu ngắn giới thiệu bộ câu hỏi" /></div><div className="cover-editor"><div className="cover-editor-preview">{!removeCover && (coverPreview || coverUrl) ? <Image unoptimized width={1200} height={900} src={coverPreview || coverUrl!} alt="Xem trước ảnh bìa quiz" /> : <span>♫</span>}</div><div className="cover-editor-controls"><strong>Ảnh bìa bộ câu hỏi</strong><p>Ảnh sẽ được cắt giữa thành tỉ lệ 4:3, nén WebP tối đa 300 KB rồi lưu ngoài database.</p><label className="button secondary cover-file-button">{coverBusy ? 'Đang nén ảnh…' : 'Chọn ảnh'}<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={coverBusy || busy} onChange={e => { chooseCover(e.target.files?.[0]); e.target.value = ''; }} /></label>{(coverFile || coverUrl) && !removeCover && <button type="button" className="button ghost" onClick={() => { setCoverFile(null); setCoverPreview(null); setRemoveCover(Boolean(coverUrl)); }}>Bỏ ảnh bìa</button>}</div></div><button className="button ghost" style={{ marginTop: 10, paddingLeft: 0 }} onClick={() => { if(clueMode){setTitle('Bài hát bí ẩn · Bộ mẫu');setDescription('Ba câu mẫu để thử chế độ gợi ý.');setTopics([{key:'round-1',gameRound:1,title:'Nhạc Việt',songCount:3}]);setQuestions(clueDemo.map(d=>({...blank(1),listenSeconds:15,answerSeconds:8,primaryAnswer:d.primaryAnswer,artist:d.artist,acceptedAnswers:d.acceptedAnswers,clues:blankClues().map((c,i)=>({...c,text:d.clues[i]}))})));setSelected(0);return;} setTitle('Đoán bài hát Việt'); setDescription('Bộ câu hỏi mẫu — thay đường dẫn YouTube và đáp án trước khi chơi.'); setTopics(demoTopics); setQuestions(demo); setActiveRound(1); setSelected(0); }}>Dùng ba câu hỏi mẫu</button></section>
     {!clueMode && <div className="round-tabs" role="tablist" aria-label="Vòng chơi">{([1, 2] as const).map(round => <button key={round} type="button" role="tab" id={`round-tab-${round}`} aria-controls="round-panel" aria-selected={activeRound === round} className={`round-tab ${activeRound === round ? 'active' : ''}`} onClick={() => switchRound(round)}><strong>Vòng {round}</strong><span>{round === 1 ? 'Cùng nghe và đoán' : 'Đấu giá thời gian'}</span><small>{questions.filter(item => item.gameRound === round).length} bài hát</small></button>)}</div>}
