@@ -1,5 +1,4 @@
-import { Music2 } from 'lucide-react';
-
+import Image from 'next/image';
 export function BrandMark() {
-  return <span className="brand-mark" aria-hidden="true"><Music2 size={24} strokeWidth={2.6} /></span>;
+  return <span className="brand-mark" aria-hidden="true"><Image src="/do-nhac-logo.svg" width={40} height={40} alt="" priority /></span>;
 }
