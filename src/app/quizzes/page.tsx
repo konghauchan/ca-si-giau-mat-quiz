@@ -8,7 +8,7 @@ import { Copy, Disc3, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import { api, claimLegacyQuizzes } from '@/lib/client';
 import { AvatarPicker } from '@/components/AvatarPicker';
 
-type Quiz = { game_type: string; id: string; title: string; description: string; visibility: string; cover_url: string | null; question_count: number; round_one_count: number; round_two_count: number; own: boolean };
+type Quiz = { game_type: string; id: string; title: string; description: string; visibility: string; cover_url: string | null; question_count: number; round_count: number; round_one_count: number; round_two_count: number; own: boolean };
 
 function Library() {
   const router = useRouter();
@@ -97,13 +97,13 @@ function Library() {
     {notice && <div className="notice success" role="status">{notice}</div>}
     {error && <div className="notice error" role="alert">{error}</div>}
     {loading ? <div className="panel empty">Đang tải bộ câu hỏi…</div> : quizzes.length === 0 ? <div className="panel empty"><Disc3 size={43} /><h2>Chưa có bộ câu hỏi nào</h2><p>Hãy tạo bộ câu hỏi đầu tiên.</p><Link className="button primary" href="/create">Tạo bộ câu hỏi</Link></div> : <div className="quiz-grid">{quizzes.map(quiz => {
-      const ready = quiz.game_type === 'SONG_CLUE' || (quiz.round_one_count > 0 && quiz.round_two_count > 0);
+      const ready = quiz.question_count > 0;
       return <article className="quiz-card" key={quiz.id}>
         <div className="quiz-cover">{quiz.cover_url ? <Image unoptimized width={1200} height={900} src={quiz.cover_url} alt={`Ảnh bìa ${quiz.title}`} loading="lazy" /> : '♫'}</div>
         <div className="quiz-card-body">
           {quiz.own && <span className="quiz-owner-tag">Của bạn</span>}
           <h2>{quiz.title}</h2><p>{quiz.description || 'Thử thách nghe nhạc cùng bạn bè.'}</p>
-          <div className="quiz-card-meta"><span>{quiz.question_count} câu hỏi</span><span>{quiz.game_type === 'SONG_CLUE' ? 'Đoán bằng gợi ý · 4 người' : `Vòng 1: ${quiz.round_one_count} · Vòng 2: ${quiz.round_two_count}`}</span><span>{quiz.visibility === 'public' ? 'Công khai' : quiz.visibility === 'unlisted' ? 'Ai có liên kết' : 'Riêng tư'}</span></div>
+          <div className="quiz-card-meta"><span>{quiz.question_count} câu hỏi</span><span>{`Đọ nhạc · ${quiz.round_count} vòng`}</span><span>{quiz.visibility === 'public' ? 'Công khai' : quiz.visibility === 'unlisted' ? 'Ai có liên kết' : 'Riêng tư'}</span></div>
           {!ready && <p>Bộ câu hỏi cần ít nhất một bài hát cho mỗi vòng. {quiz.own ? 'Bấm “Chỉnh sửa” để bổ sung.' : 'Hãy chọn bộ câu hỏi khác.'}</p>}
           <div className="quiz-card-actions">
             <button className="button primary" disabled={busyId === quiz.id || !ready} onClick={() => { setDeleteId(''); setHostQuizId(hostQuizId === quiz.id ? '' : quiz.id); }}>{hostQuizId === quiz.id ? 'Đóng' : 'Tạo phòng'}</button>
