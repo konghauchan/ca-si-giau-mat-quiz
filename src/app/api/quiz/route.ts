@@ -1,19 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { CLUE_CATEGORIES } from '@/lib/clueRules';
 import { deleteQuiz, getQuiz, listQuizzes, saveQuiz, setQuizVisibility } from '@/lib/game';
 import { assertSameOrigin, currentUser, requireUser } from '@/lib/auth';
+import { quizSchema } from '@/lib/quizSchema';
 export const runtime = 'nodejs';
-
-const question = z.object({
-  clues: z.array(z.object({ id: z.string().min(1).max(80), text: z.string().min(1).max(500), score: z.number().int().min(1).max(10000), category: z.enum(CLUE_CATEGORIES) })).length(5).optional(),
-  prompt: z.string().min(1).max(300), gameRound: z.union([z.literal(1), z.literal(2)]), topicKey: z.string().min(1).max(80), listenSeconds: z.number().int().min(1).max(60), answerSeconds: z.number().int().min(5).max(60).default(12), bidSeconds: z.number().int().min(5).max(90).default(30), mediaType: z.enum(['youtube', 'uploaded_audio']), mediaUrl: z.string(), mediaStart: z.number().min(0), resultStart: z.number().min(0).max(36000).nullable().optional(), resultSeconds: z.number().int().min(1).max(60).nullable().optional(),
-  primaryAnswer: z.string().min(1).max(120), acceptedAnswers: z.array(z.string().max(120)).max(20),
-  artist: z.string().max(120), hint: z.string().max(200), revealMin: z.number().int().min(1).max(30),
-  revealMax: z.number().int().min(1).max(30), revealStep: z.number().int().min(1).max(30)
-});
-const topic = z.object({ key: z.string().min(1).max(80), gameRound: z.union([z.literal(1), z.literal(2)]), title: z.string().min(1).max(80), songCount: z.number().int().min(1).max(30) });
-const quiz = z.object({ id: z.string().uuid().optional(), coverSourceId: z.string().uuid().optional(), gameType: z.enum(['MUSIC_BID','SONG_CLUE']).default('MUSIC_BID'), title: z.string().min(1).max(100), description: z.string().max(500), visibility: z.enum(['private', 'unlisted', 'public']), topics: z.array(topic).min(1).max(30), questions: z.array(question).min(1).max(30) });
 export async function GET(req: NextRequest) {
   try {
     const id = req.nextUrl.searchParams.get('id'); const user = await currentUser(req);
@@ -21,8 +11,11 @@ export async function GET(req: NextRequest) {
   } catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 400 }); }
 }
 export async function POST(req: NextRequest) {
-  try { assertSameOrigin(req); const user = await requireUser(req); return NextResponse.json(await saveQuiz(quiz.parse(await req.json()), user.id)); }
-  catch (e) { return NextResponse.json({ error: e instanceof z.ZodError ? 'Thông tin bộ câu hỏi không hợp lệ. Hãy kiểm tra các trường bắt buộc và thời gian đã chọn.' : (e as Error).message }, { status: 400 }); }
+  try { assertSameOrigin(req); const user = await requireUser(req); return NextResponse.json(await saveQuiz(quizSchema.parse(await req.json()), user.id)); }
+  catch (e) {
+    if (e instanceof z.ZodError) return NextResponse.json({ error: 'Có trường trong bộ câu hỏi không hợp lệ.', issues: e.issues.map(issue => ({ path: issue.path, message: issue.message })) }, { status: 400 });
+    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+  }
 }
 export async function PATCH(req: NextRequest) {
   try {
