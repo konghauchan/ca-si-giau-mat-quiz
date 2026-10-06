@@ -10,9 +10,9 @@ const clue = z.object({
 });
 
 export const questionSchema = z.object({
-  // Older music quizzes store an empty clues_json array. Five clues are required
+  // Older music quizzes store an empty clues_json array. Six clues are required
   // for clue rounds; old music questions may keep an empty array.
-  clues: z.array(clue).max(5).optional(),
+  clues: z.array(clue).max(6).optional(),
   playMode: z.enum(PLAY_MODES).optional(),
   prompt: z.string().min(1).max(300),
   gameRound: z.number().int().min(1).max(60),
@@ -52,6 +52,7 @@ export const quizSchema = z.object({
   questions: z.array(questionSchema).min(1).max(60)
 }).superRefine((quiz, ctx) => {
   for (const [index,q] of quiz.questions.entries()) {
+    if (quiz.gameType === 'MUSIC_DUEL' && q.playMode === 'CLUE' && q.clues?.length !== 6) ctx.addIssue({code:'custom',path:['questions',index,'clues'],message:'Bài này cần đủ 6 gợi ý.'});
     if (quiz.gameType === 'MUSIC_DUEL' && !q.playMode) ctx.addIssue({code:'custom',path:['questions',index,'playMode'],message:'Chọn luật cho vòng chơi.'});
     const topicIndex = quiz.topics.findIndex(t=>t.key===q.topicKey && t.gameRound===q.gameRound);
     if(topicIndex<0) ctx.addIssue({code:'custom',path:['questions',index,'topicKey'],message:'Bài hát chưa thuộc chủ đề hợp lệ.'});

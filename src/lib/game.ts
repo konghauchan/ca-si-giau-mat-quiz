@@ -187,7 +187,7 @@ export async function saveQuiz(input: { id?: string; coverSourceId?: string; tit
       songNames.add(songName);
       const playMode = inputPlayMode(q,input.gameType);
       if (playMode === 'CLUE') {
-        if (q.clues?.length !== 5 || q.clues.some(c => !c.text.trim() || c.text.length > 500 || !Number.isInteger(c.score) || c.score < 1 || c.score > 10000)) fail('Mỗi bài cần 5 gợi ý, điểm từ 1 đến 10000.');
+        if ((q.clues?.length !== 6 && !(input.gameType === 'SONG_CLUE' && q.clues?.length === 5)) || q.clues.some(c => !c.text.trim() || c.text.length > 500 || !Number.isInteger(c.score) || c.score < 1 || c.score > 10000)) fail('Mỗi bài cần 6 gợi ý, điểm từ 1 đến 10000.');
         if (!Number.isInteger(q.listenSeconds) || q.listenSeconds < 5 || q.listenSeconds > 60 || !Number.isInteger(q.answerSeconds) || q.answerSeconds < 5 || q.answerSeconds > 60) fail('Thời gian gợi ý và trả lời phải từ 5 đến 60 giây.');
         continue;
       }
