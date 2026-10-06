@@ -1,6 +1,6 @@
 # Đọ Nhạc
 
-Trò chơi đoán bài hát cho 2–4 người. Quiz mới thuộc **Đọ Nhạc** và có thể thêm nhiều vòng; mỗi vòng chọn **Nghe chung**, **Đấu giá thời gian** hoặc **Đoán qua 5 gợi ý**. Có thể lặp lại luật ở nhiều vòng, tối đa 60 bài trong một quiz. Người tạo phòng cũng là một người chơi. Quiz và phòng cũ tiếp tục dùng nội dung, luật đã lưu.
+Trò chơi đoán bài hát cho 2–4 người. Quiz mới thuộc **Đọ Nhạc** và có thể thêm nhiều vòng; mỗi vòng chọn **Nghe chung**, **Đấu giá thời gian** hoặc **Đoán qua 6 gợi ý**. Có thể lặp lại luật ở nhiều vòng, tối đa 60 bài trong một quiz. Người tạo phòng cũng là một người chơi. Quiz và phòng cũ tiếp tục dùng nội dung, luật đã lưu.
 
 ### Cấu hình vòng chơi
 
@@ -88,4 +88,11 @@ Phản hồi gameplay không gửi `primary_answer`/`accepted_answers` trước 
 
 ## Đoán bài hát qua gợi ý
 
-Chọn chế độ **Đoán bài hát qua gợi ý** ở trang tạo quiz. Thêm 5 gợi ý cho mỗi bài, sửa điểm/thời gian và xem thử; có nút dùng 3 câu mẫu. Phòng bắt đầu tự động khi đủ 4 người bấm sẵn sàng. Xem [PERFORMANCE.md](PERFORMANCE.md) để biết luật, migration, số đo và cách chạy test.
+Chọn chế độ **Đoán bài hát qua gợi ý** ở trang tạo quiz. Thêm 6 gợi ý cho mỗi bài, sửa điểm/thời gian và xem thử; có nút dùng 3 câu mẫu. Phòng bắt đầu tự động khi đủ 4 người bấm sẵn sàng. Xem [PERFORMANCE.md](PERFORMANCE.md) để biết luật, migration, số đo và cách chạy test.
+
+
+### Đọ Phim
+
+Chọn **Đọ Phim** ở mục chơi trong trang tạo quiz. Mỗi vòng chọn **Xem chung**, **Đấu giá thời gian xem** hoặc **Đoán qua 6 gợi ý**. Lưu URL YouTube, mốc bắt đầu và thời lượng như Đọ Nhạc; đáp án là tên phim. Luật điểm, thử lại, tranh quyền và chuyển vòng dùng cùng game engine. Loại quiz `FILM_DUEL` và câu hỏi `film_open`/`film_bid`/`film_clue` lưu trong các cột hiện có, không cần migration.
+
+Đoạn phim hiện hình trong lúc phát, tự dừng đúng thời lượng. Giao diện chặn chuột/phím tua, che vùng tiêu đề và điều khiển YouTube, che toàn khung trước/sau phát hoặc khi tạm dừng. Người tạo vẫn có trình phát gốc trong editor để chọn đoạn. Đây là che trên giao diện: YouTube có thể thay đổi vị trí thông tin và nội dung tên phim nằm sẵn trong video không bị loại bỏ. Chạy rounds smoke với `SMOKE_CATEGORY=FILM` để kiểm tra 4 người qua 5 vòng phim.

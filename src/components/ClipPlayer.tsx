@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { youtubeId } from '@/lib/core';
 
-type YTPlayer = { seekTo: (seconds: number, allowSeekAhead: boolean) => void; playVideo: () => void; pauseVideo: () => void; destroy: () => void };
+type YTPlayer = { seekTo: (seconds: number, allowSeekAhead: boolean) => void; playVideo: () => void; pauseVideo: () => void; getIframe: () => HTMLIFrameElement; destroy: () => void };
 type YTWindow = Window & { YT?: { Player: new (element: HTMLElement, config: object) => YTPlayer }; onYouTubeIframeAPIReady?: () => void };
 let loading: Promise<void> | null = null;
 function loadYouTube(): Promise<void> {
@@ -15,7 +15,7 @@ function loadYouTube(): Promise<void> {
   });
   return loading;
 }
-export function ClipPlayer({ url, start, duration, preview = false, reveal = false, paused = false }: { url: string; start: number; duration: number; preview?: boolean; reveal?: boolean; paused?: boolean }) {
+export function ClipPlayer({ url, start, duration, preview = false, reveal = false, showVideo = false, paused = false }: { url: string; start: number; duration: number; preview?: boolean; reveal?: boolean; showVideo?: boolean; paused?: boolean }) {
   const videoId = youtubeId(url);
   const mount = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
@@ -44,6 +44,7 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
           onReady: () => {
             if (!active) return;
             setReady(true);
+            if(!preview){const iframe=player.current?.getIframe();iframe?.setAttribute('tabindex','-1');iframe?.setAttribute('title','Đoạn video của câu hỏi');}
             if (!preview && !pausedRef.current && player.current) {
               player.current.seekTo(start, true);
               player.current.playVideo();
@@ -85,9 +86,10 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
     player.current.seekTo(start, true); player.current.playVideo();
   }
   if (!videoId) return <div className="notice error">Đường dẫn YouTube không hợp lệ.</div>;
+  const visibleVideo = preview || reveal || showVideo;
   return <div className={`clip-player ${reveal ? 'clip-player-reveal' : ''}`}>
-    <div className={`video-frame ${preview || reveal ? '' : 'concealed'}`}><div ref={mount} />{!preview && !reveal && <div className="video-mask" aria-label="Video YouTube được che để giữ bí mật đáp án"><span className="video-mask-icon">♫</span><strong>{playing ? 'Đang phát đoạn nhạc' : played ? 'Đã nghe đoạn nhạc' : 'Đoạn nhạc bí mật'}</strong><small>{duration} giây nghe</small></div>}</div>
-    {!reveal && <div className="clip-actions"><button className="button primary" type="button" disabled={paused || !ready || playing || (!preview && played)} onClick={play}>{paused ? 'Đã tạm dừng' : playing ? 'Đang phát đoạn nhạc…' : played && !preview ? 'Đã phát đoạn nhạc' : `▶ Phát ${duration} giây`}</button></div>}
+    <div className={`video-frame ${visibleVideo ? !preview ? 'guarded-video' : '' : 'concealed'}`}><div ref={mount} />{!visibleVideo && <div className="video-mask" aria-label="Video YouTube được che để giữ bí mật đáp án"><span className="video-mask-icon">♫</span><strong>{playing ? 'Đang phát đoạn nhạc' : played ? 'Đã nghe đoạn nhạc' : 'Đoạn nhạc bí mật'}</strong><small>{duration} giây nghe</small></div>}{visibleVideo && !preview && <><div className="video-interaction-shield" aria-hidden="true"/>{!playing && <div className="video-idle-cover" role="status"><strong>{paused?'Đã tạm dừng':played?'Đã phát xong đoạn video':'Đoạn video bí mật'}</strong><span>{autoplayBlocked?'Bấm Phát để bắt đầu xem':!ready?'Đang chuẩn bị video…':'Chỉ được xem một lần'}</span></div>}</>}</div>
+    {!reveal && <div className="clip-actions"><button className="button primary" type="button" disabled={paused || !ready || playing || (!preview && played)} onClick={play}>{paused ? 'Đã tạm dừng' : playing ? showVideo ? 'Đang phát đoạn phim…' : 'Đang phát đoạn nhạc…' : played && !preview ? showVideo ? 'Đã xem đoạn phim' : 'Đã phát đoạn nhạc' : `▶ Phát ${duration} giây`}</button></div>}
     {reveal && autoplayBlocked && !played && <div className="clip-actions"><button className="button primary" type="button" disabled={paused || !ready} onClick={play}>▶ Phát video kết quả</button><p className="muted">Trình duyệt đã chặn tự phát. Bấm một lần để xem video.</p></div>}
     {error && <div className="notice error">{error}</div>}
   </div>;

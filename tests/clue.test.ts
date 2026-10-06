@@ -14,3 +14,14 @@ test('all wrong and last clue timeout reveal answer',()=>{let s={...active(),clu
 test('reconnect catches up deadlines without host; finishes all questions',()=>{const s=catchUpClue(startClueQuestion(clueInitial(0),0),questions,players,25000);assert.equal(s.clueIndex,2);assert.equal(s.endsAt,32000);assert.equal(catchUpClue(s,questions,players,300000).phase,'GAME_FINISHED');});
 test('final ranking supports ties',()=>{assert.deepEqual(ranks([{score:1000},{score:1000},{score:500},{score:0}]).map(p=>p.rank),[1,1,3,4]);});
 test('buzz vs threshold has one authoritative ordered outcome',()=>{let s=voteClue(voteClue(active(),questions[0],'a',players,2001),questions[0],'b',players,2002);const buzzFirst=claimBuzzer(s,questions[0],'c',2003);assert.throws(()=>voteClue(buzzFirst,questions[0],'d',players,2004));s=voteClue(s,questions[0],'d',players,2003);assert.equal(claimBuzzer(s,questions[0],'c',2004).lockedScore,800);});
+
+
+test('sixth clue remains playable and locks its score before the result',()=>{
+ const q={clueSeconds:10,answerSeconds:8,clues:[1200,1000,800,600,400,200].map((score,i)=>({id:String(i),text:'Gợi ý',score,category:'OTHER' as const}))};
+ let s=expireClue(startClueQuestion(clueInitial(0),0),[q],players,2000);
+ for(let i=0;i<5;i++) s=expireClue(s,[q],players,s.endsAt!);
+ assert.equal(s.phase,'CLUE_ACTIVE');assert.equal(s.clueIndex,5);
+ const claimed=claimBuzzer(s,q,'a',s.startedAt+1);assert.equal(claimed.lockedScore,200);
+ assert.equal(answerClue(claimed,'a',true,'đúng',s.startedAt+2).phase,'CLUE_RESULT');
+ assert.equal(expireClue(s,[q],players,s.endsAt!).phase,'CLUE_RESULT');
+});

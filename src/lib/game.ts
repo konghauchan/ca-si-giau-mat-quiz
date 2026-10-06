@@ -151,7 +151,7 @@ async function tick(roomId: string) {
 
 export type QuestionInput = { prompt: string; playMode?: PlayMode; gameRound: number; topicKey: string; listenSeconds: number; answerSeconds: number; bidSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number; clues?: Clue[] };
 export type TopicInput = { key: string; gameRound: number; title: string; songCount: number };
-export async function saveQuiz(input: { id?: string; coverSourceId?: string; title: string; description: string; visibility: string; gameType?: 'MUSIC_BID' | 'SONG_CLUE' | 'MUSIC_DUEL'; topics: TopicInput[]; questions: QuestionInput[] }, userId: string) {
+export async function saveQuiz(input: { id?: string; coverSourceId?: string; title: string; description: string; visibility: string; gameType?: 'MUSIC_BID' | 'SONG_CLUE' | 'MUSIC_DUEL' | 'FILM_DUEL'; topics: TopicInput[]; questions: QuestionInput[] }, userId: string) {
   return await tx(async () => {
     const legacyMusic = !input.gameType || input.gameType === 'MUSIC_BID';
     const rounds = [...new Set(input.topics.map(t => t.gameRound))].sort((a,b) => a-b);
@@ -183,18 +183,19 @@ export async function saveQuiz(input: { id?: string; coverSourceId?: string; tit
     for (const q of input.questions) {
       if (!q.prompt.trim() || !q.primaryAnswer.trim()) fail('Câu hỏi và đáp án không được trống.');
       const songName = normalizeAnswer(q.primaryAnswer);
-      if (songNames.has(songName)) fail('Tên bài hát không được lặp lại giữa các chủ đề hoặc các vòng.');
+      if (songNames.has(songName)) fail('Tên đáp án không được lặp lại giữa các chủ đề hoặc các vòng.');
       songNames.add(songName);
       const playMode = inputPlayMode(q,input.gameType);
+      if (input.gameType === 'FILM_DUEL' && q.mediaType !== 'youtube') fail('Đọ Phim chỉ dùng video YouTube.');
       if (playMode === 'CLUE') {
-        if (q.clues?.length !== 5 || q.clues.some(c => !c.text.trim() || c.text.length > 500 || !Number.isInteger(c.score) || c.score < 1 || c.score > 10000)) fail('Mỗi bài cần 5 gợi ý, điểm từ 1 đến 10000.');
+        if ((q.clues?.length !== 6 && !(input.gameType === 'SONG_CLUE' && q.clues?.length === 5)) || q.clues.some(c => !c.text.trim() || c.text.length > 500 || !Number.isInteger(c.score) || c.score < 1 || c.score > 10000)) fail('Mỗi bài cần 6 gợi ý, điểm từ 1 đến 10000.');
         if (!Number.isInteger(q.listenSeconds) || q.listenSeconds < 5 || q.listenSeconds > 60 || !Number.isInteger(q.answerSeconds) || q.answerSeconds < 5 || q.answerSeconds > 60) fail('Thời gian gợi ý và trả lời phải từ 5 đến 60 giây.');
         continue;
       }
       if (playMode === 'BID' && !q.hint.trim()) fail('Câu đấu giá cần có gợi ý trước khi đấu giá.');
       if (playMode === 'BID' && (!Number.isInteger(q.bidSeconds) || q.bidSeconds < 5 || q.bidSeconds > 90)) fail('Thời gian đọc gợi ý và đấu giá phải từ 5 đến 90 giây.');
       if (!Number.isInteger(q.gameRound) || q.gameRound < 1 || q.gameRound > 60) fail('Vòng chơi không hợp lệ.');
-      if (!Number.isInteger(q.listenSeconds) || q.listenSeconds < 1 || q.listenSeconds > 10) fail('Thời lượng nghe chung phải từ 1 đến 10 giây.');
+      if (!Number.isInteger(q.listenSeconds) || q.listenSeconds < 1 || q.listenSeconds > 10) fail('Thời lượng nghe/xem chung phải từ 1 đến 10 giây.');
       if (!Number.isInteger(q.answerSeconds) || q.answerSeconds < 5 || q.answerSeconds > 60) fail('Thời gian trả lời phải từ 5 đến 60 giây.');
       if (q.mediaType === 'youtube' && !youtubeId(q.mediaUrl)) fail('Đường dẫn YouTube không hợp lệ.');
       const songId = q.mediaType === 'youtube' ? youtubeId(q.mediaUrl) : q.mediaUrl;
@@ -226,7 +227,7 @@ export async function saveQuiz(input: { id?: string; coverSourceId?: string; tit
     const sorted = rounds.flatMap(round => input.topics.filter(topic => topic.gameRound === round).flatMap(topic => input.questions.filter(q => q.topicKey === topic.key)));
     for (const [index, q] of sorted.entries()) {
       const questionId = id();
-      await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,bid_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds,clues_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, inputPlayMode(q,input.gameType) === 'CLUE' ? 'song_clue' : input.gameType === 'MUSIC_DUEL' ? inputPlayMode(q,input.gameType) === 'OPEN' ? 'music_open' : 'music_bid' : 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.bidSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null, JSON.stringify(q.clues || []));
+      await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,bid_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds,clues_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, input.gameType === 'FILM_DUEL' ? inputPlayMode(q,input.gameType) === 'CLUE' ? 'film_clue' : inputPlayMode(q,input.gameType) === 'OPEN' ? 'film_open' : 'film_bid' : inputPlayMode(q,input.gameType) === 'CLUE' ? 'song_clue' : input.gameType === 'MUSIC_DUEL' ? inputPlayMode(q,input.gameType) === 'OPEN' ? 'music_open' : 'music_bid' : 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.bidSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null, JSON.stringify(q.clues || []));
       for (const answer of new Set(q.acceptedAnswers.map(x => x.trim()).filter(Boolean))) await run('INSERT OR IGNORE INTO accepted_answers VALUES(?,?)', questionId, answer);
     }
     return { id: quizId, replacedId };
@@ -408,7 +409,7 @@ export async function getState(roomId: string, auth: string) {
   if (mode.game_type === 'SONG_CLUE') return getClueState(roomId, auth);
   if (mode.paused_at === null && mode.phase_ends_at !== null && Number(mode.phase_ends_at) <= now()) await tx(() => tick(roomId));
   const [rs, ps, qs, ts, bs, ans, scores, versions] = await batchRead([
-    { sql: 'SELECT rooms.*,quizzes.title AS quiz_title FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', args:[roomId] },
+    { sql: 'SELECT rooms.*,quizzes.title AS quiz_title,quizzes.game_type AS quiz_game_type FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', args:[roomId] },
     { sql: 'SELECT *,rowid AS seat FROM players WHERE room_id=? ORDER BY score DESC,joined_at,rowid', args:[roomId] },
     { sql: 'SELECT questions.* FROM questions JOIN rooms ON rooms.quiz_id=questions.quiz_id WHERE rooms.id=? ORDER BY order_index', args:[roomId] },
     { sql: 'SELECT topics.* FROM topics JOIN rooms ON rooms.quiz_id=topics.quiz_id WHERE rooms.id=?', args:[roomId] },
@@ -453,7 +454,7 @@ export async function getState(roomId: string, auth: string) {
     nextBid: Number(r.active_bid)
   } : null;
   const snapshot = {
-    serverNow: now(), gameType: 'MUSIC_BID' as const, playMode, roundCount: new Set(qs.map(q => q.game_round)).size,
+    serverNow: now(), gameType: 'MUSIC_BID' as const, category: r.quiz_game_type === 'FILM_DUEL' ? 'FILM' : 'MUSIC', playMode, roundCount: new Set(qs.map(q => q.game_round)).size,
     roomId, pin: r.pin, phase: r.phase, phaseStartedAt: r.phase_started_at, phaseEndsAt: r.phase_ends_at, pausedAt: r.paused_at,
     questionIndex: index, questionCount: qs.length,
     gameRound: currentRound, nextGameRound: nextQuestion ? Number(nextQuestion.game_round) : null,
