@@ -1,4 +1,5 @@
 'use client';
+import { quizCategoryLabel } from '@/lib/quizCategory';
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -103,7 +104,7 @@ function Library() {
         <div className="quiz-card-body">
           {quiz.own && <span className="quiz-owner-tag">Của bạn</span>}
           <h2>{quiz.title}</h2><p>{quiz.description || 'Thử thách nghe nhạc cùng bạn bè.'}</p>
-          <div className="quiz-card-meta"><span>{quiz.question_count} câu hỏi</span><span>{`Đọ nhạc · ${quiz.round_count} vòng`}</span><span>{quiz.visibility === 'public' ? 'Công khai' : quiz.visibility === 'unlisted' ? 'Ai có liên kết' : 'Riêng tư'}</span></div>
+          <div className="quiz-card-meta"><span>{quiz.question_count} câu hỏi</span><span>{`${quizCategoryLabel(quiz.game_type)} · ${quiz.round_count} vòng`}</span><span>{quiz.visibility === 'public' ? 'Công khai' : quiz.visibility === 'unlisted' ? 'Ai có liên kết' : 'Riêng tư'}</span></div>
           {!ready && <p>Bộ câu hỏi cần ít nhất một bài hát cho mỗi vòng. {quiz.own ? 'Bấm “Chỉnh sửa” để bổ sung.' : 'Hãy chọn bộ câu hỏi khác.'}</p>}
           <div className="quiz-card-actions">
             <button className="button primary" disabled={busyId === quiz.id || !ready} onClick={() => { setDeleteId(''); setHostQuizId(hostQuizId === quiz.id ? '' : quiz.id); }}>{hostQuizId === quiz.id ? 'Đóng' : 'Tạo phòng'}</button>
