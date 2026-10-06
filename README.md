@@ -1,6 +1,6 @@
 # Đọ Nhạc
 
-Trò chơi đoán bài hát cho 2–4 người. Quiz mới thuộc **Đọ Nhạc** và có thể thêm nhiều vòng; mỗi vòng chọn **Nghe chung**, **Đấu giá thời gian** hoặc **Đoán qua 5 gợi ý**. Có thể lặp lại luật ở nhiều vòng, tối đa 60 bài trong một quiz. Người tạo phòng cũng là một người chơi. Quiz và phòng cũ tiếp tục dùng nội dung, luật đã lưu.
+Trò chơi đoán bài hát cho 2–4 người. Quiz mới thuộc **Đọ Nhạc** và có thể thêm nhiều vòng; mỗi vòng chọn **Nghe chung**, **Đấu giá thời gian** hoặc **Đoán qua 6 gợi ý**. Có thể lặp lại luật ở nhiều vòng, tối đa 60 bài trong một quiz. Người tạo phòng cũng là một người chơi. Quiz và phòng cũ tiếp tục dùng nội dung, luật đã lưu.
 
 ### Cấu hình vòng chơi
 
@@ -88,4 +88,4 @@ Phản hồi gameplay không gửi `primary_answer`/`accepted_answers` trước 
 
 ## Đoán bài hát qua gợi ý
 
-Chọn chế độ **Đoán bài hát qua gợi ý** ở trang tạo quiz. Thêm 5 gợi ý cho mỗi bài, sửa điểm/thời gian và xem thử; có nút dùng 3 câu mẫu. Phòng bắt đầu tự động khi đủ 4 người bấm sẵn sàng. Xem [PERFORMANCE.md](PERFORMANCE.md) để biết luật, migration, số đo và cách chạy test.
+Chọn chế độ **Đoán bài hát qua gợi ý** ở trang tạo quiz. Thêm 6 gợi ý cho mỗi bài, sửa điểm/thời gian và xem thử; có nút dùng 3 câu mẫu. Phòng bắt đầu tự động khi đủ 4 người bấm sẵn sàng. Xem [PERFORMANCE.md](PERFORMANCE.md) để biết luật, migration, số đo và cách chạy test.
