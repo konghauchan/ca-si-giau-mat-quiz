@@ -9,12 +9,12 @@ export const PLAY_MODE_DESCRIPTIONS: Record<PlayMode, string> = {
   CLUE: 'Giành quyền trả lời từ 6 gợi ý. Trả lời sai sẽ mất quyền ở câu đó.'
 };
 export function storedPlayMode(q: { type?: unknown; game_round?: unknown }): PlayMode {
-  if (q.type === 'song_clue') return 'CLUE';
-  if (q.type === 'music_open') return 'OPEN';
-  if (q.type === 'music_bid') return 'BID';
+  if ((q.type === 'song_clue' || q.type === 'film_clue')) return 'CLUE';
+  if ((q.type === 'music_open' || q.type === 'film_open')) return 'OPEN';
+  if ((q.type === 'music_bid' || q.type === 'film_bid')) return 'BID';
   return Number(q.game_round) === 1 ? 'OPEN' : 'BID';
 }
 export function inputPlayMode(q: { playMode?: PlayMode; gameRound: number }, gameType?: string): PlayMode {
-  if (gameType === 'MUSIC_DUEL' && q.playMode) return q.playMode;
+  if ((gameType === 'MUSIC_DUEL' || gameType === 'FILM_DUEL') && q.playMode) return q.playMode;
   return gameType === 'SONG_CLUE' ? 'CLUE' : q.gameRound === 1 ? 'OPEN' : 'BID';
 }
