@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, Check, Clock3, Headphones, Maximize2, Minimize2, Pause, Play, Trophy, Users, Volume2, VolumeX, X } from 'lucide-react';
 import { api, gameToken } from '@/lib/client';
 import { ClipPlayer } from './ClipPlayer';
+import { NarrationControl } from './NarrationControl';
 import { AudioClipPlayer } from './AudioClipPlayer';
 import { RankingBoard } from './RankingBoard';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -104,6 +105,7 @@ export function GameRoom({ kind }: { kind: 'host' | 'player' }) {
     <div className="game-progress" aria-label={`Câu ${state.questionIndex + 1} trên ${state.questionCount}`}>{Array.from({ length: state.questionCount }, (_, index) => <span key={index} className={index < state.questionIndex ? 'done' : index === state.questionIndex ? 'current' : ''} />)}</div>
     {state.phase !== 'LOBBY' && <div className="game-topic-label"><span>VÒNG {state.gameRound} · CHỦ ĐỀ</span><strong>{state.topicName}</strong><small>Bài {state.topicQuestionIndex}/{state.topicQuestionCount}</small></div>}
     <PhaseProgress start={state.phaseStartedAt} end={state.phaseEndsAt} pausedAt={state.pausedAt} serverNow={state.serverNow} maxPoints={answerMaxPoints} />
+    <NarrationControl roomId={roomId} token={token} questionId={state.question.id} paused={state.pausedAt!=null} prepare={state.phase!=='LOBBY'} kind={['BIDDING','BID_REVEAL','OPEN_ANSWERING','ANSWERING'].includes(state.phase)?'question':['ROUND_RESULT','SCOREBOARD','GAME_FINISHED'].includes(state.phase)?'answer':undefined}/>
     {error && <div className="notice error">{error}</div>}
     {state.pausedAt !== null && <div className="game-pause-overlay" role="status"><div className="game-pause-card"><Pause size={42} /><h2>Trò chơi đang tạm dừng</h2><p>Đồng hồ và đoạn nhạc sẽ tiếp tục khi người tạo phòng bấm tiếp tục.</p>{kind === 'host' && <button type="button" className="button primary big" disabled={busy} onClick={() => command('resume')}><Play size={18} /> Tiếp tục trò chơi</button>}</div></div>}
     {['OPEN_ANSWERING', 'ANSWERING'].includes(state.phase) && state.myAnswer !== null && state.myAnswerCorrect !== null && <div className={`answer-feedback ${state.myAnswerCorrect ? 'correct' : 'wrong'}`} role="status">{state.myAnswerCorrect ? <Check size={26} /> : <X size={26} />}<div><strong>{state.myAnswerCorrect ? 'Trả lời đúng!' : state.playMode === 'OPEN' ? 'Chưa đúng, thử tiếp nhé' : 'Trả lời sai'}</strong><span>{state.myAnswerCorrect ? 'Đáp án đã được chốt. Chờ kết quả của lượt này.' : state.playMode === 'OPEN' ? `Bạn đã thử ${state.myAttemptCount} lần. Hãy nhập đáp án khác trước khi hết giờ.` : film?'Bạn đã dùng lượt trả lời duy nhất. Chờ người xem tiếp theo hoặc kết quả.':'Bạn đã dùng lượt trả lời duy nhất. Chờ người nghe tiếp theo hoặc kết quả.'}</span></div></div>}

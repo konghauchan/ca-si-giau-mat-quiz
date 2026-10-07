@@ -96,3 +96,21 @@ Chọn chế độ **Đoán bài hát qua gợi ý** ở trang tạo quiz. Thêm
 Chọn **Đọ Phim** ở mục chơi trong trang tạo quiz. Mỗi vòng chọn **Xem chung**, **Đấu giá thời gian xem** hoặc **Đoán qua 6 gợi ý**. Lưu URL YouTube, mốc bắt đầu và thời lượng như Đọ Nhạc; đáp án là tên phim. Luật điểm, thử lại, tranh quyền và chuyển vòng dùng cùng game engine. Loại quiz `FILM_DUEL` và câu hỏi `film_open`/`film_bid`/`film_clue` lưu trong các cột hiện có, không cần migration.
 
 Đoạn phim hiện hình trong lúc phát, tự dừng đúng thời lượng. Giao diện chặn chuột/phím tua, che vùng tiêu đề và điều khiển YouTube, che toàn khung trước/sau phát hoặc khi tạm dừng. Người tạo vẫn có trình phát gốc trong editor để chọn đoạn. Đây là che trên giao diện: YouTube có thể thay đổi vị trí thông tin và nội dung tên phim nằm sẵn trong video không bị loại bỏ. Chạy rounds smoke với `SMOKE_CATEGORY=FILM` để kiểm tra 4 người qua 5 vòng phim.
+
+
+## Giọng đọc WaveNet tiếng Việt
+
+- Bật bằng `GOOGLE_TTS_SERVICE_ACCOUNT_JSON` trong môi trường máy chủ; không đưa key vào mã nguồn hoặc biến `NEXT_PUBLIC_`.
+- Bật Cloud Text-to-Speech API và billing trong Google Cloud. Tạo service account có quyền dùng API trong project đó; đặt JSON chứa `client_email` và `private_key` vào biến bí mật `GOOGLE_TTS_SERVICE_ACCOUNT_JSON` trên Vercel (Production và Preview). Không dùng key Google AI Studio.
+- Giọng mặc định `vi-VN-Wavenet-A` (nữ), đổi `GOOGLE_TTS_VOICE` thành `vi-VN-Wavenet-B/C/D` nếu cần. Chỉ chấp nhận giọng WaveNet tiếng Việt để tránh chọn nhầm model có phí khác.
+- Đặt `NARRATION_CACHE_SECRET` bằng chuỗi ngẫu nhiên dài và giữ ổn định khi thay thông tin xác thực Google.
+- Vercel cần `BLOB_READ_WRITE_TOKEN`. Âm thanh nén và mã hóa AES-GCM trước khi lưu vào Blob; Turso chỉ lưu khóa cache, vị trí tệp và bộ đếm sử dụng, không lưu âm thanh.
+- Người chơi tự nghe câu hỏi ở phần đấu giá/trả lời, gợi ý khi mở và đáp án khi công bố; không đọc đè đoạn nhạc đoán. Khi đọc đáp án trên video kết quả, âm lượng YouTube giảm còn 15% rồi trở lại.
+- Có nút Nghe, Dừng và tắt/bật tự đọc cho từng thiết bị. Trình duyệt chặn tự phát thì hiện hướng dẫn bấm Nghe. Đổi câu, giành quyền trả lời hoặc tạm dừng sẽ hủy giọng cũ.
+- API chỉ đọc nội dung được phép ở trạng thái phòng hiện tại; đáp án chưa công bố không được tải, kể cả đã tạo cache. Xem thử bản nháp yêu cầu đăng nhập.
+- Tạo trước âm thanh câu hiện tại ở nền, dùng lại giữa các phòng có cùng nội dung. Lần đầu tạo có thể chưa kịp thời gian chơi; giọng đọc không kéo dài đồng hồ hoặc chặn trận đấu. Nên nghe thử trước khi chơi để làm ấm cache.
+- `TTS_DAILY_LIMIT` mặc định 2.000 lần tạo mới/ngày (UTC); bản nháp giới hạn 50 lần mới/tài khoản/ngày. Phát lại cache không gọi Google TTS. Quota này không thay thế hạn mức/chi phí trên tài khoản Google.
+- Nếu thiếu cấu hình, phần giọng đọc được ẩn và game vẫn hoạt động.
+- Tài liệu API: https://cloud.google.com/text-to-speech/docs/reference/rest/v1/text/synthesize
+
+- Giới hạn ứng dụng `TTS_MONTHLY_CHARACTER_LIMIT` mặc định 3.800.000 ký tự mới/tháng UTC; cache không tính thêm. Bộ đếm đặt chỗ trước khi gọi API (lỗi vẫn tính để giới hạn an toàn). Giới hạn này chỉ theo dõi website này, không theo dõi ứng dụng khác dùng cùng project Google. WaveNet có 4 triệu ký tự miễn phí/tháng theo bảng giá hiện tại; Google tự tính phí khi vượt quota: https://cloud.google.com/text-to-speech/pricing

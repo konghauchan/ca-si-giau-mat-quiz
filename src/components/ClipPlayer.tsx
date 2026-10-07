@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { youtubeId } from '@/lib/core';
 
-type YTPlayer = { seekTo: (seconds: number, allowSeekAhead: boolean) => void; playVideo: () => void; pauseVideo: () => void; getIframe: () => HTMLIFrameElement; destroy: () => void };
+type YTPlayer = { seekTo: (seconds: number, allowSeekAhead: boolean) => void; playVideo: () => void; pauseVideo: () => void; getIframe: () => HTMLIFrameElement; setVolume: (value: number) => void; destroy: () => void };
 type YTWindow = Window & { YT?: { Player: new (element: HTMLElement, config: object) => YTPlayer }; onYouTubeIframeAPIReady?: () => void };
 let loading: Promise<void> | null = null;
 function loadYouTube(): Promise<void> {
@@ -21,6 +21,12 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
   const player = useRef<YTPlayer | null>(null);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playedRef = useRef(false);
+  const narratingRef = useRef(false);
+  useEffect(() => {
+    const duck = (event: Event) => { narratingRef.current=!!(event as CustomEvent<boolean>).detail; player.current?.setVolume(narratingRef.current?15:100); };
+    window.addEventListener('quiz-narration',duck);
+    return () => window.removeEventListener('quiz-narration',duck);
+  }, []);
   const pausedRef = useRef(paused);
   const remainingMs = useRef(duration * 1000);
   const playStartedAt = useRef<number | null>(null);
@@ -44,6 +50,7 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
           onReady: () => {
             if (!active) return;
             setReady(true);
+            player.current?.setVolume(narratingRef.current?15:100);
             if(!preview){const iframe=player.current?.getIframe();iframe?.setAttribute('tabindex','-1');iframe?.setAttribute('title','Đoạn video của câu hỏi');}
             if (!preview && !pausedRef.current && player.current) {
               player.current.seekTo(start, true);

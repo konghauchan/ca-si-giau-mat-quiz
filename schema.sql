@@ -93,3 +93,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_clue_score_once ON score_events(room_id, q
 CREATE INDEX IF NOT EXISTS idx_players_room ON players(room_id, joined_at);
 CREATE INDEX IF NOT EXISTS idx_questions_round ON questions(quiz_id, game_round, order_index);
 CREATE INDEX IF NOT EXISTS idx_quizzes_owner_user ON quizzes(owner_user_id, updated_at);
+CREATE TABLE IF NOT EXISTS narration_cache (
+  id TEXT PRIMARY KEY, location TEXT, lease_until INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS narration_usage (
+  scope TEXT NOT NULL, day TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(scope,day)
+);

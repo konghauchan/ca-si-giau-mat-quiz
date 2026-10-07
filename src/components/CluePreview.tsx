@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Check, RotateCcw, X } from 'lucide-react';
 import { ClueActions } from './ClueActions';
 import { ClueBoard } from './ClueBoard';
+import { NarrationControl } from './NarrationControl';
 import { answerMatches } from '@/lib/core';
 import { answerClue, catchUpClue, claimBuzzer, clueInitial, requiredVotes, voteClue, type Clue, type ClueState } from '@/lib/clueRules';
 
@@ -47,6 +48,7 @@ export function CluePreview({ clues, title, artist, onClose, film = false, accep
   }
   return <div className="clue-preview-modal" role="dialog" aria-modal="true" aria-label="Xem như người chơi"><section className="panel">
     <div className="phase-banner"><span className="kicker">CHƠI THỬ · MÔ PHỎNG 4 NGƯỜI</span><button type="button" className="button ghost" onClick={onClose} aria-label="Đóng xem trước"><X/></button></div>
+    <NarrationControl kind={result||state.phase==='CLUE_ACTIVE'?'preview':undefined} previewText={result?`Đáp án là: ${title}. ${artist}`:`Gợi ý ${state.clueIndex+1}: ${clues[state.clueIndex].text}`}/>
     {result ? <div className="clue-preview-result" role="status">
       {state.outcome === 'correct' ? <><Check size={40}/><h2>Chính xác!</h2><p>Bạn nhận <strong>+{state.lockedScore} điểm</strong></p></> : <><h2>Đáp án của câu này</h2><p>Chưa có người trả lời đúng.</p></>}
       <div className="result-answer">{title || 'Chưa nhập đáp án'}</div><p>{artist}</p><button type="button" className="button secondary" onClick={reset}><RotateCcw size={18}/>Chơi thử lại</button>
@@ -59,7 +61,7 @@ export function CluePreview({ clues, title, artist, onClose, film = false, accep
         {(state.votes.includes('you') || eliminated) && <div className="clue-preview-simulation"><p>Trong phòng thật, hệ thống chờ phiếu của các bạn. Ở bản chơi thử, bạn có thể mô phỏng số phiếu còn thiếu.</p><button type="button" className="button secondary" onClick={simulateVotes}>Mô phỏng các bạn đồng ý</button></div>}
       </>}
       {state.phase === 'CLUE_ANSWERING' && <form className="clue-answer-form" onSubmit={event => { event.preventDefault(); if (answer.trim()) act('answer'); }}>
-        <h2>Bạn đã giành quyền!</h2><p>Đã khóa {state.lockedScore} điểm. Ba người còn lại chờ bạn trả lời.</p>
+        <h2>Đến lượt bạn trả lời!</h2><p>Đã khóa {state.lockedScore} điểm. Ba người còn lại chờ bạn trả lời.</p>
         <div className="field"><label htmlFor="preview-clue-answer">{film ? 'Nhập tên phim' : 'Nhập tên bài hát'}</label><input id="preview-clue-answer" autoFocus value={answer} onChange={event => setAnswer(event.target.value)} maxLength={120} autoComplete="off"/></div>
         <button className="button primary big full" disabled={!answer.trim()}>Chốt đáp án · chỉ một lần</button>
       </form>}
