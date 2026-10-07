@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { ROUND_INTRO_MS } from './roundIntro';
 import { one, all, run, tx, batchRead } from './db';
 import { answerMatches, groupBids, nextGroup, normalizeAnswer, scoreForBid, scoreForCorrectRank, scoreForTimedAnswer, youtubeId, type Phase } from './core';
 import { storedAssetExists } from './media';
@@ -46,7 +47,7 @@ async function challengers(r: Row): Promise<string[]> {
 async function startQuestion(r: Row, index: number) {
   const q = await question(String(r.quiz_id), index);
   const previous = index > 0 ? await question(String(r.quiz_id), index - 1) : undefined;
-  if (!previous || previous.topic_id !== q.topic_id || gameRound(previous) !== gameRound(q)) await setPhase(String(r.id), 'TOPIC_INTRO', 2000);
+  if (!previous || previous.topic_id !== q.topic_id || gameRound(previous) !== gameRound(q)) await setPhase(String(r.id), 'TOPIC_INTRO', !previous || gameRound(previous) !== gameRound(q) ? ROUND_INTRO_MS : 2000);
   else await beginQuestion(r, q);
   await event(String(r.id), 'QUESTION_CHANGED', { index, gameRound: gameRound(q) });
 }

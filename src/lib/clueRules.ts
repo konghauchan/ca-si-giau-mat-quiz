@@ -6,7 +6,7 @@ export type ClueQuestion = { clues: Clue[]; answerSeconds: number; clueSeconds: 
 export const requiredVotes = (eligible: number) => Math.ceil(eligible * .75);
 export const clueInitial = (time: number): ClueState => ({ phase: 'LOBBY', questionIndex: 0, clueIndex: 0, startedAt: time, endsAt: null, eliminated: [], votes: [], holder: null, lockedScore: 0, remainingMs: 0, outcome: null, answer: null });
 function phase(s: ClueState, value: CluePhase, time: number, duration: number | null): ClueState { return { ...s, phase: value, startedAt: time, endsAt: duration === null ? null : time + duration }; }
-export function startClueQuestion(s: ClueState, time: number): ClueState { return phase({ ...clueInitial(time), questionIndex: s.questionIndex }, 'QUESTION_INTRO', time, 2000); }
+export function startClueQuestion(s: ClueState, time: number, introductionMs = 2000): ClueState { return phase({ ...clueInitial(time), questionIndex: s.questionIndex }, 'QUESTION_INTRO', time, introductionMs); }
 export function nextClue(s: ClueState, q: ClueQuestion, time: number): ClueState { return s.clueIndex >= q.clues.length - 1 ? phase(s, 'CLUE_RESULT', time, 3000) : phase({ ...s, clueIndex: s.clueIndex + 1, votes: [], holder: null, outcome: null, answer: null }, 'CLUE_ACTIVE', time, q.clueSeconds * 1000); }
 export function claimBuzzer(s: ClueState, q: ClueQuestion, playerId: string, time: number): ClueState {
   if (s.phase !== 'CLUE_ACTIVE' || s.endsAt === null || time >= s.endsAt || s.eliminated.includes(playerId)) throw new Error('Bạn không thể giành quyền lúc này.');
