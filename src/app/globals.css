@@ -54,3 +54,29 @@ body:has(.game-room){background:#173c42}body:has(.game-room) .site-header,body:h
 .clue-action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}.clue-action-card.button{border-radius:18px;padding:20px;min-height:104px;display:flex;text-align:left;justify-content:flex-start;gap:14px;border:2px solid transparent;box-shadow:none}.clue-action-buzz{background:#5036d1;color:#fff}.clue-action-vote{background:#f3f5ff;color:#273654;border-color:#d9def0!important}.clue-action-icon{width:46px;height:46px;flex-shrink:0;border-radius:14px;background:#ffffff25;display:grid;place-items:center}.clue-action-vote .clue-action-icon{background:#e5e9fa;color:#5036d1}.clue-action-copy{flex:1;min-width:0}.clue-action-copy strong{display:block;font-size:21px}.clue-action-copy small{display:block;font-size:12px;font-weight:500;line-height:1.5;margin-top:5px}.clue-action-help,.clue-vote-help,.clue-preview-note{font-size:12px;line-height:1.6;color:#677286;margin:12px 0 0}.clue-vote-help{padding:10px 14px;border-radius:12px;background:#f3f5fa;margin-top:8px}.clue-action-vote.has-voted{opacity:1;background:#eaf7f0;border-color:#a4d4b8!important;color:#246142}.game-room .clue-action-help{color:var(--game-muted)}.game-room .clue-vote-help{background:#24464c;color:var(--game-text)}.game-room .clue-action-buzz{background:var(--game-lime);color:#102b2d}.game-room .clue-action-buzz .clue-action-icon{background:#102b2d16}.game-room .clue-action-vote{background:#315157;color:var(--game-text);border-color:#56767d!important}.game-room .clue-action-vote.has-voted{background:#28533f;border-color:#6d9a6b!important}.clue-preview-status{display:flex;justify-content:space-between;margin-bottom:12px;font-size:13px;color:#63708b}.clue-preview-status strong{color:#5036d1;font-size:20px}.clue-preview-simulation{padding:14px;border:1px dashed #c4b7f4;border-radius:14px;background:#f7f4ff;margin-top:14px}.clue-preview-simulation p{font-size:12px;line-height:1.6;margin:0 0 10px;color:#5f5876}.clue-preview-result{text-align:center;padding:24px 0}.clue-preview-result>svg{color:#20a566}.clue-preview-note{border-top:1px solid #e4e7ef;padding-top:14px;margin-top:22px}@media(max-width:600px){.clue-action-grid{grid-template-columns:1fr;gap:10px}.clue-action-card.button{min-height:86px;padding:16px}.clue-action-copy strong{font-size:19px}.clue-preview-modal{padding:12px}}
 
 .narration-control{margin:10px 0 16px;padding:10px 14px;border:1px solid #d9dfe8;border-radius:14px;background:#f5f7fb;color:#344054}.narration-buttons{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.narration-buttons>span{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700}.narration-buttons .button{font-size:12px;min-height:32px;padding:7px 10px}.narration-control>p{font-size:12px;line-height:1.5;margin:8px 0 0}.game-room .narration-control{background:#21434a;border-color:#45676c;color:#e4f0ed}
+
+/* Header audio settings stay accessible in the result video view and fullscreen. */
+.audio-menu { position: relative; z-index: 80; color: #152d35; }
+.audio-menu > summary { list-style: none; cursor: pointer; }
+.audio-menu > summary::-webkit-details-marker { display: none; }
+.audio-menu[open] > summary { background: #6547ed; color: white; }
+.audio-menu-panel { position: absolute; top: calc(100% + 12px); right: 0; width: min(320px, calc(100vw - 32px)); max-height: 75vh; overflow-y: auto; padding: 20px; background: #fff; border: 1px solid #dedbea; border-radius: 18px; box-shadow: 0 12px 40px #0004; display: grid; gap: 14px; text-align: left; }
+.audio-volume { display: grid; gap: 7px; font-size: 14px; }
+.audio-volume span { display: flex; justify-content: space-between; }
+.audio-volume output { font-variant-numeric: tabular-nums; color: #6547ed; }
+.audio-volume input { width: 100%; accent-color: #6547ed; cursor: pointer; padding: 0; }
+.audio-language { display: grid; gap: 6px; font-size: 14px; }
+.audio-language select { width: 100%; padding: 10px; border: 1px solid #dedbea; border-radius: 9px; background: white; color: #152d35; }
+.audio-menu-panel small { color: #687786; line-height: 1.5; }
+.audio-menu-panel .narration-control { padding: 0; margin: 0; border: 0; }
+.audio-menu-panel .narration-buttons { flex-wrap: wrap; }
+.audio-menu-panel .narration-buttons > span { display: none; }
+.clue-room .game-topbar .audio-menu { margin-left: auto; }
+
+.round-intro { text-align: center; animation: round-intro-enter .45s ease both; }
+.round-intro-icon { color: #d8f29f; margin: 12px auto 20px; }
+.round-intro h2 { font-size: clamp(28px,4vw,44px); margin: 18px 0; }
+.round-intro ol { text-align: left; max-width: 650px; margin: 24px auto; display: grid; gap: 14px; line-height: 1.65; }
+.round-intro li::marker { color: #d8f29f; font-weight: 800; }
+@keyframes round-intro-enter { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .round-intro { animation: none; } }
