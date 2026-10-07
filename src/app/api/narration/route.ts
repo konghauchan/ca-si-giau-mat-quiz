@@ -5,10 +5,11 @@ import { getState } from '@/lib/game';
 import { one } from '@/lib/db';
 import { narrationConfigured, speech } from '@/lib/narration';
 import { narrationText, type NarrationState } from '@/lib/narrationText';
+import { roundIntroText } from '@/lib/roundIntro';
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 export const dynamic = 'force-dynamic';
-const input = z.object({ language: z.enum(['vi-VN','en-US']).default('vi-VN'), roomId: z.string().uuid().optional(), questionId: z.string().uuid().optional(), kind: z.enum(['question', 'clue', 'answer', 'intro', 'prepare', 'preview']), text: z.string().trim().min(1).max(1600).optional() });
+const input = z.object({ language: z.enum(['vi-VN','en-US']).default('vi-VN'), mode: z.enum(['OPEN','BID','CLUE']).optional(), roomId: z.string().uuid().optional(), questionId: z.string().uuid().optional(), kind: z.enum(['question', 'clue', 'answer', 'intro', 'intro-audio', 'prepare', 'preview']), text: z.string().trim().min(1).max(1600).optional() });
 export function GET() { return NextResponse.json({ enabled: narrationConfigured() }, { headers: { 'Cache-Control': 'no-store' } }); }
 export async function POST(request: NextRequest) {
   try {
@@ -37,7 +38,11 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json({ preparing: true });
       }
-      text = narrationText(state as unknown as NarrationState, body.kind, body.language);
+      if (body.kind === 'intro-audio') {
+        if (!body.mode) throw new Error('Thiếu kiểu hướng dẫn.');
+        // Public rules may be downloaded before play. Answer phase guards stay intact.
+        text = roundIntroText(body.mode, 0, state.category === 'FILM', body.language);
+      } else text = narrationText(state as unknown as NarrationState, body.kind, body.language);
     }
     const audio = await speech(text, scope, body.language);
     return new Response(new Uint8Array(audio), { headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'private, no-store', 'Accept-Ranges': 'none' } });
