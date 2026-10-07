@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { ROUND_INTRO_MS } from './roundIntro';
 import { all, one, run, tx, batchRead, batchWrite } from './db';
 import { answerMatches } from './core';
 import { answerClue, catchUpClue, expireClue, claimBuzzer, clueInitial, requiredVotes, ranks, startClueQuestion, voteClue, type Clue, type ClueQuestion, type ClueState } from './clueRules';
@@ -41,7 +42,7 @@ export async function clueCommand(roomId: string, auth: string, action: string, 
     if (action === 'ready') {
       if (s.phase !== 'LOBBY') throw new Error('Trò chơi đã bắt đầu.');
       await run('UPDATE players SET ready=1,last_seen_at=? WHERE id=?', Date.now(), String(p.id));
-      if (ps.length === 4 && ps.every(other => other.id === p.id || Number(other.ready) === 1)) s = startClueQuestion(s, Date.now());
+      if (ps.length === 4 && ps.every(other => other.id === p.id || Number(other.ready) === 1)) s = startClueQuestion(s, Date.now(), ROUND_INTRO_MS);
     } else if (action === 'buzz') s = claimBuzzer(s, cfg[s.questionIndex], String(p.id), Date.now());
     else if (action === 'nextClue') s = voteClue(s, cfg[s.questionIndex], String(p.id), ids, Date.now());
     else if (action === 'answer') {
@@ -77,7 +78,7 @@ export async function clueSnapshot(roomId: string, auth: string, r: Row, pp: Row
   const seats=[...pp].sort((a,b)=>Number(a.joined_at)-Number(b.joined_at));
   if(Date.now()-Number(me.last_seen_at)>10000) await tx(()=>run('UPDATE players SET last_seen_at=? WHERE id=? AND last_seen_at<?',Date.now(),String(me.id),Date.now()-10000));
   const players=ranks(pp.map(p=>({id:String(p.id),nickname:String(p.nickname),avatarId:Number(p.avatar_id),colorIndex:seats.findIndex(seat=>seat.id===p.id),score:Number(p.score),ready:Number(p.ready)===1,connected:p.id===me.id || Date.now()-Number(p.last_seen_at)<20000,eliminated:s.eliminated.includes(String(p.id)),roundDelta:ss.filter(e=>e.player_id===p.id).reduce((sum,e)=>sum+Number(e.delta),0)})));
-  return {roomId,pin:String(r.pin),gameType:'SONG_CLUE' as const,category:r.quiz_game_type==='FILM_DUEL'?'FILM':'MUSIC',playMode:'CLUE' as const,mixed:currentOnly,gameRound:Number(q.game_round),roundCount:new Set(qq.map(q=>q.game_round)).size,pausedAt:r.paused_at,quizTitle:String(r.title),phase:s.phase,phaseStartedAt:s.startedAt,phaseEndsAt:s.endsAt,serverNow:Date.now(),lastEventId:version,questionIndex:s.questionIndex,questionCount:qq.length,me:{id:String(me.id),nickname:String(me.nickname)},players,isHost:r.host_token===auth,
+  return {roomId,pin:String(r.pin),gameType:'SONG_CLUE' as const,category:r.quiz_game_type==='FILM_DUEL'?'FILM':'MUSIC',playMode:'CLUE' as const,mixed:currentOnly,gameRound:Number(q.game_round),roundCount:new Set(qq.map(q=>q.game_round)).size,pausedAt:r.paused_at,quizTitle:String(r.title),phase:s.phase,phaseStartedAt:s.startedAt,phaseEndsAt:s.endsAt,serverNow:Date.now(),lastEventId:version,questionIndex:s.questionIndex,questionCount:qq.length,roundQuestionIndex:qq.filter(item=>Number(item.game_round)===Number(q.game_round)&&Number(item.order_index)<=s.questionIndex).length,me:{id:String(me.id),nickname:String(me.nickname)},players,isHost:r.host_token===auth,
     clue:{index:s.clueIndex,scores:clues.map(c=>c.score),items:s.phase==='QUESTION_INTRO'||s.phase==='LOBBY'?[]:clues.slice(0,s.clueIndex+1),value:clues[s.clueIndex].score,votes:s.votes.length,hasVoted:s.votes.includes(String(me.id)),requiredVotes:requiredVotes(pp.length-s.eliminated.length),holder:s.holder,lockedScore:s.lockedScore,outcome:s.outcome,submittedAnswer:s.holder===me.id?s.answer:undefined,eliminated:s.eliminated.includes(String(me.id))},
     question:{id:String(q.id),primaryAnswer:reveal?String(q.primary_answer):undefined,artist:reveal?String(q.artist):undefined,answerSeconds:Number(q.answer_seconds)}};
 }
@@ -85,7 +86,7 @@ export async function clueSnapshot(roomId: string, auth: string, r: Row, pp: Row
 // Mixed quizzes share the room clock and question order with the music engine.
 // Stop at CLUE_RESULT; the shared engine then shows scores and starts any next rule.
 export async function startCurrentClue(roomId: string, index: number) {
-  await persist(roomId,startClueQuestion({...clueInitial(Date.now()),questionIndex:index},Date.now()),'CLUE_STARTED');
+  await persist(roomId,startClueQuestion({...clueInitial(Date.now()),questionIndex:index},Date.now(),2000),'CLUE_STARTED');
 }
 export async function advanceCurrentClue(r: Row) {
   const qs = await all('SELECT * FROM questions WHERE quiz_id=? ORDER BY order_index',String(r.quiz_id));

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useAudioPreferences } from './audioPreferences';
+
 type Cue = 'submit' | 'correct' | 'wrong' | 'score' | 'rank' | 'clock' | 'tick' | 'finalTick' | 'transition' | 'reveal';
 const patterns: Record<Cue, Array<[number, number, number, number]>> = {
   submit: [[520, 0, .07, .024], [690, .08, .09, .022]],
@@ -17,21 +19,24 @@ const patterns: Record<Cue, Array<[number, number, number, number]>> = {
 };
 
 export function useGameSounds() {
+  const { settings } = useAudioPreferences();
   const [enabled, setEnabled] = useState(true);
   const context = useRef<AudioContext | null>(null);
   useEffect(() => {
     setEnabled(localStorage.getItem('game-sounds') !== 'off');
+    const sync = () => setEnabled(localStorage.getItem('game-sounds') !== 'off');
+    window.addEventListener('game-sounds-change', sync);
     const unlock = () => { if (context.current?.state === 'suspended') void context.current.resume(); };
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
-    return () => { window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); void context.current?.close(); context.current = null; };
+    return () => { window.removeEventListener('game-sounds-change', sync); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); void context.current?.close(); context.current = null; };
   }, []);
-  const toggle = useCallback(() => setEnabled(current => {
-    localStorage.setItem('game-sounds', current ? 'off' : 'on');
-    return !current;
-  }), []);
+  const toggle = useCallback(() => {
+    localStorage.setItem('game-sounds', enabled ? 'off' : 'on');
+    window.dispatchEvent(new Event('game-sounds-change'));
+  }, [enabled]);
   const play = useCallback((cue: Cue) => {
-    if (!enabled) return;
+    if (!enabled || settings.effects === 0) return;
     try {
       const audio = context.current ?? new AudioContext();
       context.current = audio;
@@ -43,13 +48,13 @@ export function useGameSounds() {
         oscillator.type = cue === 'wrong' ? 'triangle' : cue === 'clock' || cue === 'tick' || cue === 'finalTick' ? 'square' : 'sine';
         oscillator.frequency.setValueAtTime(frequency, start + delay);
         gain.gain.setValueAtTime(.0001, start + delay);
-        gain.gain.exponentialRampToValueAtTime(volume, start + delay + .015);
+        gain.gain.exponentialRampToValueAtTime(volume * settings.effects / 100, start + delay + .015);
         gain.gain.exponentialRampToValueAtTime(.0001, start + delay + duration);
         oscillator.connect(gain).connect(audio.destination);
         oscillator.start(start + delay);
         oscillator.stop(start + delay + duration + .01);
       }
     } catch { /* Audio is optional when the browser blocks playback. */ }
-  }, [enabled]);
+  }, [enabled, settings.effects]);
   return { enabled, toggle, play };
 }

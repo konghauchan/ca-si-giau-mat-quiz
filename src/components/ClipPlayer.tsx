@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { readAudioPreferences, useAudioPreferences } from '@/lib/audioPreferences';
 import { youtubeId } from '@/lib/core';
 
 type YTPlayer = { seekTo: (seconds: number, allowSeekAhead: boolean) => void; playVideo: () => void; pauseVideo: () => void; getIframe: () => HTMLIFrameElement; setVolume: (value: number) => void; destroy: () => void };
@@ -16,6 +17,8 @@ function loadYouTube(): Promise<void> {
   return loading;
 }
 export function ClipPlayer({ url, start, duration, preview = false, reveal = false, showVideo = false, paused = false }: { url: string; start: number; duration: number; preview?: boolean; reveal?: boolean; showVideo?: boolean; paused?: boolean }) {
+  const { settings } = useAudioPreferences();
+  useEffect(() => { player.current?.setVolume(settings.media * (narratingRef.current ? .15 : 1)); }, [settings.media]);
   const videoId = youtubeId(url);
   const mount = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
@@ -23,7 +26,7 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
   const playedRef = useRef(false);
   const narratingRef = useRef(false);
   useEffect(() => {
-    const duck = (event: Event) => { narratingRef.current=!!(event as CustomEvent<boolean>).detail; player.current?.setVolume(narratingRef.current?15:100); };
+    const duck = (event: Event) => { narratingRef.current=!!(event as CustomEvent<boolean>).detail; player.current?.setVolume(readAudioPreferences().media * (narratingRef.current ? .15 : 1)); };
     window.addEventListener('quiz-narration',duck);
     return () => window.removeEventListener('quiz-narration',duck);
   }, []);
@@ -50,7 +53,7 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
           onReady: () => {
             if (!active) return;
             setReady(true);
-            player.current?.setVolume(narratingRef.current?15:100);
+            player.current?.setVolume(readAudioPreferences().media * (narratingRef.current ? .15 : 1));
             if(!preview){const iframe=player.current?.getIframe();iframe?.setAttribute('tabindex','-1');iframe?.setAttribute('title','Đoạn video của câu hỏi');}
             if (!preview && !pausedRef.current && player.current) {
               player.current.seekTo(start, true);

@@ -1,7 +1,8 @@
 import { createSign } from 'node:crypto';
 import { audioFromWaveNet } from './narrationAudio.ts';
 
-export const waveNetVoice = () => process.env.GOOGLE_TTS_VOICE || 'vi-VN-Wavenet-A';
+export type NarrationLanguage = 'vi-VN' | 'en-US';
+export const waveNetVoice = (language: NarrationLanguage = 'vi-VN') => language === 'en-US' ? 'en-US-Wavenet-F' : process.env.GOOGLE_TTS_VOICE || 'vi-VN-Wavenet-A';
 export const waveNetConfigured = () => !!process.env.GOOGLE_TTS_SERVICE_ACCOUNT_JSON;
 let accessToken: { value: string; expires: number; credentials: string } | undefined;
 let refreshing: Promise<string> | undefined;
@@ -36,14 +37,14 @@ async function googleAccessToken(): Promise<string> {
   try { return await pending; } finally { refreshing = undefined; }
 }
 
-export async function generateWaveNetSpeech(text: string): Promise<Buffer> {
-  const voice = waveNetVoice();
-  if (!/^vi-VN-Wavenet-[A-D]$/.test(voice)) throw new Error('Hãy chọn giọng WaveNet tiếng Việt A, B, C hoặc D.');
+export async function generateWaveNetSpeech(text: string, language: NarrationLanguage = 'vi-VN'): Promise<Buffer> {
+  const voice = waveNetVoice(language);
+  if (!(language === 'en-US' ? voice === 'en-US-Wavenet-F' : /^vi-VN-Wavenet-[A-D]$/.test(voice))) throw new Error('Hãy chọn giọng WaveNet tiếng Việt A, B, C hoặc D.');
   if (!text.trim() || text.length > 1600 || Buffer.byteLength(text, 'utf8') > 5000) throw new Error('Nội dung đọc quá dài hoặc không hợp lệ.');
   const token = await googleAccessToken();
   const response = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ input: { text }, voice: { languageCode: 'vi-VN', name: voice }, audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: 24000, speakingRate: 1.05 } }),
+    body: JSON.stringify({ input: { text }, voice: { languageCode: language, name: voice }, audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: 24000, speakingRate: 1.05 } }),
     signal: AbortSignal.timeout(40_000)
   });
   if (response.status === 401) accessToken = undefined;

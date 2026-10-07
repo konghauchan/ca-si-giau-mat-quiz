@@ -1,6 +1,6 @@
 import { createHash, createHmac } from 'node:crypto';
 import { encryptSpeech, decryptSpeech } from './narrationAudio';
-import { generateWaveNetSpeech, waveNetConfigured, waveNetVoice } from './waveNet';
+import { generateWaveNetSpeech, waveNetConfigured, waveNetVoice, type NarrationLanguage } from './waveNet';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { put } from '@vercel/blob';
@@ -14,10 +14,10 @@ async function readCached(location: string): Promise<Buffer> {
   const encrypted = location.startsWith('https:') ? Buffer.from(await (await fetch(location, { signal: AbortSignal.timeout(10000) })).arrayBuffer()) : await fs.readFile(location);
   return decryptSpeech(encrypted, key());
 }
-export async function speech(text: string, scope: string): Promise<Buffer> {
+export async function speech(text: string, scope: string, language: NarrationLanguage = 'vi-VN'): Promise<Buffer> {
   if (!narrationConfigured()) throw new Error('Chưa cấu hình WaveNet. Cần tài khoản dịch vụ Google Cloud và kho Blob cho bản online.');
   if (!text.trim() || text.length > 1600) throw new Error('Nội dung đọc không hợp lệ.');
-  const id = createHmac('sha256', key()).update(`wavenet-linear16-v1\n${waveNetVoice()}\n${text}`).digest('hex');
+  const id = createHmac('sha256', key()).update(`wavenet-linear16-v1\n${waveNetVoice(language)}\n${text}`).digest('hex');
   const pending = inFlight.get(id); if (pending) return pending;
   const job = (async () => {
     for (let attempt = 0; attempt < 200; attempt++) {
@@ -50,7 +50,7 @@ export async function speech(text: string, scope: string): Promise<Buffer> {
       });
       if (!claimed) { await new Promise(resolve => setTimeout(resolve, 250)); continue; }
       try {
-        const audio = await generateSpeech(text); const encrypted = encryptSpeech(audio, key());
+        const audio = await generateSpeech(text, language); const encrypted = encryptSpeech(audio, key());
         let location: string;
         if (process.env.VERCEL) location = (await put(`narration/${id}.bin`, encrypted, { access: 'public', addRandomSuffix: true, contentType: 'application/octet-stream' })).url;
         else { const directory = path.resolve('./data/narration'); await fs.mkdir(directory, { recursive: true }); location = path.join(directory, `${id}.bin`); await fs.writeFile(location, encrypted); }

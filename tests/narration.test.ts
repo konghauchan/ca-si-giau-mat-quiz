@@ -53,8 +53,8 @@ test('WaveNet authenticates server-side, reads Vietnamese and reuses its OAuth t
     assert.equal(new Headers(options?.headers).get('Authorization'), 'Bearer mock-access-token');
     const body = JSON.parse(String(options?.body));
     assert.equal(body.input.text, 'Đáp án là: Một ngày mới.');
-    assert.equal(body.voice.name, 'vi-VN-Wavenet-A');
-    assert.equal(body.voice.languageCode, 'vi-VN');
+    assert.equal(body.voice.name, synthesisCalls === 2 ? 'en-US-Wavenet-F' : 'vi-VN-Wavenet-A');
+    assert.equal(body.voice.languageCode, synthesisCalls === 2 ? 'en-US' : 'vi-VN');
     assert.equal(body.audioConfig.audioEncoding, 'LINEAR16');
     synthesisCalls++;
     return Response.json({ audioContent: wav.toString('base64') });
@@ -62,13 +62,23 @@ test('WaveNet authenticates server-side, reads Vietnamese and reuses its OAuth t
   try {
     assert.deepEqual(await generateWaveNetSpeech('Đáp án là: Một ngày mới.'), wav);
     await generateWaveNetSpeech('Đáp án là: Một ngày mới.');
-    assert.equal(authenticationCalls, 1); assert.equal(synthesisCalls, 2);
+    await generateWaveNetSpeech('Đáp án là: Một ngày mới.', 'en-US');
+    assert.equal(authenticationCalls, 1); assert.equal(synthesisCalls, 3);
     process.env.GOOGLE_TTS_VOICE = 'vi-VN-Chirp3-HD-Kore';
     await assert.rejects(generateWaveNetSpeech('Đáp án là: Một ngày mới.'), /WaveNet tiếng Việt/);
-    assert.equal(synthesisCalls, 2);
+    assert.equal(synthesisCalls, 3);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalAccount === undefined) delete process.env.GOOGLE_TTS_SERVICE_ACCOUNT_JSON; else process.env.GOOGLE_TTS_SERVICE_ACCOUNT_JSON = originalAccount;
     if (originalVoice === undefined) delete process.env.GOOGLE_TTS_VOICE; else process.env.GOOGLE_TTS_VOICE = originalVoice;
   }
+});
+
+
+test('round introduction never reads hidden answers and is restricted to the first question', () => {
+  const state = { gameType: 'MUSIC_DUEL', phase: 'TOPIC_INTRO', gameRound: 2, roundQuestionIndex: 1, playMode: 'BID' as const, question: { primaryAnswer: 'Secret track' } };
+  const text = narrationText(state, 'intro');
+  assert.match(text, /Đấu giá thời gian/); assert.doesNotMatch(text, /Secret track/);
+  assert.throws(() => narrationText({...state, roundQuestionIndex: 2}, 'intro'));
+  assert.throws(() => narrationText({...state, phase: 'BIDDING'}, 'intro'));
 });
