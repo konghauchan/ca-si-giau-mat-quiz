@@ -1,8 +1,11 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { readAudioPreferences, useAudioPreferences } from '@/lib/audioPreferences';
 import { mediaToken } from '@/lib/client';
 
 export function AudioClipPlayer({ asset, start, duration, roomId, gameToken, preview = false, paused = false }: { asset: string; start: number; duration: number; roomId?: string; gameToken?: string; preview?: boolean; paused?: boolean }) {
+  const { settings } = useAudioPreferences();
+  useEffect(() => { if (audio.current) audio.current.volume = settings.media / 100; }, [settings.media]);
   const audio = useRef<HTMLAudioElement | null>(null);
   const attemptedAutoPlay = useRef(false);
   const pausedRef = useRef(paused);
@@ -18,7 +21,7 @@ export function AudioClipPlayer({ asset, start, duration, roomId, gameToken, pre
       if (!response.ok) throw new Error(await response.text());
       objectUrl = URL.createObjectURL(await response.blob());
       if (controller.signal.aborted) { URL.revokeObjectURL(objectUrl); return; }
-      audio.current = new Audio(objectUrl);
+      audio.current = new Audio(objectUrl); audio.current.volume = readAudioPreferences().media / 100;
       audio.current.onended = () => setPlaying(false);
       setReady(true);
       if (!preview && !pausedRef.current && !attemptedAutoPlay.current) {
