@@ -8,7 +8,7 @@ import { narrationText, type NarrationState } from '@/lib/narrationText';
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 export const dynamic = 'force-dynamic';
-const input = z.object({ roomId: z.string().uuid().optional(), questionId: z.string().uuid().optional(), kind: z.enum(['question', 'clue', 'answer', 'prepare', 'preview']), text: z.string().trim().min(1).max(1600).optional() });
+const input = z.object({ language: z.enum(['vi-VN','en-US']).default('vi-VN'), roomId: z.string().uuid().optional(), questionId: z.string().uuid().optional(), kind: z.enum(['question', 'clue', 'answer', 'intro', 'prepare', 'preview']), text: z.string().trim().min(1).max(1600).optional() });
 export function GET() { return NextResponse.json({ enabled: narrationConfigured() }, { headers: { 'Cache-Control': 'no-store' } }); }
 export async function POST(request: NextRequest) {
   try {
@@ -30,16 +30,16 @@ export async function POST(request: NextRequest) {
         if (!q) throw new Error('Không tìm thấy câu hỏi.');
         after(async () => {
           const clues = JSON.parse(String(q.clues_json || '[]')) as Array<{ text: string }>;
-          const answer = `Đáp án là: ${q.primary_answer}${q.artist ? `. ${q.artist}` : ''}.`;
-          const clueTexts = clues.map((clue, index) => `Gợi ý ${index + 1}: ${clue.text}`);
-          const texts = clueTexts.length ? [clueTexts[0], answer, ...clueTexts.slice(1)] : [String(q.prompt) + (q.hint && ['music','music_bid','film_bid'].includes(String(q.type)) ? ` Gợi ý: ${q.hint}` : ''), answer];
-          for (let index = 0; index < texts.length; index += 2) await Promise.allSettled(texts.slice(index, index + 2).map(value => speech(value, scope)));
+          const answer = `${body.language === 'en-US' ? 'The answer is' : 'Đáp án là'}: ${q.primary_answer}${q.artist ? `. ${q.artist}` : ''}.`;
+          const clueTexts = clues.map((clue, index) => `${body.language === 'en-US' ? 'Clue' : 'Gợi ý'} ${index + 1}: ${clue.text}`);
+          const texts = clueTexts.length ? [clueTexts[0], answer, ...clueTexts.slice(1)] : [String(q.prompt) + (q.hint && ['music','music_bid','film_bid'].includes(String(q.type)) ? ` ${body.language === 'en-US' ? 'Hint' : 'Gợi ý'}: ${q.hint}` : ''), answer];
+          for (let index = 0; index < texts.length; index += 2) await Promise.allSettled(texts.slice(index, index + 2).map(value => speech(value, scope, body.language)));
         });
         return NextResponse.json({ preparing: true });
       }
-      text = narrationText(state as unknown as NarrationState, body.kind);
+      text = narrationText(state as unknown as NarrationState, body.kind, body.language);
     }
-    const audio = await speech(text, scope);
+    const audio = await speech(text, scope, body.language);
     return new Response(new Uint8Array(audio), { headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'private, no-store', 'Accept-Ranges': 'none' } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof z.ZodError ? 'Yêu cầu giọng đọc không hợp lệ.' : (error as Error).message }, { status: 400 });
