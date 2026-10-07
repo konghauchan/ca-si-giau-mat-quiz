@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Mic, Play, Square, Volume2, VolumeX } from 'lucide-react';
 import { useAudioPreferences } from '@/lib/audioPreferences';
 import { useGameSounds } from '@/lib/useGameSounds';
+import { loadIntroAudio, prepareIntroAudio } from '@/lib/introAudio';
+import type { IntroMode } from '@/lib/roundIntro';
 type Kind = 'question' | 'clue' | 'answer' | 'preview' | 'intro';
-export function NarrationControl({ roomId, token, questionId, kind, clueIndex, paused = false, previewText, prepare = false, header = false }: {
-  roomId?: string; token?: string; questionId?: string; kind?: Kind; clueIndex?: number; paused?: boolean; previewText?: string; prepare?: boolean; header?: boolean;
+export function NarrationControl({ roomId, token, questionId, kind, clueIndex, paused = false, previewText, prepare = false, header = false, introMode, film = false }: {
+  roomId?: string; token?: string; questionId?: string; kind?: Kind; clueIndex?: number; paused?: boolean; previewText?: string; prepare?: boolean; header?: boolean; introMode?: IntroMode; film?: boolean;
 }) {
   const { settings, update } = useAudioPreferences();
   const { enabled: effectsEnabled, toggle: toggleEffects } = useGameSounds();
@@ -31,6 +33,10 @@ export function NarrationControl({ roomId, token, questionId, kind, clueIndex, p
     return () => controller.abort();
   }, []);
   useEffect(() => {
+    if (!configured || !automatic || !roomId || !questionId || !introMode) return;
+    void prepareIntroAudio({ roomId, questionId, token: token || '', language: settings.language, film }, introMode);
+  }, [configured, automatic, roomId, questionId, token, introMode, film, settings.language]);
+  useEffect(() => {
     if (!configured || !automatic || !prepare || !roomId || !questionId) return;
     void fetch('/api/narration', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-game-token': token || '' }, body: JSON.stringify({ roomId, questionId, kind: 'prepare', language: settings.language }) }).catch(() => {});
   }, [configured, automatic, prepare, roomId, token, questionId, settings.language]);
@@ -50,9 +56,15 @@ export function NarrationControl({ roomId, token, questionId, kind, clueIndex, p
       }
       fetching = true; setStatus('loading'); setError('');
       try {
+        let blob: Blob;
+        if (kind === 'intro' && roomId && questionId && introMode) {
+          blob = await loadIntroAudio({ roomId, questionId, token: token || '', language: settings.language, film }, introMode);
+        } else {
         const response = await fetch('/api/narration', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-game-token': token || '' }, body: JSON.stringify({ roomId, questionId, kind, language: settings.language, ...(kind === 'preview' ? { text: previewText } : {}) }), signal: controller.signal });
         if (!response.ok) { const body = await response.json(); throw new Error(body.error || 'Chưa phát được giọng đọc.'); }
-        const blob = await response.blob(); if (controller.signal.aborted) return;
+        blob = await response.blob();
+        }
+        if (controller.signal.aborted) return;
         objectUrl = URL.createObjectURL(blob); audio.current = new Audio(objectUrl); audio.current.volume = volume.current / 100;
         audio.current.onended = () => { setStatus('idle'); announce(false); };
         audio.current.onerror = () => { setStatus('error'); setError('Không phát được âm thanh.'); announce(false); };
@@ -64,7 +76,7 @@ export function NarrationControl({ roomId, token, questionId, kind, clueIndex, p
     start.current = () => void play();
     if (automatic) void play();
     return halt;
-  }, [configured, kind, roomId, token, questionId, clueIndex, paused, previewText, automatic, settings.language]);
+  }, [configured, kind, roomId, token, questionId, clueIndex, paused, previewText, automatic, settings.language, introMode, film]);
   if ((!configured || !kind) && !header) return null;
   const label = kind === 'intro' ? 'giới thiệu' : kind === 'answer' ? 'đáp án' : kind === 'clue' ? 'gợi ý' : 'câu hỏi';
   const controls = <div className="narration-control">
