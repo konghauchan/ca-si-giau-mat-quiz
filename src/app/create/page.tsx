@@ -175,7 +175,7 @@ function Creator() {
         label = rawField === 'title' ? 'Tên chủ đề' : fieldLabels[String(rawField)] || '';
       }
       const matchingLabel = [...(root?.querySelectorAll('label') || [])].find(node => node.textContent?.trim().startsWith(label));
-      const control = matchingLabel?.closest('.field')?.querySelector('input:not([disabled]),textarea,select') || matchingLabel?.querySelector('input,textarea,select');
+      const control = matchingLabel?.closest('.field')?.querySelector('input:not([disabled]),textarea,select') || matchingLabel?.querySelector('input,textarea,select') || (section === 'questions' && rawField === 'titleHintIndices' ? root?.querySelector('button') : null);
       if (control instanceof HTMLElement) { focusedControl = control; control.focus({ preventScroll: true }); control.scrollIntoView({ behavior: 'smooth', block: 'center' }); control.classList.add('validation-focus'); }
     });
     return () => { cancelAnimationFrame(frame); focusedControl?.classList.remove('validation-focus'); };
