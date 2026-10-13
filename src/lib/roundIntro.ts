@@ -24,8 +24,8 @@ export function roundRules(mode: IntroMode, film = false) {
 export function roundIntroText(mode: IntroMode, round: number, film = false, language = 'vi-VN'): string {
   if (language === 'en-US') {
     const rules = mode === 'OPEN' ? 'Everyone watches or listens together. Wrong guesses may be retried before time runs out. Faster correct answers earn more points.' : mode === 'BID' ? 'Read the hint and bid the time you need. Lowest bids answer first. You get one answer. If wrong, the next group plays.' : 'Six clues open one by one. Press I know first to answer immediately. You get one answer. A wrong answer or timeout eliminates you from this question.';
-    return `Round ${round}. ${rules}`;
+    return `${round > 0 ? `Round ${round}. ` : ''}${rules}`;
   }
   const info = roundRules(mode, film);
-  return `Vòng ${round}. ${info.title}. ${info.rules.join(' ')}`;
+  return `${round > 0 ? `Vòng ${round}. ` : ''}${info.title}. ${info.rules.join(' ')}`;
 }
