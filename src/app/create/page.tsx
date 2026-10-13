@@ -64,6 +64,7 @@ function Creator() {
   const [persistedId, setPersistedId] = useState(editId); const [coverUrl, setCoverUrl] = useState<string | null>(null); const [coverFile, setCoverFile] = useState<File | null>(null); const [coverPreview, setCoverPreview] = useState<string | null>(null); const [removeCover, setRemoveCover] = useState(false); const [coverBusy, setCoverBusy] = useState(false);
   const [topics, setTopics] = useState<Topic[]>(initialTopics);
   const [questions, setQuestions] = useState<Question[]>([blank(1), blank(2)]); const [activeRound, setActiveRound] = useState<number>(1); const [selected, setSelected] = useState(0);
+  useEffect(() => { document.querySelector('.editor > section.panel')?.scrollTo({top:0}); }, [selected]);
   const playMode = roundModes[activeRound-1] || 'OPEN';
   const clueMode = playMode === 'CLUE';
   useEffect(()=>{document.getElementById(`round-tab-${activeRound}`)?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});},[activeRound]);
