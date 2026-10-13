@@ -19,7 +19,7 @@ async function initialize(): Promise<Client> {
     try {
       // A deployed function should not run DDL on every cold start. Check the
       // columns it needs with one read, and migrate only an older database.
-      await client.execute(`SELECT q.deleted_at,q.replacement_id,q.cover_url,q.game_type,q.owner_user_id,s.clues_json,s.game_round,s.listen_seconds,s.answer_seconds,s.bid_seconds,s.topic_id,s.result_start,s.result_seconds,r.paused_at,r.clue_state,p.ready,p.avatar_id,a.id,u.id,us.token_hash
+      await client.execute(`SELECT q.deleted_at,q.replacement_id,q.cover_url,q.game_type,q.owner_user_id,s.title_hint_indices,s.clues_json,s.game_round,s.listen_seconds,s.answer_seconds,s.bid_seconds,s.topic_id,s.result_start,s.result_seconds,r.paused_at,r.clue_state,p.ready,p.avatar_id,a.id,u.id,us.token_hash
         FROM quizzes q,questions s,rooms r,players p,answer_attempts a,users u,user_sessions us,narration_cache nc,narration_usage nu LIMIT 0`);
       return client;
     } catch (error) {
@@ -38,6 +38,7 @@ async function initialize(): Promise<Client> {
       if (!columns.some(column => column.name === name)) await migration.execute(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
     }
     await addColumn('quizzes', 'game_type', "TEXT NOT NULL DEFAULT 'MUSIC_BID'");
+    await addColumn('questions', 'title_hint_indices', "TEXT NOT NULL DEFAULT '[]'");
     await addColumn('questions', 'clues_json', "TEXT NOT NULL DEFAULT '[]'");
     await addColumn('rooms', 'clue_state', "TEXT NOT NULL DEFAULT '{}'");
     await addColumn('players', 'ready', 'INTEGER NOT NULL DEFAULT 0');
