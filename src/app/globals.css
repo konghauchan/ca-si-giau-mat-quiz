@@ -99,3 +99,5 @@ body:has(.game-room){background:#173c42}body:has(.game-room) .site-header,body:h
  .round-intro-step p { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .round-intro { animation: none; } }
+
+.title-hint,.title-hint-editor{padding:20px;border:1px solid #7d9392;border-radius:16px;margin:20px 0}.title-hint-mask{font-size:clamp(18px,3vw,28px);letter-spacing:.08em;white-space:pre-wrap;overflow-wrap:anywhere}.title-hint-letters{display:flex;gap:6px;flex-wrap:wrap}.title-hint-letters button{padding:7px 10px;border:1px solid #8a85a4;border-radius:8px;background:white}.title-hint-letters button[aria-pressed="true"]{background:#6351f3;color:white}.title-hint-editor p{font-size:13px}.title-hint-editor legend{font-weight:800}
