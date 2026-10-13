@@ -7,7 +7,7 @@ export function roundRules(mode: IntroMode, film = false) {
       { title: `${media} cùng nhau`, description: 'Tất cả nhận cùng một đoạn.' },
       { title: 'Gõ đáp án', description: 'Sai? Thử tiếp khi còn giờ.' },
       { title: 'Đúng sớm, điểm cao', description: 'Điểm giảm theo thời gian.' },
-    ], notes: ['Được thử nhiều đáp án'] }
+    ], notes: film ? ['Được thử nhiều đáp án'] : ['Được thử nhiều đáp án', 'Hé chữ giữa lượt · Điểm còn lại −30%'] }
     : mode === 'BID'
     ? { title: 'Đấu giá thời gian', steps: [
       { title: 'Đọc gợi ý · Đặt giây', description: `Chọn thời gian cần ${media.toLowerCase()}.` },

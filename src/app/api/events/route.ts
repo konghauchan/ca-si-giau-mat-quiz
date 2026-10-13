@@ -5,18 +5,20 @@ export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export const maxDuration=30;
 type Watcher=()=>void;
-type Hub={listeners:Set<Watcher>; version:number; timer:ReturnType<typeof setTimeout>|null; stopped:boolean};
+type Hub={listeners:Set<Watcher>; version:number; hintStart:number; timer:ReturnType<typeof setTimeout>|null; stopped:boolean};
 const hubs=new Map<string,Hub>();
 // Share lightweight change probes within a function instance. No full snapshot
 // reads or write transaction while a room is idle. Each stream expires in 20s.
 function watch(roomId:string,listener:Watcher) {
   let hub=hubs.get(roomId);
-  if(!hub){hub={listeners:new Set(),version:-1,timer:null,stopped:false};hubs.set(roomId,hub);
+  if(!hub){hub={listeners:new Set(),version:-1,hintStart:-1,timer:null,stopped:false};hubs.set(roomId,hub);
     const current=hub;
     const poll=async()=>{if(current.stopped)return; try{
-      const row=await one('SELECT phase_ends_at,paused_at,(SELECT COALESCE(MAX(id),0) FROM game_events WHERE room_id=rooms.id) AS version FROM rooms WHERE id=?',roomId);
+      const row=await one('SELECT phase,phase_started_at,phase_ends_at,paused_at,(SELECT COALESCE(MAX(id),0) FROM game_events WHERE room_id=rooms.id) AS version FROM rooms WHERE id=?',roomId);
       const due=row?.paused_at===null&&row.phase_ends_at!==null&&Number(row.phase_ends_at)<=Date.now();
-      if(row&&(Number(row.version)!==current.version||due)){current.version=Number(row.version);current.listeners.forEach(fn=>fn());}
+      const hintDue=row?.paused_at===null&&row.phase==='OPEN_ANSWERING'&&Date.now()>=(Number(row.phase_started_at)+Number(row.phase_ends_at))/2&&current.hintStart!==Number(row.phase_started_at);
+      if(hintDue)current.hintStart=Number(row!.phase_started_at);
+      if(row&&(Number(row.version)!==current.version||due||hintDue)){current.version=Number(row.version);current.listeners.forEach(fn=>fn());}
     }catch{current.listeners.forEach(fn=>fn());}
     if(!current.stopped)current.timer=setTimeout(poll,250);};void poll();
   }

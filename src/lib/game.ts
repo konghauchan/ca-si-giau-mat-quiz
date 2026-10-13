@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { ROUND_INTRO_MS } from './roundIntro';
 import { one, all, run, tx, batchRead } from './db';
+import { maskedTitle, scoreWithTitleHint, titleHintAt, titleHintLimit } from './titleHint';
 import { answerMatches, groupBids, nextGroup, normalizeAnswer, scoreForBid, scoreForCorrectRank, scoreForTimedAnswer, youtubeId, type Phase } from './core';
 import { storedAssetExists } from './media';
 import { removeUnusedCover } from './coverStorage';
@@ -116,7 +117,8 @@ async function resolveOpenAnswers(r: Row) {
     if (answer.correct !== 1) continue;
     correctRank++;
     const rankedPoints = scoreForCorrectRank(500, correctRank);
-    const points = scoreForTimedAnswer(rankedPoints, Number(r.phase_started_at), Number(r.phase_ends_at), Number(answer.created_at));
+    const scoring = (String(q.type) === 'music_open' || (String(q.type) === 'music' && gameRound(q) === 1)) && titleHintLimit(String(q.primary_answer)) > 0 ? scoreWithTitleHint : scoreForTimedAnswer;
+    const points = scoring(rankedPoints, Number(r.phase_started_at), Number(r.phase_ends_at), Number(answer.created_at));
     await run('UPDATE players SET score=score+? WHERE id=?', points, String(answer.player_id));
     await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, String(answer.player_id), points, 'OPEN_CORRECT', now());
     await event(roomId, 'SCORE_AWARDED', { playerId: answer.player_id, points, correctRank, gameRound: gameRound(q) });
@@ -150,7 +152,7 @@ async function tick(roomId: string) {
   }
 }
 
-export type QuestionInput = { prompt: string; playMode?: PlayMode; gameRound: number; topicKey: string; listenSeconds: number; answerSeconds: number; bidSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number; clues?: Clue[] };
+export type QuestionInput = { titleHintIndices?: number[]; prompt: string; playMode?: PlayMode; gameRound: number; topicKey: string; listenSeconds: number; answerSeconds: number; bidSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number; clues?: Clue[] };
 export type TopicInput = { key: string; gameRound: number; title: string; songCount: number };
 export async function saveQuiz(input: { id?: string; coverSourceId?: string; title: string; description: string; visibility: string; gameType?: 'MUSIC_BID' | 'SONG_CLUE' | 'MUSIC_DUEL' | 'FILM_DUEL'; topics: TopicInput[]; questions: QuestionInput[] }, userId: string) {
   return await tx(async () => {
@@ -229,6 +231,7 @@ export async function saveQuiz(input: { id?: string; coverSourceId?: string; tit
     for (const [index, q] of sorted.entries()) {
       const questionId = id();
       await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,bid_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds,clues_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, input.gameType === 'FILM_DUEL' ? inputPlayMode(q,input.gameType) === 'CLUE' ? 'film_clue' : inputPlayMode(q,input.gameType) === 'OPEN' ? 'film_open' : 'film_bid' : inputPlayMode(q,input.gameType) === 'CLUE' ? 'song_clue' : input.gameType === 'MUSIC_DUEL' ? inputPlayMode(q,input.gameType) === 'OPEN' ? 'music_open' : 'music_bid' : 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.bidSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null, JSON.stringify(q.clues || []));
+      await run('UPDATE questions SET title_hint_indices=? WHERE id=?', JSON.stringify(q.titleHintIndices || []), questionId);
       for (const answer of new Set(q.acceptedAnswers.map(x => x.trim()).filter(Boolean))) await run('INSERT OR IGNORE INTO accepted_answers VALUES(?,?)', questionId, answer);
     }
     return { id: quizId, replacedId };
@@ -469,6 +472,7 @@ export async function getState(roomId: string, auth: string) {
       mediaType: q.media_type, mediaUrl: canHear || reveal ? q.media_url : undefined,
       mediaStart: canHear || reveal ? q.media_start : undefined,
       listenSeconds: q.listen_seconds, answerSeconds: q.answer_seconds, bidSeconds: q.bid_seconds, primaryAnswer: reveal ? q.primary_answer : undefined, artist: reveal ? q.artist : undefined, hint: q.hint, resultStart: reveal ? q.result_start : undefined, resultSeconds: reveal ? q.result_seconds : undefined },
+    titleHint: playMode === 'OPEN' && r.quiz_game_type !== 'FILM_DUEL' && r.phase === 'OPEN_ANSWERING' && titleHintLimit(String(q.primary_answer)) > 0 ? { opensAt: titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at)), revealed: Number(r.paused_at ?? now()) >= titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at)), mask: maskedTitle(String(q.primary_answer), JSON.parse(String(q.title_hint_indices || '[]')), Number(r.paused_at ?? now()) >= titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at))) } : null,
     activeBid: r.active_bid, activeChallengerIds: (playMode === 'OPEN' && r.phase !== 'LOBBY') || r.active_bid !== null ? challengerIds : [],
     turnNotice,
     players, me: me ? { id: me.id, nickname: me.nickname } : null, isHost: host,
