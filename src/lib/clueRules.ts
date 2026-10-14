@@ -1,7 +1,7 @@
 export const CLUE_CATEGORIES = ['YEAR', 'ARTIST', 'MV', 'LYRIC', 'TITLE_STRUCTURE', 'EVENT', 'CAREER', 'TRIVIA', 'KEYWORD', 'OTHER'] as const;
 export type Clue = { id: string; text: string; score: number; category: typeof CLUE_CATEGORIES[number] };
 export type CluePhase = 'LOBBY' | 'QUESTION_INTRO' | 'CLUE_ACTIVE' | 'CLUE_ANSWERING' | 'CLUE_FEEDBACK' | 'CLUE_RESULT' | 'GAME_FINISHED';
-export type ClueState = { phase: CluePhase; questionIndex: number; clueIndex: number; startedAt: number; endsAt: number | null; eliminated: string[]; votes: string[]; holder: string | null; lockedScore: number; remainingMs: number; outcome: 'correct' | 'wrong' | 'timeout' | null; answer: string | null };
+export type ClueState = { phase: CluePhase; questionIndex: number; clueIndex: number; startedAt: number; endsAt: number | null; eliminated: string[]; votes: string[]; holder: string | null; lockedScore: number; remainingMs: number; outcome: 'correct' | 'wrong' | 'timeout' | null; answer: string | null; pendingAnswer?: {correct:boolean;text:string} };
 export type ClueQuestion = { clues: Clue[]; answerSeconds: number; clueSeconds: number };
 export const requiredVotes = (eligible: number) => Math.ceil(eligible * .75);
 export const clueInitial = (time: number): ClueState => ({ phase: 'LOBBY', questionIndex: 0, clueIndex: 0, startedAt: time, endsAt: null, eliminated: [], votes: [], holder: null, lockedScore: 0, remainingMs: 0, outcome: null, answer: null });
@@ -21,12 +21,21 @@ export function answerClue(s: ClueState, playerId: string, correct: boolean, tex
   if (s.phase !== 'CLUE_ANSWERING' || s.holder !== playerId || time >= Number(s.endsAt)) throw new Error('Bạn không có quyền trả lời hoặc đã hết giờ.');
   return phase({ ...s, eliminated: correct ? s.eliminated : [...new Set([...s.eliminated, playerId])], outcome: correct ? 'correct' : 'wrong', answer: text }, correct ? 'CLUE_RESULT' : 'CLUE_FEEDBACK', time, correct ? 3000 : 1500);
 }
+export function queueClueAnswer(s:ClueState,playerId:string,correct:boolean,text:string,time:number):ClueState {
+  if(s.pendingAnswer) throw new Error('Bạn chỉ được trả lời một lần.');
+  answerClue(s,playerId,correct,text,time);
+  return {...s,answer:text,pendingAnswer:{correct,text}};
+}
 export function expireClue(s: ClueState, questions: ClueQuestion[], players: string[], time: number): ClueState {
   const q = questions[s.questionIndex];
   if (s.endsAt === null || time < s.endsAt) return s;
   const at = s.endsAt;
   if (s.phase === 'QUESTION_INTRO') return phase(s, 'CLUE_ACTIVE', at, q.clueSeconds * 1000);
   if (s.phase === 'CLUE_ACTIVE') return nextClue(s, q, at);
+  if (s.phase === 'CLUE_ANSWERING' && s.pendingAnswer) {
+    const pending=s.pendingAnswer;const next=answerClue(s,s.holder!,pending.correct,pending.text,at-1);
+    return {...next,pendingAnswer:undefined,startedAt:at,endsAt:at+(pending.correct?3000:1500)};
+  }
   if (s.phase === 'CLUE_ANSWERING') return phase({ ...s, eliminated: [...new Set([...s.eliminated, s.holder!])], outcome: 'timeout', answer: null }, 'CLUE_FEEDBACK', at, 1500);
   if (s.phase === 'CLUE_FEEDBACK') {
     if (players.every(p => s.eliminated.includes(p))) return phase(s, 'CLUE_RESULT', at, 3000);
