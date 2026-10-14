@@ -3,7 +3,7 @@ import {choicesForPlayer,type Choice} from './multiplayer';
 import { ROUND_INTRO_MS } from './roundIntro';
 import { all, one, run, tx, batchRead, batchWrite } from './db';
 import { answerMatches } from './core';
-import { answerClue, catchUpClue, expireClue, claimBuzzer, clueInitial, requiredVotes, ranks, startClueQuestion, voteClue, type Clue, type ClueQuestion, type ClueState } from './clueRules';
+import { answerClue, queueClueAnswer, catchUpClue, expireClue, claimBuzzer, clueInitial, requiredVotes, ranks, startClueQuestion, voteClue, type Clue, type ClueQuestion, type ClueState } from './clueRules';
 type Row = Record<string, unknown>;
 const parse = (r: Row): ClueState => { const saved = JSON.parse(String(r.clue_state || '{}')); return saved.phase ? saved : clueInitial(Number(r.created_at)); };
 const config = (rows: Row[]): ClueQuestion[] => rows.map(q => ({ clues: JSON.parse(String(q.clues_json)), clueSeconds: Number(q.listen_seconds), answerSeconds: Number(q.answer_seconds) }));
@@ -13,6 +13,15 @@ async function persist(roomId: string, s: ClueState, event: string) {
     {sql:'INSERT INTO game_events(room_id,type,payload,created_at) VALUES(?,?,?,?)',args:[roomId,event,JSON.stringify({phase:s.phase,clueIndex:s.clueIndex}),Date.now()]}
   ]);
 }
+async function settleChoice(roomId:string,s:ClueState,cfg:ClueQuestion[],ids:string[],clock:number) {
+  if(s.phase!=='CLUE_ANSWERING'||!s.pendingAnswer||s.endsAt===null||clock<s.endsAt)return s;
+  const next=expireClue(s,cfg,ids,clock);
+  if(next.outcome==='correct') {
+    await run('INSERT INTO score_events(id,room_id,question_index,player_id,delta,reason,created_at) VALUES(?,?,?,?,?,?,?)',crypto.randomUUID(),roomId,s.questionIndex,s.holder!,s.lockedScore,'CLUE_CORRECT',s.endsAt);
+    await run('UPDATE players SET score=score+? WHERE id=?',s.lockedScore,s.holder!);
+  }
+  return next;
+}
 export async function tickClue(roomId: string) {
   const head=await one('SELECT phase_ends_at FROM rooms WHERE id=?',roomId);
   if (head?.phase_ends_at == null || Date.now() < Number(head.phase_ends_at)) return;
@@ -21,7 +30,9 @@ export async function tickClue(roomId: string) {
     const s = parse(r); if (s.endsAt === null || Date.now() < s.endsAt) return;
     const qs = await all('SELECT clues_json,listen_seconds,answer_seconds FROM questions WHERE quiz_id=? ORDER BY order_index', String(r.quiz_id));
     const ps = await all('SELECT id FROM players WHERE room_id=?', roomId);
-    const updated = catchUpClue(s, config(qs), ps.map(p => String(p.id)), Date.now());
+    const ids=ps.map(p=>String(p.id));const cfg=config(qs);
+    const settled=await settleChoice(roomId,s,cfg,ids,Date.now());
+    const updated = catchUpClue(settled, cfg, ids, Date.now());
     if (updated !== s) await persist(roomId, updated, 'CLUE_TRANSITION');
   });
 }
@@ -53,14 +64,14 @@ export async function clueCommand(roomId: string, auth: string, action: string, 
       const text=chosen?.label||supplied;if(!text)throw new Error('Nhập đáp án.');
       const aliases = await all('SELECT answer FROM accepted_answers WHERE question_id=?', String(q.id));
       const correct = chosen ? chosen.id===q.correct_choice_id : answerMatches(text, [String(q.primary_answer), ...aliases.map(a => String(a.answer))]);
-      s = answerClue(s, String(p.id), correct, text, Date.now());
+      s = q.answer_mode==='CHOICE' ? queueClueAnswer(s,String(p.id),correct,text,Date.now()) : answerClue(s, String(p.id), correct, text, Date.now());
       await run('INSERT INTO answer_attempts(id,room_id,question_index,player_id,amount,text,correct,created_at) VALUES(?,?,?,?,?,?,?,?)', crypto.randomUUID(), roomId, s.questionIndex, String(p.id), s.lockedScore, text, correct ? 1 : 0, Date.now());
-      if (correct) {
+      if (correct && q.answer_mode!=='CHOICE') {
         await run('INSERT INTO score_events(id,room_id,question_index,player_id,delta,reason,created_at) VALUES(?,?,?,?,?,?,?)', crypto.randomUUID(), roomId, s.questionIndex, String(p.id), s.lockedScore, 'CLUE_CORRECT', Date.now());
         await run('UPDATE players SET score=score+? WHERE id=?', s.lockedScore, String(p.id));
       }
     } else throw new Error('Chế độ gợi ý tự vận hành. Hãy dùng các nút dành cho người chơi.');
-    await persist(roomId, s, action === 'buzz' ? 'BUZZER_WINNER' : action === 'answer' ? 'ANSWER_RESULT' : action === 'nextClue' ? 'CLUE_VOTE' : 'PLAYER_READY');
+    await persist(roomId, s, action === 'buzz' ? 'BUZZER_WINNER' : action === 'answer' ? q.answer_mode==='CHOICE'?'ANSWER_SUBMITTED':'ANSWER_RESULT' : action === 'nextClue' ? 'CLUE_VOTE' : 'PLAYER_READY');
   });
 }
 export async function getClueState(roomId: string, auth: string, currentOnly = false) {
@@ -83,7 +94,7 @@ export async function clueSnapshot(roomId: string, auth: string, r: Row, pp: Row
   if(Date.now()-Number(me.last_seen_at)>10000) await tx(()=>run('UPDATE players SET last_seen_at=? WHERE id=? AND last_seen_at<?',Date.now(),String(me.id),Date.now()-10000));
   const players=ranks(pp.map(p=>({id:String(p.id),nickname:String(p.nickname),avatarId:Number(p.avatar_id),colorIndex:seats.findIndex(seat=>seat.id===p.id),score:Number(p.score),ready:Number(p.ready)===1,connected:p.id===me.id || Date.now()-Number(p.last_seen_at)<20000,eliminated:s.eliminated.includes(String(p.id)),roundDelta:ss.filter(e=>e.player_id===p.id).reduce((sum,e)=>sum+Number(e.delta),0)})));
   return {roomId,pin:String(r.pin),gameType:'SONG_CLUE' as const,category:r.quiz_game_type==='FILM_DUEL'?'FILM':'MUSIC',playMode:'CLUE' as const,mixed:currentOnly,gameRound:Number(q.game_round),roundCount:new Set(qq.map(q=>q.game_round)).size,pausedAt:r.paused_at,quizTitle:String(r.title),phase:s.phase,phaseStartedAt:s.startedAt,phaseEndsAt:s.endsAt,serverNow:Date.now(),lastEventId:version,questionIndex:s.questionIndex,questionCount:qq.length,roundQuestionIndex:qq.filter(item=>Number(item.game_round)===Number(q.game_round)&&Number(item.order_index)<=s.questionIndex).length,me:{id:String(me.id),nickname:String(me.nickname)},players,isHost:r.host_token===auth,
-    clue:{index:s.clueIndex,scores:clues.map(c=>c.score),items:s.phase==='QUESTION_INTRO'||s.phase==='LOBBY'?[]:clues.slice(0,s.clueIndex+1),value:clues[s.clueIndex].score,votes:s.votes.length,hasVoted:s.votes.includes(String(me.id)),requiredVotes:requiredVotes(pp.length-s.eliminated.length),holder:s.holder,lockedScore:s.lockedScore,outcome:s.outcome,submittedAnswer:s.holder===me.id?s.answer:undefined,eliminated:s.eliminated.includes(String(me.id))},
+    clue:{index:s.clueIndex,scores:clues.map(c=>c.score),items:s.phase==='QUESTION_INTRO'||s.phase==='LOBBY'?[]:clues.slice(0,s.clueIndex+1),value:clues[s.clueIndex].score,votes:s.votes.length,hasVoted:s.votes.includes(String(me.id)),requiredVotes:requiredVotes(pp.length-s.eliminated.length),holder:s.holder,lockedScore:s.lockedScore,outcome:s.outcome,answerLocked:!!s.pendingAnswer,submittedAnswer:s.holder===me.id?s.answer:undefined,eliminated:s.eliminated.includes(String(me.id))},
     choices: q.answer_mode==='CHOICE' && (reveal || (s.phase==='CLUE_ANSWERING' && s.holder===me.id)) ? choicesForPlayer(JSON.parse(String(q.choice_options||'[]')),String(me.id)):[],
     question:{answerMode:q.answer_mode||'TEXT',id:String(q.id),primaryAnswer:reveal?String(q.primary_answer):undefined,artist:reveal?String(q.artist):undefined,answerSeconds:Number(q.answer_seconds)}};
 }
@@ -96,7 +107,7 @@ export async function startCurrentClue(roomId: string, index: number) {
 export async function advanceCurrentClue(r: Row) {
   const qs = await all('SELECT * FROM questions WHERE quiz_id=? ORDER BY order_index',String(r.quiz_id));
   const ps = await all('SELECT id FROM players WHERE room_id=?',String(r.id));
-  let s=parse(r);
+  let s=await settleChoice(String(r.id),parse(r),config(qs),ps.map(p=>String(p.id)),Date.now());
   for (let i=0;i<32 && s.phase!=='CLUE_RESULT' && s.endsAt!==null && Date.now()>=s.endsAt;i++) {
     const next=expireClue(s,config(qs),ps.map(p=>String(p.id)),Date.now());
     if(next===s)break;s=next;

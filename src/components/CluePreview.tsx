@@ -7,7 +7,7 @@ import { ClueActions } from './ClueActions';
 import { ClueBoard } from './ClueBoard';
 import { NarrationControl } from './NarrationControl';
 import { answerMatches } from '@/lib/core';
-import { answerClue, catchUpClue, claimBuzzer, clueInitial, requiredVotes, voteClue, type Clue, type ClueState } from '@/lib/clueRules';
+import { answerClue, queueClueAnswer, catchUpClue, claimBuzzer, clueInitial, requiredVotes, voteClue, type Clue, type ClueState } from '@/lib/clueRules';
 
 const players = ['you', 'alex', 'blake', 'casey'];
 const initial = () => ({ ...clueInitial(Date.now()), phase: 'CLUE_ACTIVE' as const, endsAt: Date.now() + 15000 });
@@ -63,7 +63,7 @@ export function CluePreview({ clues, title, artist, onClose, film = false, accep
         {eliminated ? <div className="notice error" role="status">Bạn đã mất quyền trả lời ở câu này. Những người còn lại tiếp tục chơi.</div> : <ClueActions disabled={false} hasVoted={state.votes.includes('you')} votes={state.votes.length} requiredVotes={requiredVotes(eligible.length)} lastClue={state.clueIndex === clues.length - 1} answerSeconds={answerSeconds} onBuzz={() => act('buzz')} onVote={() => act('vote')}/>}
         {(state.votes.includes('you') || eliminated) && <div className="clue-preview-simulation"><p>Trong phòng thật, hệ thống chờ phiếu của các bạn. Ở bản chơi thử, bạn có thể mô phỏng số phiếu còn thiếu.</p><button type="button" className="button secondary" onClick={simulateVotes}>Mô phỏng các bạn đồng ý</button></div>}
       </>}
-      {state.phase==='CLUE_ANSWERING'&&state.holder==='you'&&answerMode==='CHOICE'&&<ChoiceAnswers choices={choices} disabled={false} onAnswer={id=>setState(current=>answerClue(current,'you',id==='preview-0',choices.find(c=>c.id===id)?.label||'',Date.now()))}/>}{state.phase === 'CLUE_ANSWERING' && <form hidden={answerMode==='CHOICE'} className="clue-answer-form" onSubmit={event => { event.preventDefault(); if (answer.trim()) act('answer'); }}>
+      {state.phase==='CLUE_ANSWERING'&&state.holder==='you'&&answerMode==='CHOICE'&&(state.pendingAnswer?<div className="notice info" role="status">Đã chốt đáp án. Kết quả sẽ công bố khi hết giờ.</div>:<ChoiceAnswers choices={choices} disabled={false} onAnswer={id=>setState(current=>queueClueAnswer(current,'you',id==='preview-0',choices.find(c=>c.id===id)?.label||'',Date.now()))}/>)}{state.phase === 'CLUE_ANSWERING' && <form hidden={answerMode==='CHOICE'} className="clue-answer-form" onSubmit={event => { event.preventDefault(); if (answer.trim()) act('answer'); }}>
         <h2>Đến lượt bạn trả lời!</h2><p>Đã khóa {state.lockedScore} điểm. Ba người còn lại chờ bạn trả lời.</p>
         <div className="field"><label htmlFor="preview-clue-answer">{film ? 'Nhập tên phim' : 'Nhập tên bài hát'}</label><input id="preview-clue-answer" autoFocus value={answer} onChange={event => setAnswer(event.target.value)} maxLength={120} autoComplete="off"/></div>
         <button className="button primary big full" disabled={!answer.trim()}>Chốt đáp án · chỉ một lần</button>

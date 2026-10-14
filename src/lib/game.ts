@@ -398,10 +398,10 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
         await event(roomId,'ANSWER_SUBMITTED',{playerId:p.id});
         const allAttempts=await all('SELECT player_id,correct FROM answer_attempts WHERE room_id=? AND question_index=?',roomId,index);
         const players=await all('SELECT id FROM players WHERE room_id=?',roomId);
-        if(simultaneous) {
+        if(simultaneous && q.answer_mode!=='CHOICE') {
           const allBids=await bids(roomId,index);
           if(players.every(player=>allAttempts.some(a=>a.player_id===player.id)||clock>=bidWindow(Number(r.phase_started_at),Number(allBids.find(b=>b.player_id===player.id)?.amount),Number(q.answer_seconds)).answerEndsAt)) await resolveAnswers(r);
-        } else if(players.every(player=>allAttempts.some(a=>a.player_id===player.id && (single || a.correct===1)))) await resolveOpenAnswers(r);
+        } else if(!simultaneous && q.answer_mode!=='CHOICE' && players.every(player=>allAttempts.some(a=>a.player_id===player.id && (single || a.correct===1)))) await resolveOpenAnswers(r);
       } else fail('Thao tác không hợp lệ.');
     }
   });
@@ -482,7 +482,7 @@ export async function getState(roomId: string, auth: string) {
     players, me: me ? { id: me.id, nickname: me.nickname } : null, isHost: host,
     myBid: me ? bidRows.find(b => b.player_id === me.id)?.amount ?? null : null,
     myAnswer: myAnswerRow?.text ?? null,
-    myAnswerCorrect: myAnswerRow ? myAnswerRow.correct === 1 : null,
+    myAnswerCorrect: myAnswerRow && (q.answer_mode!=='CHOICE' || reveal) ? myAnswerRow.correct === 1 : null,
     myAttemptCount: me ? answerRows.filter(a => a.player_id === me.id).length : 0,
     lastEventId: versions[0].id
   };
