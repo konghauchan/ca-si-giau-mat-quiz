@@ -6,11 +6,13 @@ import { PLAYER_COLORS } from '@/lib/playerAppearance';
 
 type RankedPlayer = { id: string; nickname: string; avatarId: number; colorIndex: number; score: number; rank?: number; roundDelta?: number; correctRank?: number };
 
-export function RankingBoard({ players, finished }: { players: RankedPlayer[]; finished: boolean }) {
+export function RankingBoard({ players, finished,meId }: { players: RankedPlayer[]; finished: boolean;meId?:string }) {
+  const [expanded,setExpanded]=useState(false);
+  const visible=expanded?players:players.filter((p,i)=>i<5||p.id===meId);
   const [progress, setProgress] = useState(finished ? 1 : 0);
-  const previousOrder = useMemo(() => [...players].sort((a, b) =>
+  const previousOrder = useMemo(() => [...visible].sort((a, b) =>
     (b.score - (b.roundDelta ?? 0)) - (a.score - (a.roundDelta ?? 0)) || players.indexOf(a) - players.indexOf(b)
-  ), [players]);
+  ), [visible]);
   useEffect(() => {
     if (finished) { setProgress(1); return; }
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setProgress(1); return; }
@@ -28,13 +30,14 @@ export function RankingBoard({ players, finished }: { players: RankedPlayer[]; f
 
   const positionProgress = Math.max(0, Math.min(1, (progress - .22) / .78));
   const maxScore = Math.max(1, ...players.map(player => player.score));
-  return <div className="ranking-board" aria-label="Bảng xếp hạng">
-    {players.map((player, finalIndex) => {
+  return <div>{players.length>5&&<button type="button" className="button secondary" onClick={()=>setExpanded(!expanded)}>{expanded?"Thu gọn bảng điểm":`Xem tất cả ${players.length} người`}</button>}<div className="ranking-scroll"><div className="ranking-board" style={{height:visible.length*70}} aria-label="Bảng xếp hạng">
+    {visible.map((player, displayIndex) => {
+      const finalIndex=players.findIndex(p=>p.id===player.id);
       const previousIndex = previousOrder.findIndex(item => item.id === player.id);
       const oldScore = player.score - (player.roundDelta ?? 0);
       const shownScore = Math.round(oldScore + (player.score - oldScore) * progress);
-      const rank = progress >= .8 ? player.rank ?? finalIndex + 1 : previousIndex + 1;
-      const position = previousIndex + (finalIndex - previousIndex) * positionProgress;
+      const rank = progress >= .8 ? player.rank ?? finalIndex + 1 : players.findIndex(p=>p.id===previousOrder[previousIndex]?.id)+1;
+      const position = previousIndex + (displayIndex - previousIndex) * positionProgress;
       const barWidth = Math.max(3, shownScore / maxScore * 100);
       return <div className={`ranking-card ${finalIndex === 0 ? 'leader' : ''}`} key={player.id} style={{ transform: `translateY(${position * 70}px)`, '--player-color': PLAYER_COLORS[player.colorIndex] ?? PLAYER_COLORS[0] } as CSSProperties}>
         <span className="ranking-place" aria-label={`Hạng ${rank}`}>{rank}</span>
@@ -43,5 +46,5 @@ export function RankingBoard({ players, finished }: { players: RankedPlayer[]; f
         <div className="ranking-points"><strong>{shownScore.toLocaleString('vi-VN')}</strong><small>điểm</small>{!!player.roundDelta && <em>+{player.roundDelta}</em>}</div>
       </div>;
     })}
-  </div>;
+  </div></div></div>;
 }
