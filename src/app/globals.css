@@ -101,3 +101,10 @@ body:has(.game-room){background:#173c42}body:has(.game-room) .site-header,body:h
 @media (prefers-reduced-motion: reduce) { .round-intro { animation: none; } }
 
 .title-hint,.title-hint-editor{padding:20px;border:1px solid #7d9392;border-radius:16px;margin:20px 0}.title-hint-mask{display:block;font-size:clamp(16px,2.6vw,24px);letter-spacing:.04em;white-space:pre-wrap;overflow-wrap:anywhere}.title-hint-letters{display:flex;gap:6px;flex-wrap:wrap}.title-hint-letters button{padding:7px 10px;border:1px solid #8a85a4;border-radius:8px;background:white}.title-hint-letters button[aria-pressed="true"]{background:#6351f3;color:white}.title-hint-editor p{font-size:13px}.title-hint-editor legend{font-weight:800}
+/* Keep the question editor visible while browsing a long question list. */
+@media (min-width:851px){
+  .editor > .editor-side{position:static}
+  .editor > section.panel{position:sticky;top:18px;max-height:calc(100dvh - 36px);overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}
+}
+
+.choice-answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0}.choice-answers p{grid-column:1/-1}.choice-answers button{justify-content:flex-start;text-align:left;min-height:70px;overflow-wrap:anywhere}.choice-answers button b{padding:8px 12px;background:#6351f3;color:white;border-radius:8px}.ranking-scroll{max-height:500px;overflow:auto}.game-sidebar .player-list{max-height:60vh;overflow:auto}@media(max-width:600px){.choice-answers{grid-template-columns:1fr}}
