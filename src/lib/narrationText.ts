@@ -1,7 +1,7 @@
 import { roundIntroText } from './roundIntro.ts';
 export type NarrationKind = 'question' | 'clue' | 'answer' | 'intro';
 export type NarrationState = {
-  gameRound?: number; roundQuestionIndex?: number; playMode?: 'OPEN'|'BID'|'CLUE'; category?: string; gameType: string; phase: string; question: { prompt?: unknown; hint?: unknown; primaryAnswer?: unknown; artist?: unknown };
+  personal?:{stage:string}|null; gameRound?: number; roundQuestionIndex?: number; playMode?: 'OPEN'|'BID'|'CLUE'; category?: string; gameType: string; phase: string; question: { prompt?: unknown; hint?: unknown; primaryAnswer?: unknown; artist?: unknown };
   clue?: { index: number; items: Array<{ text: string }> };
 };
 export function narrationText(state: NarrationState, kind: NarrationKind, language: 'vi-VN'|'en-US' = 'vi-VN'): string {
@@ -19,6 +19,6 @@ export function narrationText(state: NarrationState, kind: NarrationKind, langua
     if (!item) throw new Error('Gợi ý chưa được mở.');
     return `${language === 'en-US' ? 'Clue' : 'Gợi ý'} ${state.clue!.index + 1}: ${item.text}`;
   }
-  if (state.gameType === 'SONG_CLUE' || !['TOPIC_INTRO', 'BIDDING', 'BID_REVEAL', 'OPEN_ANSWERING', 'ANSWERING'].includes(state.phase)) throw new Error('Câu hỏi chưa sẵn sàng để đọc.');
+  if (state.gameType === 'SONG_CLUE' || (!['TOPIC_INTRO', 'BIDDING', 'BID_REVEAL', 'OPEN_ANSWERING', 'ANSWERING'].includes(state.phase) && !(state.phase==='MEDIA_PLAYING' && state.personal?.stage==='ANSWER'))) throw new Error('Câu hỏi chưa sẵn sàng để đọc.');
   return `${state.question.prompt || 'Đáp án của bạn là gì?'}${state.question.hint && ['BIDDING', 'BID_REVEAL'].includes(state.phase) ? ` ${language === 'en-US' ? 'Hint' : 'Gợi ý'}: ${state.question.hint}` : ''}`;
 }
