@@ -16,12 +16,15 @@ function loadYouTube(): Promise<void> {
   });
   return loading;
 }
-export function ClipPlayer({ url, start, duration, preview = false, reveal = false, showVideo = false, paused = false }: { url: string; start: number; duration: number; preview?: boolean; reveal?: boolean; showVideo?: boolean; paused?: boolean }) {
+export function ClipPlayer({ url, start, duration, preview = false, reveal = false, showVideo = false, paused = false, playAt, serverNow }: { url: string; start: number; duration: number; preview?: boolean; reveal?: boolean; showVideo?: boolean; paused?: boolean; playAt?:number; serverNow?:number }) {
   const { settings } = useAudioPreferences();
   useEffect(() => { player.current?.setVolume(settings.media * (narratingRef.current ? .15 : 1)); }, [settings.media]);
   const videoId = youtubeId(url);
   const mount = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
+  const startTimer = useRef<ReturnType<typeof setTimeout>|null>(null);
+  const scheduledLocal = useRef(playAt ? Date.now()+playAt-(serverNow??Date.now()) : 0);
+  useEffect(()=>{scheduledLocal.current=playAt ? Date.now()+playAt-(serverNow??Date.now()):0;},[playAt,serverNow]);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playedRef = useRef(false);
   const narratingRef = useRef(false);
@@ -48,7 +51,7 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
       player.current = new (window as YTWindow).YT!.Player(mount.current, {
         videoId,
         width: '100%', height: '100%',
-        playerVars: { autoplay: preview || pausedRef.current ? 0 : 1, controls: preview ? 1 : 0, disablekb: preview ? 0 : 1, fs: preview ? 1 : 0, iv_load_policy: 3, rel: 0, playsinline: 1, start: Math.floor(start) },
+        playerVars: { autoplay: preview || pausedRef.current || playAt ? 0 : 1, controls: preview ? 1 : 0, disablekb: preview ? 0 : 1, fs: preview ? 1 : 0, iv_load_policy: 3, rel: 0, playsinline: 1, start: Math.floor(start) },
         events: {
           onReady: () => {
             if (!active) return;
@@ -57,13 +60,13 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
             if(!preview){const iframe=player.current?.getIframe();iframe?.setAttribute('tabindex','-1');iframe?.setAttribute('title','Đoạn video của câu hỏi');}
             if (!preview && !pausedRef.current && player.current) {
               player.current.seekTo(start, true);
-              player.current.playVideo();
+              startTimer.current=setTimeout(()=>{if(!pausedRef.current)player.current?.playVideo();},Math.max(0,scheduledLocal.current-Date.now()));
             }
           },
           onStateChange: (event: { data: number }) => {
             if (!active) return;
             if (event.data === 1) {
-              if (pausedRef.current || (endedRef.current && !preview)) { player.current?.pauseVideo(); return; }
+              if (pausedRef.current || Date.now()<scheduledLocal.current || (endedRef.current && !preview)) { player.current?.pauseVideo(); return; }
               setAutoplayBlocked(false);
               playedRef.current = true; setPlaying(true); setPlayed(true);
               playStartedAt.current = Date.now();
@@ -81,16 +84,17 @@ export function ClipPlayer({ url, start, duration, preview = false, reveal = fal
         }
       });
     }).catch(e => { if (active) setError(e.message); });
-    return () => { active = false; if (stopTimer.current) clearTimeout(stopTimer.current); player.current?.destroy(); player.current = null; };
+    return () => { active = false; if(startTimer.current)clearTimeout(startTimer.current); if (stopTimer.current) clearTimeout(stopTimer.current); player.current?.destroy(); player.current = null; };
   }, [videoId, start, duration, preview, reveal]);
   useEffect(() => {
     pausedRef.current = paused;
     if (preview || !player.current || endedRef.current) return;
+    if(startTimer.current)clearTimeout(startTimer.current);
     if (paused) player.current.pauseVideo();
-    else if (ready) player.current.playVideo();
-  }, [paused, preview, ready]);
+    else if (ready) startTimer.current=setTimeout(()=>player.current?.playVideo(),Math.max(0,scheduledLocal.current-Date.now()));
+  }, [paused, preview, ready,playAt,serverNow]);
   function play() {
-    if (!player.current || paused || (!preview && playedRef.current)) return;
+    if (!player.current || paused || Date.now()<scheduledLocal.current || (!preview && playedRef.current)) return;
     if (stopTimer.current) clearTimeout(stopTimer.current);
     setAutoplayBlocked(false);
     player.current.seekTo(start, true); player.current.playVideo();
