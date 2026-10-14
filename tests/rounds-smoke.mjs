@@ -41,10 +41,20 @@ async function expire() {
   await db.execute({sql:'UPDATE rooms SET phase_ends_at=?,clue_state=? WHERE id=?',args:[at,JSON.stringify(clue),room.roomId]});
   return state();
 }
-async function nextRound() {assert.equal((await expire()).phase,'SCOREBOARD');await command('nextQuestion');assert.equal((await state()).phase,'TOPIC_INTRO');await expire();}
-await command('start');await expire();assert.equal((await state()).phase,'BIDDING');assert.equal((await state()).category,film?'FILM':'MUSIC');
+async function checkIntroduction() {
+  for (const token of tokens) {
+    const intro=await state(token);
+    assert.equal(intro.phase,'TOPIC_INTRO');
+    assert.equal(intro.roundQuestionIndex,1);
+    assert.equal(intro.phaseEndsAt-intro.phaseStartedAt,18000);
+    assert.equal(intro.question.primaryAnswer,undefined);
+    assert.equal(intro.playMode,modes[intro.gameRound-1]);
+  }
+}
+async function nextRound() {assert.equal((await expire()).phase,'SCOREBOARD');await command('nextQuestion');await checkIntroduction();await expire();}
+await command('start');await checkIntroduction();await command('pause');assert.notEqual((await state()).pausedAt,null);await command('resume');assert.equal((await state()).phase,'TOPIC_INTRO');await expire();assert.equal((await state()).phase,'BIDDING');assert.equal((await state()).category,film?'FILM':'MUSIC');
 for(const token of tokens)await command('bid',1,token);
-await expire();assert.equal((await state()).phase,'MEDIA_PLAYING');await expire();
+await expire();assert.equal((await state()).phase,'MEDIA_PLAYING');await db.execute({sql:'UPDATE rooms SET phase_started_at=?,phase_ends_at=? WHERE id=?',args:[Date.now()-6000,Date.now()+12000,room.roomId]});
 await command('answer','Sai',tokens[1]);await assert.rejects(command('answer','Bài 1',tokens[1]),/một lần/);
 for(const token of [tokens[0],tokens[2],tokens[3]])await command('answer','Bài 1',token);
 assert.equal((await state()).phase,'ROUND_RESULT');await nextRound();await expire();
@@ -69,5 +79,5 @@ assert.equal((await state()).playMode,'OPEN');assert.equal((await state()).gameR
 await expire();for(const token of tokens)await command('answer','Bài 5',token);
 assert.equal((await expire()).phase,'SCOREBOARD');await command('nextQuestion');
 const finished=await state();assert.equal(finished.phase,'GAME_FINISHED');assert.equal(finished.players.length,4);assert.ok(finished.players.every(p=>p.score>0));
-console.log((film?'FILM: ':'MUSIC: ')+'PASS: five rounds BID → CLUE → OPEN → CLUE → OPEN, four players, retry rules, pause, reset, ranking, persistence and validation.');
+console.log((film?'FILM: ':'MUSIC: ')+'PASS: five round intros (18s, four players, hidden answers), BID → CLUE → OPEN → CLUE → OPEN, retry rules, pause, reset, ranking, persistence and validation.');
 db.close();
