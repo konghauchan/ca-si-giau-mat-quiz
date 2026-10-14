@@ -55,7 +55,7 @@ export default function SharedQuizPage() {
       </div>
       {notice && <div className="notice success" role="status">{notice}</div>}
       {error && <div className="notice error" role="alert">{error}</div>}
-      <form className="panel shared-quiz-start" onSubmit={createRoom}><span className="kicker">BẮT ĐẦU CHƠI</span><h2>Tạo phòng từ bộ câu hỏi này</h2><p>Nhập tên và chọn avatar. Bạn sẽ là người chơi đầu tiên trong phòng; chia sẻ mã phòng cho tối đa 3 người nữa.</p><div className="field"><label htmlFor="shared-host-name">Tên hiển thị của bạn</label><input id="shared-host-name" value={nickname} onChange={event => setNickname(event.target.value)} minLength={2} maxLength={24} placeholder="Nhập tên của bạn" required /></div><AvatarPicker value={avatarId} onChange={setAvatarId} /><button className="button primary big" disabled={busy || quiz.questionCount === 0}><Play size={18} /> {busy ? 'Đang tạo phòng…' : 'Tạo phòng và tham gia'}</button></form>
+      <form className="panel shared-quiz-start" onSubmit={createRoom}><span className="kicker">BẮT ĐẦU CHƠI</span><h2>Tạo phòng từ bộ câu hỏi này</h2><p>Nhập tên và chọn avatar. Bạn sẽ là người chơi đầu tiên trong phòng; chia sẻ mã phòng cho tối đa 49 người nữa.</p><div className="field"><label htmlFor="shared-host-name">Tên hiển thị của bạn</label><input id="shared-host-name" value={nickname} onChange={event => setNickname(event.target.value)} minLength={2} maxLength={24} placeholder="Nhập tên của bạn" required /></div><AvatarPicker value={avatarId} onChange={setAvatarId} /><button className="button primary big" disabled={busy || quiz.questionCount === 0}><Play size={18} /> {busy ? 'Đang tạo phòng…' : 'Tạo phòng và tham gia'}</button></form>
     </>}
   </main>;
 }

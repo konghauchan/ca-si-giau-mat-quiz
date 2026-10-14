@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { MAX_PLAYERS, BID_PREPARATION_MS, bidWindow, bidStage, choicesForPlayer, type Choice, type AnswerMode } from './multiplayer';
 import { ROUND_INTRO_MS } from './roundIntro';
 import { one, all, run, tx, batchRead } from './db';
 import { maskedTitle, scoreWithTitleHint, titleHintAt, titleHintLimit } from './titleHint';
@@ -42,7 +43,7 @@ async function setPhase(roomId: string, phase: Phase, durationMs: number | null 
 }
 async function bids(roomId: string, index: number) { return await all('SELECT player_id,amount,auto_assigned FROM bids WHERE room_id=? AND question_index=? ORDER BY amount,created_at', roomId, index); }
 async function challengers(r: Row): Promise<string[]> {
-  if (storedPlayMode(await question(String(r.quiz_id), Number(r.question_index))) === 'OPEN') return (await all('SELECT id FROM players WHERE room_id=? ORDER BY joined_at, rowid', String(r.id))).map(p => String(p.id));
+  if (storedPlayMode(await question(String(r.quiz_id), Number(r.question_index))) === 'OPEN' || r.phase==='MEDIA_PLAYING') return (await all('SELECT id FROM players WHERE room_id=? ORDER BY joined_at, rowid', String(r.id))).map(p => String(p.id));
   return (await bids(String(r.id), Number(r.question_index))).filter(b => b.amount === r.active_bid).map(b => String(b.player_id));
 }
 async function startQuestion(r: Row, index: number) {
@@ -67,12 +68,12 @@ async function finishBidding(r: Row) {
   await setPhase(String(r.id), 'BID_REVEAL', 2000);
   await event(String(r.id), 'BIDDING_ENDED');
 }
-async function startNextGroup(r: Row, announce = false) {
-  const groups = groupBids((await bids(String(r.id), Number(r.question_index))).map(b => ({ playerId: String(b.player_id), amount: Number(b.amount) })));
-  const group = nextGroup(groups, r.active_bid === null ? null : Number(r.active_bid));
-  if (!group) { const q = await question(String(r.quiz_id), Number(r.question_index)); await setPhase(String(r.id), 'ROUND_RESULT', resultDuration(q)); await event(String(r.id), 'ROUND_ENDED'); return; }
-  await setPhase(String(r.id), announce ? 'TURN_TRANSITION' : 'MEDIA_PLAYING', announce ? TURN_TRANSITION_MS : (group.amount + 5) * 1000, group.amount);
-  await event(String(r.id), 'CHALLENGERS_SELECTED', { amount: group.amount, playerIds: group.playerIds });
+async function startSimultaneous(r: Row) {
+  const q = await question(String(r.quiz_id), Number(r.question_index));
+  const rows = await bids(String(r.id), Number(r.question_index));
+  const maximum = Math.max(...rows.map(b=>Number(b.amount)));
+  await setPhase(String(r.id),'MEDIA_PLAYING',BID_PREPARATION_MS+(maximum+Number(q.answer_seconds))*1000);
+  await event(String(r.id),'SIMULTANEOUS_LISTENING_STARTED');
 }
 async function moveToNextQuestion(r: Row) {
   const roomId = String(r.id); const index = Number(r.question_index);
@@ -81,32 +82,19 @@ async function moveToNextQuestion(r: Row) {
   else { await run('UPDATE rooms SET question_index=question_index+1 WHERE id=?', roomId); await startQuestion(r, index + 1); }
 }
 async function resolveAnswers(r: Row) {
-  const roomId = String(r.id); const index = Number(r.question_index); const amount = Number(r.active_bid);
-  const attempts = await all('SELECT * FROM answer_attempts WHERE room_id=? AND question_index=? AND amount=? ORDER BY created_at, rowid', roomId, index, amount);
-  const q = await question(String(r.quiz_id), index);
-  let correct = false; let correctRank = 0;
-  for (const a of attempts.filter(attempt => attempt.correct === 1)) {
-    correct = true;
-    correctRank++;
-    const basePoints = scoreForBid(amount, Number(q.reveal_min), Number(q.reveal_max), Number(q.reveal_step));
-    const rankedPoints = scoreForCorrectRank(basePoints, correctRank);
-    const points = scoreForTimedAnswer(rankedPoints, Number(r.phase_started_at), Number(r.phase_ends_at), Number(a.created_at));
-    await run('UPDATE players SET score=score+? WHERE id=?', points, String(a.player_id));
-    await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, String(a.player_id), points, 'CORRECT', now());
-    await event(roomId, 'SCORE_AWARDED', { playerId: a.player_id, points, correctRank });
+  const roomId=String(r.id), index=Number(r.question_index);
+  const q=await question(String(r.quiz_id),index);
+  const attempts=await all('SELECT * FROM answer_attempts WHERE room_id=? AND question_index=? ORDER BY created_at,rowid',roomId,index);
+  let rank=0;
+  for(const a of attempts.filter(a=>a.correct===1)) {
+    rank++;
+    const window=bidWindow(Number(r.phase_started_at),Number(a.amount),Number(q.answer_seconds));
+    const points=scoreForTimedAnswer(scoreForBid(Number(a.amount),Number(q.reveal_min),Number(q.reveal_max),Number(q.reveal_step)),window.listenEndsAt,window.answerEndsAt,Number(a.created_at));
+    await run('UPDATE players SET score=score+? WHERE id=?',points,String(a.player_id));
+    await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)',id(),roomId,index,String(a.player_id),points,'CORRECT',now());
+    await event(roomId,'SCORE_AWARDED',{playerId:a.player_id,points,correctRank:rank});
   }
-  if (Number(r.wrong_penalty_percentage) > 0) {
-    const correctPlayers = new Set(attempts.filter(a => a.correct === 1).map(a => String(a.player_id)));
-    const wrongPlayers = new Set(attempts.filter(a => a.correct !== 1 && !correctPlayers.has(String(a.player_id))).map(a => String(a.player_id)));
-    for (const playerId of wrongPlayers) {
-      const penalty = Math.floor(scoreForBid(amount, Number(q.reveal_min), Number(q.reveal_max), Number(q.reveal_step)) * Number(r.wrong_penalty_percentage) / 100);
-      await run('UPDATE players SET score=score-? WHERE id=?', penalty, playerId);
-      await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, playerId, -penalty, 'WRONG', now());
-    }
-  }
-  await event(roomId, 'ANSWER_RESOLVED', { amount, correct });
-  if (correct) { await setPhase(roomId, 'ROUND_RESULT', resultDuration(q)); await event(roomId, 'ROUND_ENDED'); }
-  else await startNextGroup(r, true);
+  await setPhase(roomId,'ROUND_RESULT',resultDuration(q));await event(roomId,'ROUND_ENDED');
 }
 async function resolveOpenAnswers(r: Row) {
   const roomId = String(r.id); const index = Number(r.question_index);
@@ -116,8 +104,8 @@ async function resolveOpenAnswers(r: Row) {
   for (const answer of attempts) {
     if (answer.correct !== 1) continue;
     correctRank++;
-    const rankedPoints = scoreForCorrectRank(500, correctRank);
-    const scoring = (String(q.type) === 'music_open' || (String(q.type) === 'music' && gameRound(q) === 1)) && titleHintLimit(String(q.primary_answer)) > 0 ? scoreWithTitleHint : scoreForTimedAnswer;
+    const rankedPoints = 500;
+    const scoring = (String(q.type) === 'music_open' || (String(q.type) === 'music' && gameRound(q) === 1)) && q.answer_mode !== 'CHOICE' && titleHintLimit(String(q.primary_answer)) > 0 ? scoreWithTitleHint : scoreForTimedAnswer;
     const points = scoring(rankedPoints, Number(r.phase_started_at), Number(r.phase_ends_at), Number(answer.created_at));
     await run('UPDATE players SET score=score+? WHERE id=?', points, String(answer.player_id));
     await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, String(answer.player_id), points, 'OPEN_CORRECT', now());
@@ -136,9 +124,9 @@ async function advance(r: Row) {
   else if (r.phase === 'OPEN_MEDIA_PLAYING') await setPhase(roomId, 'OPEN_ANSWERING', Number(q.answer_seconds) * 1000);
   else if (r.phase === 'OPEN_ANSWERING') await resolveOpenAnswers(r);
   else if (r.phase === 'BIDDING') await finishBidding(r);
-  else if (r.phase === 'BID_REVEAL') await startNextGroup({ ...r, active_bid: null });
+  else if (r.phase === 'BID_REVEAL') await startSimultaneous(r);
   else if (r.phase === 'TURN_TRANSITION') await setPhase(roomId, 'MEDIA_PLAYING', (Number(r.active_bid) + 5) * 1000, Number(r.active_bid));
-  else if (r.phase === 'MEDIA_PLAYING') await setPhase(roomId, 'ANSWERING', Number(q.answer_seconds) * 1000, Number(r.active_bid));
+  else if (r.phase === 'MEDIA_PLAYING') await resolveAnswers(r);
   else if (r.phase === 'ANSWERING') await resolveAnswers(r);
   else if (r.phase === 'ROUND_RESULT') await setPhase(roomId, 'SCOREBOARD', SCOREBOARD_MS, null, Number(r.phase_ends_at));
   else if (r.phase === 'SCOREBOARD') await moveToNextQuestion(r);
@@ -152,7 +140,7 @@ async function tick(roomId: string) {
   }
 }
 
-export type QuestionInput = { titleHintIndices?: number[]; prompt: string; playMode?: PlayMode; gameRound: number; topicKey: string; listenSeconds: number; answerSeconds: number; bidSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number; clues?: Clue[] };
+export type QuestionInput = { answerMode?: AnswerMode; distractors?: string[]; titleHintIndices?: number[]; prompt: string; playMode?: PlayMode; gameRound: number; topicKey: string; listenSeconds: number; answerSeconds: number; bidSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number; clues?: Clue[] };
 export type TopicInput = { key: string; gameRound: number; title: string; songCount: number };
 export async function saveQuiz(input: { id?: string; coverSourceId?: string; title: string; description: string; visibility: string; gameType?: 'MUSIC_BID' | 'SONG_CLUE' | 'MUSIC_DUEL' | 'FILM_DUEL'; topics: TopicInput[]; questions: QuestionInput[] }, userId: string) {
   return await tx(async () => {
@@ -231,6 +219,8 @@ export async function saveQuiz(input: { id?: string; coverSourceId?: string; tit
     for (const [index, q] of sorted.entries()) {
       const questionId = id();
       await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,bid_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds,clues_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, input.gameType === 'FILM_DUEL' ? inputPlayMode(q,input.gameType) === 'CLUE' ? 'film_clue' : inputPlayMode(q,input.gameType) === 'OPEN' ? 'film_open' : 'film_bid' : inputPlayMode(q,input.gameType) === 'CLUE' ? 'song_clue' : input.gameType === 'MUSIC_DUEL' ? inputPlayMode(q,input.gameType) === 'OPEN' ? 'music_open' : 'music_bid' : 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.bidSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null, JSON.stringify(q.clues || []));
+      const options: Choice[] = q.answerMode==='CHOICE' ? [q.primaryAnswer,...(q.distractors||[])].map(label=>({id:id(),label:label.trim()})) : [];
+      await run('UPDATE questions SET answer_mode=?,choice_options=?,correct_choice_id=? WHERE id=?', q.answerMode||'TEXT', JSON.stringify(options), options[0]?.id||null, questionId);
       await run('UPDATE questions SET title_hint_indices=? WHERE id=?', JSON.stringify(q.titleHintIndices || []), questionId);
       for (const answer of new Set(q.acceptedAnswers.map(x => x.trim()).filter(Boolean))) await run('INSERT OR IGNORE INTO accepted_answers VALUES(?,?)', questionId, answer);
     }
@@ -321,7 +311,7 @@ export async function joinRoom(pin: string, nickname: string, avatarId = 1, clie
       }
     }
     if (r.phase !== 'LOBBY') fail('Trò chơi đã bắt đầu.');
-    if (Number((await one('SELECT COUNT(*) AS count FROM players WHERE room_id=?', String(r.id)))?.count) >= 4) fail('Phòng đã đủ 4 người.');
+    if (Number((await one('SELECT COUNT(*) AS count FROM players WHERE room_id=?', String(r.id)))?.count) >= MAX_PLAYERS) fail('Phòng đã đủ 50 người.');
     if (await one('SELECT 1 FROM players WHERE room_id=? AND lower(nickname)=lower(?)', String(r.id), name)) fail('Tên hiển thị đã được dùng.');
     const playerId = id(); const playerToken = clientToken || token();
     await run('INSERT INTO players(id,room_id,token,nickname,avatar_id,score,joined_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?)', playerId, String(r.id), playerToken, name, avatarId, 0, now(), now());
@@ -329,11 +319,11 @@ export async function joinRoom(pin: string, nickname: string, avatarId = 1, clie
     return { roomId: r.id, playerId, playerToken };
   });
 }
-export async function gameCommand(roomId: string, auth: string, action: string, value?: string | number) {
+export async function gameCommand(roomId: string, auth: string, action: string, value?: string | number, receivedAt = Date.now()) {
   const mode = await one('SELECT game_type FROM quizzes JOIN rooms ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', roomId);
   if (mode?.game_type === 'SONG_CLUE') { await clueCommand(roomId, auth, action, value); return getClueState(roomId, auth); }
   await tx(async () => {
-    await tick(roomId);
+    if(action!=='answer')await tick(roomId);
     const r = await room(roomId); const index = Number(r.question_index);
     if (['buzz','nextClue','answer'].includes(action) && ['CLUE_ACTIVE','CLUE_ANSWERING','CLUE_FEEDBACK'].includes(String(r.phase))) {
       if (r.paused_at !== null) fail('Trò chơi đang tạm dừng.');
@@ -350,8 +340,8 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
         const elapsed = now() - Number(r.paused_at);
         if (String(r.phase).startsWith('CLUE_') || r.phase === 'QUESTION_INTRO') await shiftClueClock(r,elapsed);
         await run('UPDATE rooms SET paused_at=NULL,phase_started_at=phase_started_at+?,phase_ends_at=CASE WHEN phase_ends_at IS NULL THEN NULL ELSE phase_ends_at+? END WHERE id=?', elapsed, elapsed, roomId);
-        if (['OPEN_ANSWERING', 'ANSWERING'].includes(String(r.phase))) {
-          await run('UPDATE answer_attempts SET created_at=created_at+? WHERE room_id=? AND question_index=? AND amount=?', elapsed, roomId, index, r.phase === 'OPEN_ANSWERING' ? 0 : Number(r.active_bid));
+        if (['OPEN_ANSWERING', 'ANSWERING', 'MEDIA_PLAYING'].includes(String(r.phase))) {
+          await run('UPDATE answer_attempts SET created_at=created_at+? WHERE room_id=? AND question_index=?', elapsed, roomId, index);
         }
         await event(roomId, 'GAME_RESUMED');
       } else if (action === 'endGame') {
@@ -360,7 +350,7 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
       } else if (r.paused_at !== null) fail('Trò chơi đang tạm dừng.');
       else if (action === 'start') {
         if (r.phase !== 'LOBBY') fail('Trò chơi đã bắt đầu.');
-        if (Number((await one('SELECT COUNT(*) AS count FROM players WHERE room_id=?', roomId))?.count) < 2) fail('Cần ít nhất 2 người chơi.');
+        if (Number((await one('SELECT COUNT(*) AS count FROM players WHERE room_id=?', roomId))?.count) < 1) fail('Cần ít nhất một người chơi.');
         await startQuestion(r, index); await event(roomId, 'GAME_STARTED');
       } else if (action === 'endBidding') { if (r.phase !== 'BIDDING') fail('Không trong thời gian đấu giá.'); await finishBidding(r); }
       else if (action === 'showScoreboard') { if (!['ROUND_RESULT','CLUE_RESULT'].includes(String(r.phase))) fail('Chưa có kết quả.'); await setPhase(roomId, 'SCOREBOARD', SCOREBOARD_MS); }
@@ -383,26 +373,35 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
         const locked = Number((await one('SELECT COUNT(*) AS count FROM bids WHERE room_id=? AND question_index=?', roomId, index))?.count);
         if (locked === total) await finishBidding(r);
       } else if (action === 'answer') {
-        if (!['OPEN_ANSWERING', 'ANSWERING'].includes(String(r.phase)) || (r.phase_ends_at !== null && Number(r.phase_ends_at) <= now())) fail('Đã hết thời gian trả lời.');
-        if (!(await challengers(r)).includes(String(p.id))) fail('Chưa đến lượt bạn trả lời.');
-        const text = String(value ?? '').trim().slice(0, 120);
-        if (!text) fail('Nhập đáp án.');
-        const previous = await all('SELECT text,correct,created_at FROM answer_attempts WHERE room_id=? AND question_index=? AND player_id=? ORDER BY created_at DESC,rowid DESC', roomId, index, String(p.id));
-        if (r.phase === 'ANSWERING' && previous.length > 0) fail('Luật đấu giá chỉ cho trả lời một lần.');
-        if (r.phase === 'OPEN_ANSWERING' && previous.some(attempt => attempt.correct === 1)) fail('Bạn đã trả lời đúng.');
-        if (r.phase === 'OPEN_ANSWERING' && previous.length >= 30) fail('Bạn đã dùng hết 30 lần thử cho câu này.');
-        if (previous.some(attempt => normalizeAnswer(String(attempt.text)) === normalizeAnswer(text))) fail('Bạn đã thử đáp án này. Hãy nhập tên khác.');
-        const q = await question(String(r.quiz_id), index);
-        const accepted = [String(q.primary_answer), ...(await all('SELECT answer FROM accepted_answers WHERE question_id=?', String(q.id))).map(x => String(x.answer))];
-        const correct = answerMatches(text, accepted) ? 1 : 0;
-        const amount = r.phase === 'OPEN_ANSWERING' ? 0 : Number(r.active_bid);
-        await run('INSERT INTO answer_attempts(id,room_id,question_index,player_id,amount,text,correct,created_at) VALUES(?,?,?,?,?,?,?,?)', id(), roomId, index, String(p.id), amount, text, correct, now());
-        await event(roomId, 'ANSWER_SUBMITTED', { playerId: p.id });
-        const settledCount = Number((await one(`SELECT COUNT(DISTINCT player_id) AS count FROM answer_attempts WHERE room_id=? AND question_index=? AND amount=?${r.phase === 'OPEN_ANSWERING' ? ' AND correct=1' : ''}`, roomId, index, amount))?.count);
-        if (settledCount === (await challengers(r)).length) {
-          if (r.phase === 'OPEN_ANSWERING') await resolveOpenAnswers(r);
-          else await resolveAnswers(r);
-        }
+        const q=await question(String(r.quiz_id),index);
+        const simultaneous=r.phase==='MEDIA_PLAYING' && storedPlayMode(q)==='BID';
+        const ownBid=simultaneous ? (await bids(roomId,index)).find(b=>b.playerId===p.id || b.player_id===p.id) : undefined;
+        const clock=receivedAt;
+        const window=ownBid ? bidWindow(Number(r.phase_started_at),Number(ownBid.amount),Number(q.answer_seconds)) : null;
+        if(simultaneous && (!window || clock < window.listenEndsAt || clock >= window.answerEndsAt)) fail('Chưa đến lượt trả lời hoặc đã hết thời gian riêng của bạn.');
+        if(!simultaneous && (r.phase!=='OPEN_ANSWERING' || Number(r.phase_ends_at)<=clock)) fail('Đã hết thời gian trả lời.');
+        if(!(await challengers(r)).includes(String(p.id))) fail('Chưa đến lượt bạn trả lời.');
+        const previous=await all('SELECT text,correct,created_at FROM answer_attempts WHERE room_id=? AND question_index=? AND player_id=? ORDER BY created_at DESC,rowid DESC',roomId,index,String(p.id));
+        const single=simultaneous || q.answer_mode==='CHOICE';
+        if(single && previous.length) fail('Bạn chỉ được trả lời một lần.');
+        if(previous.some(a=>a.correct===1)) fail('Bạn đã trả lời đúng.');
+        if(previous.length>=30) fail('Bạn đã dùng hết 30 lần thử cho câu này.');
+        const supplied=String(value??'').trim().slice(0,120);
+        const options:Choice[]=JSON.parse(String(q.choice_options||'[]'));
+        const chosen=q.answer_mode==='CHOICE'?options.find(c=>c.id===supplied):undefined;
+        if(q.answer_mode==='CHOICE' && !chosen) fail('Lựa chọn không hợp lệ.');
+        const text=chosen?.label || supplied;if(!text) fail('Nhập đáp án.');
+        if(previous.some(a=>normalizeAnswer(String(a.text))===normalizeAnswer(text))) fail('Bạn đã thử đáp án này. Hãy nhập tên khác.');
+        const accepted=[String(q.primary_answer),...(await all('SELECT answer FROM accepted_answers WHERE question_id=?',String(q.id))).map(a=>String(a.answer))];
+        const correct=chosen ? (chosen.id===q.correct_choice_id?1:0) : (answerMatches(text,accepted)?1:0);
+        await run('INSERT INTO answer_attempts(id,room_id,question_index,player_id,amount,text,correct,created_at) VALUES(?,?,?,?,?,?,?,?)',id(),roomId,index,String(p.id),simultaneous?Number(ownBid!.amount):0,text,correct,clock);
+        await event(roomId,'ANSWER_SUBMITTED',{playerId:p.id});
+        const allAttempts=await all('SELECT player_id,correct FROM answer_attempts WHERE room_id=? AND question_index=?',roomId,index);
+        const players=await all('SELECT id FROM players WHERE room_id=?',roomId);
+        if(simultaneous) {
+          const allBids=await bids(roomId,index);
+          if(players.every(player=>allAttempts.some(a=>a.player_id===player.id)||clock>=bidWindow(Number(r.phase_started_at),Number(allBids.find(b=>b.player_id===player.id)?.amount),Number(q.answer_seconds)).answerEndsAt)) await resolveAnswers(r);
+        } else if(players.every(player=>allAttempts.some(a=>a.player_id===player.id && (single || a.correct===1)))) await resolveOpenAnswers(r);
       } else fail('Thao tác không hợp lệ.');
     }
   });
@@ -430,8 +429,11 @@ export async function getState(roomId: string, auth: string) {
   const currentRound = gameRound(q); const nextQuestion = qs[index + 1];
   const reveal = ['ROUND_RESULT', 'SCOREBOARD', 'GAME_FINISHED'].includes(String(r.phase));
   const bidRows = bs; const answerRows = ans;
-  const challengerIds = playMode === 'OPEN' ? ps.map(p => String(p.id)) : bs.filter(b => b.amount === r.active_bid).map(b => String(b.player_id));
-  const canHear = r.phase === 'OPEN_MEDIA_PLAYING' || (r.phase === 'MEDIA_PLAYING' && (host || challengerIds.includes(String(me?.id))));
+  const challengerIds = playMode === 'OPEN' || (playMode==='BID' && r.phase==='MEDIA_PLAYING') ? ps.map(p => String(p.id)) : bs.filter(b => b.amount === r.active_bid).map(b => String(b.player_id));
+  const clock=Number(r.paused_at??now());
+  const myBidRow=me?bidRows.find(b=>b.player_id===me.id):undefined;
+  const personal=playMode==='BID' && r.phase==='MEDIA_PLAYING' && myBidRow ? bidStage(Number(r.phase_started_at),Number(myBidRow.amount),Number(q.answer_seconds),clock) : null;
+  const canHear=r.phase==='OPEN_MEDIA_PLAYING'||(personal?.stage==='LISTEN'||personal?.stage==='PREPARE');
   const showBids = !['LOBBY', 'BIDDING'].includes(String(r.phase));
   const latestAnswer = (playerId: unknown) => answerRows.filter(a => a.player_id === playerId).at(-1);
   const myAnswerRow = me ? latestAnswer(me.id) : undefined;
@@ -442,7 +444,7 @@ export async function getState(roomId: string, auth: string) {
     bidLocked: bidRows.some(b => b.player_id === p.id),
     bid: showBids ? bidRows.find(b => b.player_id === p.id)?.amount ?? null : undefined,
     autoBid: showBids ? !!bidRows.find(b => b.player_id === p.id)?.auto_assigned : undefined,
-    answerLocked: playMode === 'OPEN' ? correctRows.some(a => a.player_id === p.id) : answerRows.some(a => a.player_id === p.id),
+    answerLocked: playMode === 'OPEN' && q.answer_mode !== 'CHOICE' ? correctRows.some(a => a.player_id === p.id) : answerRows.some(a => a.player_id === p.id) || (personal!==null && clock>=bidWindow(Number(r.phase_started_at),Number(bidRows.find(b=>b.player_id===p.id)?.amount),Number(q.answer_seconds)).answerEndsAt),
     answer: reveal ? correctRows.find(a => a.player_id === p.id)?.text ?? latestAnswer(p.id)?.text ?? null : undefined,
     correct: reveal ? correctRows.some(a => a.player_id === p.id) : undefined,
     correctRank: reveal && correctRows.some(a => a.player_id === p.id) ? correctRows.findIndex(a => a.player_id === p.id) + 1 : undefined,
@@ -468,12 +470,14 @@ export async function getState(roomId: string, auth: string) {
     topicName: topic?.title ?? 'Chủ đề chung',
     topicQuestionIndex: q.topic_id ? qs.filter(item => item.topic_id === q.topic_id && Number(item.order_index) <= index).length : qs.filter(item => gameRound(item) === currentRound && Number(item.order_index) <= index).length,
     topicQuestionCount: topic?.song_count ?? qs.filter(item => gameRound(item) === currentRound).length,
-    question: { id: q.id, prompt: q.prompt, type: q.type, revealType: q.reveal_type, revealUnit: q.reveal_unit, revealMin: q.reveal_min, revealMax: q.reveal_max, revealStep: q.reveal_step,
+    question: { answerMode:q.answer_mode||'TEXT', id: q.id, prompt: q.prompt, type: q.type, revealType: q.reveal_type, revealUnit: q.reveal_unit, revealMin: q.reveal_min, revealMax: q.reveal_max, revealStep: q.reveal_step,
       mediaType: q.media_type, mediaUrl: canHear || reveal ? q.media_url : undefined,
       mediaStart: canHear || reveal ? q.media_start : undefined,
       listenSeconds: q.listen_seconds, answerSeconds: q.answer_seconds, bidSeconds: q.bid_seconds, primaryAnswer: reveal ? q.primary_answer : undefined, artist: reveal ? q.artist : undefined, hint: q.hint, resultStart: reveal ? q.result_start : undefined, resultSeconds: reveal ? q.result_seconds : undefined },
-    titleHint: playMode === 'OPEN' && r.quiz_game_type !== 'FILM_DUEL' && r.phase === 'OPEN_ANSWERING' && titleHintLimit(String(q.primary_answer)) > 0 ? { opensAt: titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at)), revealed: Number(r.paused_at ?? now()) >= titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at)), mask: maskedTitle(String(q.primary_answer), JSON.parse(String(q.title_hint_indices || '[]')), Number(r.paused_at ?? now()) >= titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at))) } : null,
-    activeBid: r.active_bid, activeChallengerIds: (playMode === 'OPEN' && r.phase !== 'LOBBY') || r.active_bid !== null ? challengerIds : [],
+    personal,
+    choices: q.answer_mode==='CHOICE' && me && (reveal || (r.phase==='OPEN_ANSWERING') || (personal?.stage==='ANSWER')) ? choicesForPlayer(JSON.parse(String(q.choice_options||'[]')),String(me.id)) : [],
+    titleHint: q.answer_mode!=='CHOICE' && playMode === 'OPEN' && r.quiz_game_type !== 'FILM_DUEL' && r.phase === 'OPEN_ANSWERING' && titleHintLimit(String(q.primary_answer)) > 0 ? { opensAt: titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at)), revealed: Number(r.paused_at ?? now()) >= titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at)), mask: maskedTitle(String(q.primary_answer), JSON.parse(String(q.title_hint_indices || '[]')), Number(r.paused_at ?? now()) >= titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at))) } : null,
+    activeBid: r.active_bid, activeChallengerIds: ((playMode === 'OPEN' && r.phase !== 'LOBBY') || personal!==null || r.active_bid !== null) ? challengerIds : [],
     turnNotice,
     players, me: me ? { id: me.id, nickname: me.nickname } : null, isHost: host,
     myBid: me ? bidRows.find(b => b.player_id === me.id)?.amount ?? null : null,

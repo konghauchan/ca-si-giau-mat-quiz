@@ -1,12 +1,12 @@
 # Đọ Nhạc
 
-Trò chơi đoán bài hát cho 2–4 người. Quiz mới thuộc **Đọ Nhạc** và có thể thêm nhiều vòng; mỗi vòng chọn **Nghe chung**, **Đấu giá thời gian** hoặc **Đoán qua 6 gợi ý**. Có thể lặp lại luật ở nhiều vòng, tối đa 60 bài trong một quiz. Người tạo phòng cũng là một người chơi. Quiz và phòng cũ tiếp tục dùng nội dung, luật đã lưu.
+Trò chơi đoán bài hát cho 1–50 người. Quiz mới thuộc **Đọ Nhạc** và có thể thêm nhiều vòng; mỗi vòng chọn **Nghe chung**, **Đấu giá thời gian** hoặc **Đoán qua 6 gợi ý**. Có thể lặp lại luật ở nhiều vòng, tối đa 60 bài trong một quiz. Người tạo phòng cũng là một người chơi. Quiz và phòng cũ tiếp tục dùng nội dung, luật đã lưu.
 
 ### Cấu hình vòng chơi
 
-Trong trang tạo/chỉnh sửa, bấm **Thêm vòng chơi**, chọn luật ở **Luật chơi vòng…**, rồi thêm chủ đề và bài hát. Xóa vòng sẽ xóa các bài trong vòng đó sau xác nhận; các vòng sau được đánh số lại. Vòng nghe chung cho thử lại đáp án sai (tối đa 30 lần/câu); đấu giá chỉ cho trả lời một lần; gợi ý loại người trả lời sai khỏi câu. Các vòng chuyển tự động qua màn kết quả và bảng điểm, điểm được cộng xuyên suốt quiz. Quiz mới do host bắt đầu; phòng gợi ý cũ vẫn dùng cơ chế 4 người sẵn sàng.
+Trong trang tạo/chỉnh sửa, bấm **Thêm vòng chơi**, chọn luật ở **Luật chơi vòng…**, rồi thêm chủ đề và bài hát. Xóa vòng sẽ xóa các bài trong vòng đó sau xác nhận; các vòng sau được đánh số lại. Vòng nghe chung cho thử lại đáp án sai (tối đa 30 lần/câu); đấu giá chỉ cho trả lời một lần; gợi ý loại người trả lời sai khỏi câu. Các vòng chuyển tự động qua màn kết quả và bảng điểm, điểm được cộng xuyên suốt quiz. Quiz mới do host bắt đầu; phòng gợi ý bắt đầu khi tất cả người đang tham gia sẵn sàng, kể cả chơi một mình.
 
-Luật của quiz mới lưu bằng loại câu hỏi `music_open`, `music_bid`, `song_clue`, độc lập với số vòng. Không cần thêm cột hay chuyển dữ liệu Turso. `tests/rounds-smoke.mjs` kiểm tra 5 vòng với 4 người, lưu/mở lại, thử lại đáp án, tạm dừng và đặt lại quyền ở câu mới. Chạy với server và test cùng `DATABASE_PATH=./data/rounds-smoke.sqlite`, cổng 3210 (chỉ dùng database kiểm thử local).
+Luật của quiz mới lưu bằng loại câu hỏi `music_open`, `music_bid`, `song_clue`, độc lập với số vòng. Dữ liệu cũ tự nhận cách trả lời TEXT; migration bổ sung các cột đáp án ABCD. `tests/rounds-smoke.mjs` kiểm tra 5 vòng với 4 người, lưu/mở lại, thử lại đáp án, tạm dừng và đặt lại quyền ở câu mới. Chạy với server và test cùng `DATABASE_PATH=./data/rounds-smoke.sqlite`, cổng 3210 (chỉ dùng database kiểm thử local).
 
 ## Chạy local
 
@@ -24,7 +24,7 @@ Mở `http://localhost:3000`. Trên Windows có thể tạo `.env.local` bằng 
 2. Tại **Thư viện**, bấm **Tạo phòng**, nhập tên hiển thị và chọn một trong 20 avatar. Người tạo phòng chiếm một trong bốn vị trí chơi và nhận mã phòng 6 số.
 3. Mở thêm 1–3 thẻ trình duyệt (hoặc thiết bị cùng mạng), vào `/join`, nhập mã phòng, tên hiển thị và chọn avatar. Không cần đăng nhập. Mỗi vị trí có màu riêng xuyên suốt trận đấu.
    Quiz mới mặc định **Riêng tư** và chỉ hiện trong thư viện của tài khoản tạo. Bấm **Chia sẻ** trên thẻ quiz để chuyển sang **Ai có liên kết** và sao chép URL `/quiz/<id>`; người mở link bằng ẩn danh có thể xem thông tin quiz và tạo phòng, nhưng không xem được câu hỏi, đáp án hoặc chỉnh sửa quiz. Có thể chọn **Công khai** để quiz xuất hiện trong thư viện mọi người, hoặc **Tắt chia sẻ** để chặn truy cập bằng link. Link cũ vẫn dẫn đến bản mới khi quiz được chỉnh sửa sau khi đã tạo phòng.
-4. Người tạo bắt đầu vòng 1: chủ đề mới hiện 3 giây trước bài đầu tiên, sau đó tất cả cùng nghe rồi trả lời. Vòng 1 cho phép gửi nhiều đáp án khác nhau trong thời gian trả lời, tối đa 30 lần mỗi người mỗi câu; đáp án đúng được chốt. Vòng 2 mỗi người chỉ được gửi một đáp án. Các chủ đề chạy lần lượt trong từng vòng; hết vòng 1, vòng 2 tự bắt đầu. Nếu nhóm trước không đoán đúng, cả phòng thấy thông báo và tên người nghe tiếp theo trong 3 giây.
+4. Người tạo bắt đầu vòng 1: chủ đề mới hiện 3 giây trước bài đầu tiên, sau đó tất cả cùng nghe rồi trả lời. Vòng 1 cho phép gửi nhiều đáp án khác nhau trong thời gian trả lời, tối đa 30 lần mỗi người mỗi câu; đáp án đúng được chốt. Vòng 2 mỗi người chỉ được gửi một đáp án. Các chủ đề chạy lần lượt trong từng vòng; hết vòng 1, vòng 2 tự bắt đầu. Vòng đấu giá phát đồng thời: mỗi người nghe theo số giây đã bid, rồi có thời gian trả lời riêng bằng nhau. Công bố kết quả khi tất cả trả lời hoặc hết giờ.
 5. Với bài YouTube, màn kết quả hiện tên bài hát, ca sĩ và video tự phát từ mốc đã đặt; nếu chưa đặt đoạn công bố riêng thì phát 4 giây từ mốc nghe nhạc. Nếu trình duyệt chặn tự phát, người chơi có nút phát dự phòng. Bảng điểm hiển thị sau đó 4 giây và câu tiếp theo tự bắt đầu. Trong lúc chơi, YouTube không hiện thanh tua và không nhận phím tắt tua.
 
 Có thể chạy `npm run seed` để thêm quiz công khai **Đoán bài hát Việt** với 3 câu mẫu. Các YouTube URL và đáp án trong quiz seed là **placeholder**, không phát được. Để tạo quiz mẫu thuộc tài khoản, dùng nút **Dùng mẫu 3 câu hỏi** trong trang tạo quiz và thay URL/đáp án trước khi lưu.
@@ -40,7 +40,7 @@ npm run build
 
 `npm run auth-smoke` kiểm tra đăng ký, đăng nhập, quyền quản lý quiz theo tài khoản và khả năng chơi ẩn danh; chạy khi website local đang mở. Với database local cũ, đặt `TEST_DATABASE_PATH` trỏ tới file SQLite để kiểm tra cả việc nhận lại quiz cũ bằng mã sở hữu.
 
-`npm run smoke` chạy luồng API 4 người gồm host với quiz test mới. Test kiểm tra vòng nghe chung, chuyển sang vòng bid, giới hạn 4 người, bid bí mật, đồng bid, escalation, answer matching, xếp điểm theo tốc độ và game end.
+`npm run smoke` chạy luồng API 4 người gồm host với quiz test mới. Để kiểm tra luật mới, chạy `tests/multiplayer-smoke.mjs` với database kiểm thử local: 50 người, bid đồng thời, giới hạn trả lời, điểm số, chơi một mình và SSE.
 
 `npm run media-smoke` kiểm tra upload audio, gợi ý trong phase bidding, quyền preview và quyền nhận clip, cùng đoạn clip đúng 1 giây.
 
@@ -69,7 +69,7 @@ Quiz online chỉ hỗ trợ đường dẫn YouTube. Tệp âm thanh lưu trên
 
 Luồng trạng thái bắt đầu bằng `TOPIC_INTRO` khi vào một chủ đề mới, rồi `OPEN_MEDIA_PLAYING → OPEN_ANSWERING → ROUND_RESULT → SCOREBOARD` cho các bài vòng 1 hoặc `BIDDING → BID_REVEAL → MEDIA_PLAYING → ANSWERING → ROUND_RESULT → SCOREBOARD` cho vòng 2. Khi nhóm đang nghe không đoán đúng và vẫn còn nhóm khác, `ANSWERING → TURN_TRANSITION → MEDIA_PLAYING`. Thời gian trả lời theo từng bài; sau kết quả và bảng điểm, hệ thống tự chuyển bài hoặc kết thúc trò chơi. Giới hạn thời gian được xử lý trên máy chủ khi có yêu cầu trạng thái hoặc sự kiện. Người tạo phòng có thể kết thúc đấu giá, bỏ qua bài và kết thúc trò chơi.
 
-Vòng 1 có 500 điểm cơ bản mỗi câu; các đáp án đúng nhận lần lượt 100%, 75%, 50%, 25% theo thứ tự server nhận. Vòng 2 điểm cơ bản giảm khi bid nhiều giây; nhóm trùng bid chia điểm theo cùng thứ tự. Chỉ vòng 1 được thử lại sau đáp án sai; đáp án sai không chiếm thứ hạng. Mỗi vòng dùng bài hát khác nhau để tránh lộ đáp án trước khi bid.
+Nghe chung có 500 điểm cơ bản mỗi câu, giảm dần theo thời gian trả lời. Đấu giá có điểm cơ bản giảm khi bid nhiều giây, tiếp tục giảm theo thời gian trả lời riêng của từng người; không nhân điểm theo thứ hạng 1–4. Chỉ vòng 1 được thử lại sau đáp án sai; đáp án sai không chiếm thứ hạng. Mỗi vòng dùng bài hát khác nhau để tránh lộ đáp án trước khi bid.
 
 Phản hồi gameplay không gửi `primary_answer`/`accepted_answers` trước `ROUND_RESULT`. Bid của người khác không gửi trước `BID_REVEAL`; media URL chỉ gửi cho challenger đang nghe và sau kết quả. Token player/host nằm trong `localStorage` cùng trình duyệt để refresh khôi phục phiên. Host có thể mất kết nối tạm thời; state và timer vẫn được lưu trong SQLite, rồi tiếp tục khi có request.
 
@@ -88,7 +88,7 @@ Phản hồi gameplay không gửi `primary_answer`/`accepted_answers` trước 
 
 ## Đoán bài hát qua gợi ý
 
-Chọn chế độ **Đoán bài hát qua gợi ý** ở trang tạo quiz. Thêm 6 gợi ý cho mỗi bài, sửa điểm/thời gian và xem thử; có nút dùng 3 câu mẫu. Phòng bắt đầu tự động khi đủ 4 người bấm sẵn sàng. Xem [PERFORMANCE.md](PERFORMANCE.md) để biết luật, migration, số đo và cách chạy test.
+Chọn chế độ **Đoán bài hát qua gợi ý** ở trang tạo quiz. Thêm 6 gợi ý cho mỗi bài, sửa điểm/thời gian và xem thử; có nút dùng 3 câu mẫu. Phòng bắt đầu tự động khi tất cả người đang tham gia bấm sẵn sàng. Xem [PERFORMANCE.md](PERFORMANCE.md) để biết luật, migration, số đo và cách chạy test.
 
 
 ### Đọ Phim
@@ -114,3 +114,7 @@ Chọn **Đọ Phim** ở mục chơi trong trang tạo quiz. Mỗi vòng chọn
 - Tài liệu API: https://cloud.google.com/text-to-speech/docs/reference/rest/v1/text/synthesize
 
 - Giới hạn ứng dụng `TTS_MONTHLY_CHARACTER_LIMIT` mặc định 3.800.000 ký tự mới/tháng UTC; cache không tính thêm. Bộ đếm đặt chỗ trước khi gọi API (lỗi vẫn tính để giới hạn an toàn). Giới hạn này chỉ theo dõi website này, không theo dõi ứng dụng khác dùng cùng project Google. WaveNet có 4 triệu ký tự miễn phí/tháng theo bảng giá hiện tại; Google tự tính phí khi vượt quota: https://cloud.google.com/text-to-speech/pricing
+
+## Phòng 1–50 người và đáp án ABCD
+
+Mỗi vòng chọn gõ đáp án hoặc chọn ABCD. Với ABCD, nhập đáp án chính và ba đáp án nhiễu khác nhau. Hệ thống đảo vị trí riêng cho từng người, chỉ gửi lựa chọn khi đến thời gian trả lời và chỉ chấp nhận một lần. Không mở gợi ý chữ cho ABCD. Vòng gợi ý vẫn dành quyền trả lời cho người bấm Tôi biết trước. Bảng xếp hạng mặc định hiện top 5 và vị trí của bạn, có thể mở toàn bộ 50 người.

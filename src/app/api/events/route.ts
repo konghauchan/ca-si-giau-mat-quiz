@@ -30,17 +30,18 @@ export async function GET(req:NextRequest){
   let initial:Record<string,unknown>;try{initial=await getState(roomId,auth);}catch{return new Response('Không có quyền truy cập phòng.',{status:401});}
   const encoder=new TextEncoder();let closeStream=()=>{};
   const stream=new ReadableStream<Uint8Array>({start(controller){
-    let closed=false;let pending=false;let dirty=false;let previous=initial;
+    let closed=false;let pending=false;let dirty=false;let previous=initial;let personalTimer:ReturnType<typeof setTimeout>|null=null;
     const emit=(event:string,data:unknown)=>{if(!closed)controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));};
+    const schedulePersonal=(state:Record<string,unknown>)=>{if(personalTimer)clearTimeout(personalTimer);personalTimer=null;const p=state.personal as {stage:string;mediaStartsAt:number;listenEndsAt:number;answerEndsAt:number}|null;const end=p?.stage==='PREPARE'?p.mediaStartsAt:p?.stage==='LISTEN'?p.listenEndsAt:p?.stage==='ANSWER'?p.answerEndsAt:null;if(state.pausedAt===null&&end!==null)personalTimer=setTimeout(()=>{void update();},Math.max(20,end-Date.now()+15));};
     const update=async()=>{if(closed)return;if(pending){dirty=true;return;}pending=true;try{
       const next=await getState(roomId,auth);const patch:Record<string,unknown>={};
       for(const [key,value] of Object.entries(next))if(key==='serverNow'||JSON.stringify(value)!==JSON.stringify(previous[key]))patch[key]=value;
-      if(Object.keys(patch).some(key=>key!=='serverNow'))emit('patch',patch);previous=next;
+      if(Object.keys(patch).some(key=>key!=='serverNow'))emit('patch',patch);previous=next;schedulePersonal(next);
     }catch{closeStream();}finally{pending=false;if(dirty){dirty=false;void update();}}};
     const unwatch=watch(roomId,()=>{void update();});
     const heartbeat=setInterval(()=>{void update();},10000);const limit=setTimeout(()=>closeStream(),20000);
-    closeStream=()=>{if(closed)return;closed=true;unwatch();clearInterval(heartbeat);clearTimeout(limit);req.signal.removeEventListener('abort',closeStream);try{controller.close();}catch{}};
-    emit('state',initial);req.signal.addEventListener('abort',closeStream,{once:true});if(req.signal.aborted)closeStream();
+    closeStream=()=>{if(closed)return;closed=true;unwatch();clearInterval(heartbeat);clearTimeout(limit);if(personalTimer)clearTimeout(personalTimer);req.signal.removeEventListener('abort',closeStream);try{controller.close();}catch{}};
+    emit('state',initial);schedulePersonal(initial);req.signal.addEventListener('abort',closeStream,{once:true});if(req.signal.aborted)closeStream();
   },cancel(){closeStream();}});
   return new Response(stream,{headers:{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform',Connection:'keep-alive','X-Accel-Buffering':'no'}});
 }

@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { readAudioPreferences, useAudioPreferences } from '@/lib/audioPreferences';
 import { mediaToken } from '@/lib/client';
 
-export function AudioClipPlayer({ asset, start, duration, roomId, gameToken, preview = false, paused = false }: { asset: string; start: number; duration: number; roomId?: string; gameToken?: string; preview?: boolean; paused?: boolean }) {
+export function AudioClipPlayer({ asset, start, duration, roomId, gameToken, preview = false, paused = false,playAt,serverNow }: { asset: string; start: number; duration: number; roomId?: string; gameToken?: string; preview?: boolean; paused?: boolean;playAt?:number;serverNow?:number }) {
+  const scheduledLocal=useRef(playAt?Date.now()+playAt-(serverNow??Date.now()):0);
+  const startTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  useEffect(()=>{scheduledLocal.current=playAt?Date.now()+playAt-(serverNow??Date.now()):0;},[playAt,serverNow]);
   const { settings } = useAudioPreferences();
   useEffect(() => { if (audio.current) audio.current.volume = settings.media / 100; }, [settings.media]);
   const audio = useRef<HTMLAudioElement | null>(null);
@@ -24,26 +27,22 @@ export function AudioClipPlayer({ asset, start, duration, roomId, gameToken, pre
       audio.current = new Audio(objectUrl); audio.current.volume = readAudioPreferences().media / 100;
       audio.current.onended = () => setPlaying(false);
       setReady(true);
-      if (!preview && !pausedRef.current && !attemptedAutoPlay.current) {
-        attemptedAutoPlay.current = true;
-        void audio.current.play().then(() => { setPlaying(true); setPlayed(true); }).catch(() => {
-          setError('Trình duyệt đã chặn tự phát. Bấm Nghe đoạn nhạc để tiếp tục.');
-        });
-      }
+
     }).catch(e => { if (!controller.signal.aborted) setError(e.message || 'Không tải được đoạn nhạc.'); });
-    return () => { controller.abort(); audio.current?.pause(); audio.current = null; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+    return () => { controller.abort();if(startTimer.current)clearTimeout(startTimer.current); audio.current?.pause(); audio.current = null; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [asset, start, duration, roomId, gameToken, preview]);
   useEffect(() => {
     pausedRef.current = paused;
     if (preview || !audio.current) return;
+    if(startTimer.current)clearTimeout(startTimer.current);
     if (paused) { audio.current.pause(); setPlaying(false); }
     else if (ready && !audio.current.ended && (played || !attemptedAutoPlay.current)) {
       attemptedAutoPlay.current = true;
-      void audio.current.play().then(() => { setPlaying(true); setPlayed(true); }).catch(() => setError('Trình duyệt đã chặn tự phát. Bấm Nghe đoạn nhạc để tiếp tục.'));
+      startTimer.current=setTimeout(()=>{void audio.current?.play().then(() => { setPlaying(true); setPlayed(true); }).catch(() => setError('Trình duyệt đã chặn tự phát. Bấm Nghe đoạn nhạc để tiếp tục.'));},Math.max(0,scheduledLocal.current-Date.now()));
     }
-  }, [paused, preview, ready, played]);
+  }, [paused, preview, ready, played,playAt,serverNow]);
   async function play() {
-    if (!audio.current || paused || (!preview && played)) return;
+    if (!audio.current || paused || Date.now()<scheduledLocal.current || (!preview && played)) return;
     try { audio.current.currentTime = 0; await audio.current.play(); setPlaying(true); setPlayed(true); setError(''); }
     catch { setError('Trình duyệt không thể phát nhạc. Hãy kiểm tra âm lượng hoặc thử lại.'); }
   }
