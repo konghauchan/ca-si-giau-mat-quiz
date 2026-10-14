@@ -5,7 +5,7 @@ export const PLAY_MODE_LABELS: Record<PlayMode, string> = {
 };
 export const PLAY_MODE_DESCRIPTIONS: Record<PlayMode, string> = {
   OPEN: 'Tất cả cùng nghe và đoán. Có thể thử lại khi trả lời sai.',
-  BID: 'Xem gợi ý rồi đấu giá thời gian nghe. Mỗi người trả lời một lần.',
+  BID: 'Đặt số giây muốn nghe, cùng bắt đầu và trả lời theo đồng hồ riêng. Nghe ít giây được nhiều điểm hơn.',
   CLUE: 'Giành quyền trả lời từ 6 gợi ý. Trả lời sai sẽ mất quyền ở câu đó.'
 };
 export function storedPlayMode(q: { type?: unknown; game_round?: unknown }): PlayMode {
