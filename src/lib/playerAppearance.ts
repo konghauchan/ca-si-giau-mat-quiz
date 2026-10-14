@@ -21,5 +21,5 @@ export const AVATARS = [
   { name: 'Khủng Long', main: '#7bd3ae', accent: '#39a77a', backdrop: '#c7f5d4' },
 ] as const;
 
-export const PLAYER_COLORS = ['#ff6d83', '#55d5ea', '#f6c354', '#b9a0ff'] as const;
+export const PLAYER_COLORS = ['#ff6d83', '#55d5ea', '#f6c354', '#b9a0ff',...Array.from({length:46},(_,i)=>`hsl(${(i*137.508)%360} 75% 70%)`)];
 export function avatarId(value: number) { return Number.isInteger(value) && value >= 1 && value <= AVATARS.length ? value : 1; }
