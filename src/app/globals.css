@@ -127,3 +127,5 @@ body:has(.game-room){background:#173c42}body:has(.game-room) .site-header,body:h
 @media(max-width:600px){.choice-answers{gap:10px}.choice-option{min-height:82px;padding:12px;gap:9px}.choice-option .choice-letter{flex-basis:30px;height:32px;font-size:18px}}
 @media(max-width:380px){.choice-answers{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.choice-option{transition:none;animation:none}.choice-answers .choice-selected{transform:none}}
+
+.result-video-only>.choice-answers{width:min(100%,760px);flex-shrink:0}
