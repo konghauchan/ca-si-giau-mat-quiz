@@ -107,7 +107,23 @@ body:has(.game-room){background:#173c42}body:has(.game-room) .site-header,body:h
   .editor > section.panel{position:sticky;top:18px;max-height:calc(100dvh - 36px);overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}
 }
 
-.choice-answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0}.choice-answers p{grid-column:1/-1}.choice-answers button{justify-content:flex-start;text-align:left;min-height:70px;overflow-wrap:anywhere}.choice-answers button b{padding:8px 12px;background:#6351f3;color:white;border-radius:8px}.ranking-scroll{max-height:500px;overflow:auto}.game-sidebar .player-list{max-height:60vh;overflow:auto}@media(max-width:600px){.choice-answers{grid-template-columns:1fr}}
+.ranking-scroll{max-height:500px;overflow:auto}.game-sidebar .player-list{max-height:60vh;overflow:auto}
 
-.choice-answers .choice-selected{outline:3px solid #a99aff;outline-offset:2px;background:#403b68;opacity:1;transform:scale(.99)}
-.choice-answers button[disabled]:not(.choice-selected){opacity:.55}
+
+
+/* ABCD: selection is private; correctness appears only after the server reveal. */
+.choice-answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:20px 0;text-align:left}
+.choice-answers .choice-status{grid-column:1/-1;margin:0;font-size:14px;font-weight:600;color:inherit}
+.choice-option{--choice-bg:#ac2147;--choice-edge:#f27596;display:flex;align-items:center;gap:14px;min-height:88px;width:100%;padding:17px;border:2px solid var(--choice-edge);border-radius:16px;background:var(--choice-bg);color:#fff;text-align:left;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 4px 0 #0003;transition:background .18s,border-color .18s,box-shadow .18s,transform .18s,opacity .18s}
+.choice-b{--choice-bg:#1d55ad;--choice-edge:#75aafa}.choice-c{--choice-bg:#8a4d04;--choice-edge:#f9c669}.choice-d{--choice-bg:#126951;--choice-edge:#69d9b5}
+.choice-option .choice-letter{display:grid;place-items:center;flex:0 0 38px;height:38px;padding:0;background:#0003;color:inherit;border-radius:10px;font-size:22px}
+.choice-copy{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}.choice-label{overflow-wrap:anywhere}.choice-tag{font-size:12px;font-weight:700;line-height:1.5}.choice-check{font-size:22px}
+.choice-option:enabled:hover{filter:brightness(1.13);transform:translateY(-2px)}.choice-option:focus-visible{outline:3px solid #fff;outline-offset:4px}
+.choice-option:disabled{cursor:default;opacity:1}.choice-answers.has-selection:not(.is-revealed) .choice-option:not(.choice-selected){opacity:.48;box-shadow:none}
+.choice-answers .choice-selected{outline:3px solid #fff;outline-offset:3px;box-shadow:0 0 0 7px #a99aff55,0 6px 0 #0003;transform:translateY(-2px)}
+.choice-answers .choice-correct{background:#13734a;border-color:#77f1ad;color:#fff;box-shadow:0 0 0 3px #77f1ad44;animation:choice-reveal .3s ease-out}
+.choice-answers .choice-wrong{background:#414956;border-color:#646e7c;color:#d3d8e1;box-shadow:none}.choice-wrong .choice-letter{background:#ffffff12}.choice-answers .choice-wrong.choice-selected{outline-color:#e5e7eb;box-shadow:0 0 0 6px #ffffff16}
+@keyframes choice-reveal{from{transform:scale(.97)}to{transform:scale(1)}}
+@media(max-width:600px){.choice-answers{gap:10px}.choice-option{min-height:82px;padding:12px;gap:9px}.choice-option .choice-letter{flex-basis:30px;height:32px;font-size:18px}}
+@media(max-width:380px){.choice-answers{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.choice-option{transition:none;animation:none}.choice-answers .choice-selected{transform:none}}
