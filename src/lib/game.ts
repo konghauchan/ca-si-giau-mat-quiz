@@ -1,7 +1,9 @@
+import { sharedRead, invalidateRead } from './sharedRead';
+import { fastCommand } from './fastCommands';
 import crypto from 'node:crypto';
 import { MAX_PLAYERS, BID_PREPARATION_MS, bidWindow, bidStage, choicesForPlayer, type Choice, type AnswerMode } from './multiplayer';
 import { ROUND_INTRO_MS } from './roundIntro';
-import { one, all, run, tx, batchRead } from './db';
+import { one, all, run, tx, batchRead, batchWrite } from './db';
 import { maskedTitle, scoreWithTitleHint, titleHintAt, titleHintLimit } from './titleHint';
 import { answerMatches, groupBids, nextGroup, normalizeAnswer, scoreForBid, scoreForCorrectRank, scoreForTimedAnswer, youtubeId, type Phase } from './core';
 import { storedAssetExists } from './media';
@@ -60,11 +62,7 @@ async function beginQuestion(r: Row, q: Row) {
 }
 async function finishBidding(r: Row) {
   const q = await question(String(r.quiz_id), Number(r.question_index));
-  for (const p of await all('SELECT id FROM players WHERE room_id=?', String(r.id))) {
-    if (!await one('SELECT 1 FROM bids WHERE room_id=? AND question_index=? AND player_id=?', String(r.id), Number(r.question_index), String(p.id))) {
-      await run('INSERT INTO bids VALUES(?,?,?,?,?,?)', String(r.id), Number(r.question_index), String(p.id), Number(q.reveal_max), 1, now());
-    }
-  }
+  await run('INSERT OR IGNORE INTO bids(room_id,question_index,player_id,amount,auto_assigned,created_at) SELECT room_id,?,id,?,1,? FROM players WHERE room_id=?',Number(r.question_index),Number(q.reveal_max),now(),String(r.id));
   await setPhase(String(r.id), 'BID_REVEAL', 2000);
   await event(String(r.id), 'BIDDING_ENDED');
 }
@@ -85,21 +83,22 @@ async function resolveAnswers(r: Row) {
   const roomId=String(r.id), index=Number(r.question_index);
   const q=await question(String(r.quiz_id),index);
   const attempts=await all('SELECT * FROM answer_attempts WHERE room_id=? AND question_index=? ORDER BY created_at,rowid',roomId,index);
+  const writes:Parameters<typeof batchWrite>[0]=[];
   let rank=0;
   for(const a of attempts.filter(a=>a.correct===1)) {
     rank++;
     const window=bidWindow(Number(r.phase_started_at),Number(a.amount),Number(q.answer_seconds));
     const points=scoreForTimedAnswer(scoreForBid(Number(a.amount),Number(q.reveal_min),Number(q.reveal_max),Number(q.reveal_step)),window.listenEndsAt,window.answerEndsAt,Number(a.created_at));
-    await run('UPDATE players SET score=score+? WHERE id=?',points,String(a.player_id));
-    await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)',id(),roomId,index,String(a.player_id),points,'CORRECT',now());
-    await event(roomId,'SCORE_AWARDED',{playerId:a.player_id,points,correctRank:rank});
+    writes.push({sql:'UPDATE players SET score=score+? WHERE id=?',args:[points,String(a.player_id)]},{sql:'INSERT INTO score_events VALUES(?,?,?,?,?,?,?)',args:[id(),roomId,index,String(a.player_id),points,'CORRECT',now()]},{sql:'INSERT INTO game_events(room_id,type,payload,created_at) VALUES(?,?,?,?)',args:[roomId,'SCORE_AWARDED',JSON.stringify({playerId:a.player_id,points,correctRank:rank}),now()]});
   }
+  if(writes.length)await batchWrite(writes);
   await setPhase(roomId,'ROUND_RESULT',resultDuration(q));await event(roomId,'ROUND_ENDED');
 }
 async function resolveOpenAnswers(r: Row) {
   const roomId = String(r.id); const index = Number(r.question_index);
   const q = await question(String(r.quiz_id), index);
   const attempts = await all('SELECT * FROM answer_attempts WHERE room_id=? AND question_index=? AND amount=0 ORDER BY created_at, rowid', roomId, index);
+  const writes:Parameters<typeof batchWrite>[0]=[];
   let correctRank = 0;
   for (const answer of attempts) {
     if (answer.correct !== 1) continue;
@@ -107,10 +106,9 @@ async function resolveOpenAnswers(r: Row) {
     const rankedPoints = 500;
     const scoring = (String(q.type) === 'music_open' || (String(q.type) === 'music' && gameRound(q) === 1)) && q.answer_mode !== 'CHOICE' && titleHintLimit(String(q.primary_answer)) > 0 ? scoreWithTitleHint : scoreForTimedAnswer;
     const points = scoring(rankedPoints, Number(r.phase_started_at), Number(r.phase_ends_at), Number(answer.created_at));
-    await run('UPDATE players SET score=score+? WHERE id=?', points, String(answer.player_id));
-    await run('INSERT INTO score_events VALUES(?,?,?,?,?,?,?)', id(), roomId, index, String(answer.player_id), points, 'OPEN_CORRECT', now());
-    await event(roomId, 'SCORE_AWARDED', { playerId: answer.player_id, points, correctRank, gameRound: gameRound(q) });
+    writes.push({sql:'UPDATE players SET score=score+? WHERE id=?',args:[points,String(answer.player_id)]},{sql:'INSERT INTO score_events VALUES(?,?,?,?,?,?,?)',args:[id(),roomId,index,String(answer.player_id),points,'OPEN_CORRECT',now()]},{sql:'INSERT INTO game_events(room_id,type,payload,created_at) VALUES(?,?,?,?)',args:[roomId,'SCORE_AWARDED',JSON.stringify({playerId:answer.player_id,points,correctRank,gameRound:gameRound(q)}),now()]});
   }
+  if(writes.length)await batchWrite(writes);
   await event(roomId, 'ANSWER_RESOLVED', { gameRound: gameRound(q), correct: correctRank > 0 });
   await setPhase(roomId, 'ROUND_RESULT', resultDuration(q));
   await event(roomId, 'ROUND_ENDED');
@@ -319,7 +317,9 @@ export async function joinRoom(pin: string, nickname: string, avatarId = 1, clie
     return { roomId: r.id, playerId, playerToken };
   });
 }
-export async function gameCommand(roomId: string, auth: string, action: string, value?: string | number, receivedAt = Date.now()) {
+export async function gameCommand(roomId: string, auth: string, action: string, value?: string | number, receivedAt = Date.now(), receiptOnly=false) {
+  const receipt=await fastCommand(roomId,auth,action,value,receivedAt);
+  if(receipt)return receiptOnly?receipt:getState(roomId,auth);
   const mode = await one('SELECT game_type FROM quizzes JOIN rooms ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', roomId);
   if (mode?.game_type === 'SONG_CLUE') { await clueCommand(roomId, auth, action, value); return getClueState(roomId, auth); }
   await tx(async () => {
@@ -405,13 +405,14 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
       } else fail('Thao tác không hợp lệ.');
     }
   });
+  invalidateRead('mode:'+roomId);invalidateRead('snapshot:'+roomId);
   return getState(roomId, auth);
 }
 export async function getState(roomId: string, auth: string) {
-  const mode = await one('SELECT rooms.*,quizzes.game_type FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', roomId) ?? fail('Không tìm thấy phòng.');
+  const mode = await sharedRead('mode:'+roomId,()=>one('SELECT rooms.*,quizzes.game_type FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', roomId)) ?? fail('Không tìm thấy phòng.');
   if (mode.game_type === 'SONG_CLUE') return getClueState(roomId, auth);
-  if (mode.paused_at === null && mode.phase_ends_at !== null && Number(mode.phase_ends_at) <= now()) await tx(() => tick(roomId));
-  const [rs, ps, qs, ts, bs, ans, scores, versions] = await batchRead([
+  if (mode.paused_at === null && mode.phase_ends_at !== null && Number(mode.phase_ends_at) <= now()) await sharedRead('tick:'+roomId,()=>tx(() => tick(roomId)));
+  const [rs, ps, qs, ts, bs, ans, scores, versions] = await sharedRead('snapshot:'+roomId,()=>batchRead([
     { sql: 'SELECT rooms.*,quizzes.title AS quiz_title,quizzes.game_type AS quiz_game_type FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', args:[roomId] },
     { sql: 'SELECT *,rowid AS seat FROM players WHERE room_id=? ORDER BY score DESC,joined_at,rowid', args:[roomId] },
     { sql: 'SELECT questions.* FROM questions JOIN rooms ON rooms.quiz_id=questions.quiz_id WHERE rooms.id=? ORDER BY order_index', args:[roomId] },
@@ -420,7 +421,7 @@ export async function getState(roomId: string, auth: string) {
     { sql: 'SELECT player_id,amount,text,correct FROM answer_attempts WHERE room_id=? AND question_index=(SELECT question_index FROM rooms WHERE id=?) ORDER BY created_at,rowid', args:[roomId,roomId] },
     { sql: 'SELECT player_id,SUM(delta) AS delta FROM score_events WHERE room_id=? AND question_index=(SELECT question_index FROM rooms WHERE id=?) GROUP BY player_id', args:[roomId,roomId] },
     { sql: 'SELECT COALESCE(MAX(id),0) AS id FROM game_events WHERE room_id=?', args:[roomId] }
-  ]);
+  ]));
   const r = rs[0]; const host = r.host_token === auth; const me = ps.find(p => p.token === auth) ?? null;
   if (!host && !me) fail('Phiên người chơi không hợp lệ.');
   const index = Number(r.question_index); const q = qs[index]; const topic = ts.find(t => t.id === q.topic_id);
@@ -486,7 +487,7 @@ export async function getState(roomId: string, auth: string) {
     myAttemptCount: me ? answerRows.filter(a => a.player_id === me.id).length : 0,
     lastEventId: versions[0].id
   };
-  if (me && now() - Number(me.last_seen_at) >= 10000) await tx(() => run('UPDATE players SET last_seen_at=? WHERE id=? AND last_seen_at<?', now(), String(me.id), now() - 10000));
+  if (me && now() - Number(me.last_seen_at) >= 10000) await run('UPDATE players SET last_seen_at=? WHERE id=? AND last_seen_at<?', now(), String(me.id), now() - 10000);
   return snapshot;
 }
 export async function eventVersion(roomId: string) { return Number((await one('SELECT MAX(id) AS id FROM game_events WHERE room_id=?', roomId))?.id ?? 0); }
