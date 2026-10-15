@@ -1,3 +1,4 @@
+import {gameErrorStatus} from '@/lib/gameErrors';
 import { timedResponse } from '@/lib/timing';
 import { NextRequest, NextResponse } from 'next/server';
 import { getState } from '@/lib/game';
@@ -9,5 +10,5 @@ async function handle(req: NextRequest) {
     const roomId = req.nextUrl.searchParams.get('roomId') || '';
     const auth = req.headers.get('x-game-token') || '';
     return NextResponse.json(await getState(roomId, auth), { headers: { 'Cache-Control': 'no-store' } });
-  } catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 401 }); }
+  } catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: gameErrorStatus(e) }); }
 }

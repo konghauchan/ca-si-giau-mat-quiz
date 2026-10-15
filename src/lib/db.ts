@@ -130,3 +130,12 @@ export async function batchWrite(statements: InStatement[]): Promise<void> {
   if (!transaction) throw new Error('Write batch requires a transaction.');
   await traceDb(() => transaction.batch(statements));
 }
+
+// A short write batch is atomic in libSQL; no application work runs while its lock is held.
+export async function atomicWrite(statements:InStatement[]) {
+ const connection=await db();
+ for(let attempt=0;;attempt++){try{return await traceDb(()=>connection.batch(statements,'write'));}catch(error){
+  if(!/SQLITE_BUSY|database is locked/i.test(String(error))||attempt>=4)throw error;
+  await new Promise(resolve=>setTimeout(resolve,20*(attempt+1)));
+ }}
+}
