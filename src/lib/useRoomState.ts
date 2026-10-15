@@ -22,5 +22,5 @@ export function useRoomState<T extends Versioned>(roomId:string,token:string){
     if(!abort.signal.aborted)timer=setTimeout(connect,failures?Math.min(5000,500*failures):100);
     };void connect();return()=>{abort.abort();clearTimeout(timer);};
   },[roomId,token]);
-  return {state,setState:(next:T)=>acceptRef.current(next),error:error||connectionError,setError};
+  return {state,patchState:(patch:(value:T)=>T)=>{if(current.current)acceptRef.current(patch(current.current));},setState:(next:T)=>acceptRef.current(next),error:error||connectionError,setError};
 }
