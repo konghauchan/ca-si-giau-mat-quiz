@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';import path from 'node:path';import {createClient} from '@libsql/client';import {registerTestAccount} from './register-test-account.mjs';
+const base=process.env.SMOKE_BASE_URL||'http://localhost:3219';assert.match(base,/^http:\/\/localhost:/);assert.ok(process.env.DATABASE_PATH?.includes('rounds-smoke'));assert.ok(!process.env.TURSO_DATABASE_URL);const db=createClient({url:'file:'+path.resolve(process.env.DATABASE_PATH)}),cookie=await registerTestAccount(base);
+async function request(endpoint,body,token='',account=false){const r=await fetch(base+endpoint,{method:body?'POST':'GET',headers:{origin:base,'content-type':'application/json','x-game-token':token,...(account?{cookie}:{})},body:body?JSON.stringify(body):undefined});return {status:r.status,body:await r.json(),timing:r.headers.get('server-timing')};}
+const q={playMode:'BID',answerMode:'CHOICE',distractors:['Sai A','Sai B','Sai C'],gameRound:1,topicKey:'t',prompt:'Câu hỏi?',listenSeconds:5,answerSeconds:30,bidSeconds:30,mediaType:'youtube',mediaUrl:'https://youtu.be/Q0000000000',mediaStart:0,primaryAnswer:'Đúng',acceptedAnswers:[],artist:'',hint:'Gợi ý',revealMin:1,revealMax:10,revealStep:1};
+const quiz=(await request('/api/quiz',{gameType:'MUSIC_DUEL',title:'Fast command race',description:'',visibility:'unlisted',topics:[{key:'t',gameRound:1,title:'Test',songCount:1}],questions:[q]},'',true)).body;
+const owner=(await request('/api/quiz?id='+quiz.id,null,'',true)).body;const correct=owner.questions[0].correct_choice_id,wrong=JSON.parse(owner.questions[0].choice_options).find(c=>c.id!==correct).id;
+const room=(await request('/api/room',{action:'create',quizId:quiz.id,nickname:'Alpha'})).body;
+const beta=(await request('/api/room',{action:'join',pin:room.pin,nickname:'Beta'})).body;
+const state=async()=> (await request('/api/state?roomId='+room.roomId,null,room.hostToken)).body;
+const cmd=(action,value,token=room.hostToken)=>request('/api/command',{roomId:room.roomId,action,value,receiptOnly:true},token);
+const expire=()=>db.execute({sql:'UPDATE rooms SET phase_ends_at=? WHERE id=?',args:[Date.now()-1,room.roomId]});
+await cmd('start');await expire();await state();assert.equal((await cmd('bid',1)).body.ack,true);
+const bids=await Promise.all([cmd('bid',1,beta.playerToken),cmd('bid',1,beta.playerToken)]);assert.deepEqual(bids.map(r=>r.status).sort(),[200,400]);
+assert.equal((await state()).phase,'BID_REVEAL');await expire();await state();await db.execute({sql:'UPDATE rooms SET phase_started_at=?,phase_ends_at=? WHERE id=?',args:[Date.now()-6500,Date.now()+29000,room.roomId]});
+const answers=await Promise.all([cmd('answer',correct),cmd('answer',wrong)]);assert.deepEqual(answers.map(r=>r.status).sort(),[200,400]);const accepted=answers.find(r=>r.status===200);assert.equal(accepted.body.ack,true);assert.equal(accepted.body.questionId,owner.questions[0].id);assert.equal(accepted.body.correct,undefined);assert.equal(accepted.body.myAnswerCorrect,undefined);assert.match(accepted.timing,/queries;desc="2"/);
+assert.equal((await cmd('answer',wrong,beta.playerToken)).body.ack,true);const waiting=await state();assert.equal(waiting.phase,'MEDIA_PLAYING');assert.equal(waiting.myAnswerCorrect,null);assert.ok(waiting.players.every(p=>p.score===0));await expire();assert.equal((await state()).phase,'ROUND_RESULT');
+const attempts=(await db.execute({sql:'SELECT COUNT(*) AS n FROM answer_attempts WHERE room_id=?',args:[room.roomId]})).rows;assert.equal(Number(attempts[0].n),2);
+console.log('PASS: atomic bid/answer race accepts one request, receipt has no correctness, only two DB calls, waits for deadline, two persisted attempts.');db.close();
