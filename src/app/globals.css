@@ -108,3 +108,6 @@ body:has(.game-room){background:#173c42}body:has(.game-room) .site-header,body:h
 }
 
 .choice-answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0}.choice-answers p{grid-column:1/-1}.choice-answers button{justify-content:flex-start;text-align:left;min-height:70px;overflow-wrap:anywhere}.choice-answers button b{padding:8px 12px;background:#6351f3;color:white;border-radius:8px}.ranking-scroll{max-height:500px;overflow:auto}.game-sidebar .player-list{max-height:60vh;overflow:auto}@media(max-width:600px){.choice-answers{grid-template-columns:1fr}}
+
+.choice-answers .choice-selected{outline:3px solid #a99aff;outline-offset:2px;background:#403b68;opacity:1;transform:scale(.99)}
+.choice-answers button[disabled]:not(.choice-selected){opacity:.55}
