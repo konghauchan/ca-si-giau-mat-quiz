@@ -1,4 +1,4 @@
-import data from './data/music-catalog.json' with {type:'json'};
+import data from './musicCatalogSeed.json' with {type:'json'};
 import {indexSongs,matchSongs} from './songCatalog.ts';
 import type {MusicScope,SongWork} from './musicSearch.ts';
 // Public provider metadata shared by every quiz, independent of hidden questions.
