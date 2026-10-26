@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
   try { assertSameOrigin(req); const user = await requireUser(req); return NextResponse.json(await saveQuiz(quizSchema.parse(await req.json()), user.id)); }
   catch (e) {
     if (e instanceof z.ZodError) return NextResponse.json({ error: 'Có trường trong bộ câu hỏi không hợp lệ.', issues: e.issues.map(issue => ({ path: issue.path, message: issue.message })) }, { status: 400 });
+    if(e instanceof Error && 'issues' in e) return NextResponse.json({error:e.message,issues:e.issues},{status:400});
     return NextResponse.json({ error: (e as Error).message }, { status: 400 });
   }
 }

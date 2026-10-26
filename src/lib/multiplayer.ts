@@ -1,6 +1,6 @@
 export const MAX_PLAYERS = 50;
 export const BID_PREPARATION_MS = 5000;
-export type AnswerMode = 'TEXT' | 'CHOICE';
+export type AnswerMode = 'TEXT' | 'CHOICE' | 'SEARCH';
 export type Choice = { id: string; label: string };
 export function bidWindow(start: number, seconds: number, answerSeconds: number) {
   const mediaStartsAt = start + BID_PREPARATION_MS;

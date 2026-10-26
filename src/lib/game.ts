@@ -1,3 +1,5 @@
+import {verifySongSelection,savedSongToken} from './musicBrainz';
+import type {MusicScope} from './musicSearch';
 import { sharedRead, invalidateRead } from './sharedRead';
 import { fastCommand } from './fastCommands';
 import crypto from 'node:crypto';
@@ -104,7 +106,7 @@ async function resolveOpenAnswers(r: Row) {
     if (answer.correct !== 1) continue;
     correctRank++;
     const rankedPoints = 500;
-    const scoring = (String(q.type) === 'music_open' || (String(q.type) === 'music' && gameRound(q) === 1)) && q.answer_mode !== 'CHOICE' && titleHintLimit(String(q.primary_answer)) > 0 ? scoreWithTitleHint : scoreForTimedAnswer;
+    const scoring = (String(q.type) === 'music_open' || (String(q.type) === 'music' && gameRound(q) === 1)) && q.answer_mode === 'TEXT' && titleHintLimit(String(q.primary_answer)) > 0 ? scoreWithTitleHint : scoreForTimedAnswer;
     const points = scoring(rankedPoints, Number(r.phase_started_at), Number(r.phase_ends_at), Number(answer.created_at));
     writes.push({sql:'UPDATE players SET score=score+? WHERE id=?',args:[points,String(answer.player_id)]},{sql:'INSERT INTO score_events VALUES(?,?,?,?,?,?,?)',args:[id(),roomId,index,String(answer.player_id),points,'OPEN_CORRECT',now()]},{sql:'INSERT INTO game_events(room_id,type,payload,created_at) VALUES(?,?,?,?)',args:[roomId,'SCORE_AWARDED',JSON.stringify({playerId:answer.player_id,points,correctRank,gameRound:gameRound(q)}),now()]});
   }
@@ -138,9 +140,19 @@ async function tick(roomId: string) {
   }
 }
 
-export type QuestionInput = { answerMode?: AnswerMode; distractors?: string[]; titleHintIndices?: number[]; prompt: string; playMode?: PlayMode; gameRound: number; topicKey: string; listenSeconds: number; answerSeconds: number; bidSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number; clues?: Clue[] };
+export type QuestionInput = { searchToken?:string; answerMode?: AnswerMode; distractors?: string[]; titleHintIndices?: number[]; prompt: string; playMode?: PlayMode; gameRound: number; topicKey: string; listenSeconds: number; answerSeconds: number; bidSeconds: number; mediaType: 'youtube' | 'uploaded_audio'; mediaUrl: string; mediaStart: number; resultStart?: number | null; resultSeconds?: number | null; primaryAnswer: string; acceptedAnswers: string[]; artist: string; hint: string; revealMin: number; revealMax: number; revealStep: number; clues?: Clue[] };
 export type TopicInput = { key: string; gameRound: number; title: string; songCount: number };
-export async function saveQuiz(input: { id?: string; coverSourceId?: string; title: string; description: string; visibility: string; gameType?: 'MUSIC_BID' | 'SONG_CLUE' | 'MUSIC_DUEL' | 'FILM_DUEL'; topics: TopicInput[]; questions: QuestionInput[] }, userId: string) {
+export async function saveQuiz(input: { id?: string; musicScope?:MusicScope; coverSourceId?: string; title: string; description: string; visibility: string; gameType?: 'MUSIC_BID' | 'SONG_CLUE' | 'MUSIC_DUEL' | 'FILM_DUEL'; topics: TopicInput[]; questions: QuestionInput[] }, userId: string) {
+  const scope=input.musicScope||'VI';
+  const searchAnswers=new Map<QuestionInput,string>();
+  for(const [index,q] of input.questions.entries()) if(q.answerMode==='SEARCH') {
+    try {
+      if(input.gameType==='FILM_DUEL') throw new Error('Tìm bài hát chỉ dành cho Đọ Nhạc.');
+      const song=await verifySongSelection(q.searchToken||'',scope);
+      if(song.title!==q.primaryAnswer.trim()) throw new Error('Tên đáp án đã thay đổi. Hãy chọn lại bài hát từ MusicBrainz.');
+      searchAnswers.set(q,song.id);
+    }catch(error){throw Object.assign(new Error((error as Error).message),{issues:[{path:['questions',index,'searchToken'],message:(error as Error).message}]});}
+  }
   return await tx(async () => {
     const legacyMusic = !input.gameType || input.gameType === 'MUSIC_BID';
     const rounds = [...new Set(input.topics.map(t => t.gameRound))].sort((a,b) => a-b);
@@ -206,6 +218,7 @@ export async function saveQuiz(input: { id?: string; coverSourceId?: string; tit
     }
     if (existing && !replacedId) { await run('UPDATE quizzes SET title=?,description=?,visibility=?,game_type=?,updated_at=? WHERE id=?', input.title.trim(), input.description.trim(), input.visibility, input.gameType || 'MUSIC_BID', now(), quizId); await run('DELETE FROM questions WHERE quiz_id=?', quizId); await run('DELETE FROM topics WHERE quiz_id=?', quizId); }
     else await run('INSERT INTO quizzes(id,owner_token,owner_user_id,title,description,visibility,game_type,cover_url,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)', quizId, ownerToken, userId, input.title.trim(), input.description.trim(), input.visibility, input.gameType || 'MUSIC_BID', existing?.cover_url ? String(existing.cover_url) : coverSource?.cover_url ? String(coverSource.cover_url) : null, now(), now());
+    await run('UPDATE quizzes SET music_scope=? WHERE id=?',scope,quizId);
     const topicIds = new Map<string, string>();
     for (const round of rounds) {
       for (const [index, topic] of input.topics.filter(topic => topic.gameRound === round).entries()) {
@@ -219,6 +232,7 @@ export async function saveQuiz(input: { id?: string; coverSourceId?: string; tit
       await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,bid_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds,clues_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, input.gameType === 'FILM_DUEL' ? inputPlayMode(q,input.gameType) === 'CLUE' ? 'film_clue' : inputPlayMode(q,input.gameType) === 'OPEN' ? 'film_open' : 'film_bid' : inputPlayMode(q,input.gameType) === 'CLUE' ? 'song_clue' : input.gameType === 'MUSIC_DUEL' ? inputPlayMode(q,input.gameType) === 'OPEN' ? 'music_open' : 'music_bid' : 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.bidSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null, JSON.stringify(q.clues || []));
       const options: Choice[] = q.answerMode==='CHOICE' ? [q.primaryAnswer,...(q.distractors||[])].map(label=>({id:id(),label:label.trim()})) : [];
       await run('UPDATE questions SET answer_mode=?,choice_options=?,correct_choice_id=? WHERE id=?', q.answerMode||'TEXT', JSON.stringify(options), options[0]?.id||null, questionId);
+      await run('UPDATE questions SET musicbrainz_work_id=? WHERE id=?',searchAnswers.get(q)||null,questionId);
       await run('UPDATE questions SET title_hint_indices=? WHERE id=?', JSON.stringify(q.titleHintIndices || []), questionId);
       for (const answer of new Set(q.acceptedAnswers.map(x => x.trim()).filter(Boolean))) await run('INSERT OR IGNORE INTO accepted_answers VALUES(?,?)', questionId, answer);
     }
@@ -252,15 +266,15 @@ export async function getQuiz(quizId: string, userId?: string) {
   const counts = await one('SELECT COUNT(*) AS question_count,COUNT(DISTINCT game_round) AS round_count,SUM(CASE WHEN game_round=1 THEN 1 ELSE 0 END) AS round_one_count,SUM(CASE WHEN game_round=2 THEN 1 ELSE 0 END) AS round_two_count FROM questions WHERE quiz_id=?', quizId);
   const roundRows = await all('SELECT game_round,type,COUNT(*) AS song_count FROM questions WHERE quiz_id=? GROUP BY game_round,type ORDER BY game_round',quizId);
   const rounds = roundRows.map(row=>({number:Number(row.game_round),playMode:storedPlayMode(row),songCount:Number(row.song_count)}));
-  if (!own) return { id: q.id, gameType: q.game_type, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundCount: counts?.round_count ?? 0, rounds, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, own: false };
+  if (!own) return { id: q.id, gameType: q.game_type, musicScope:q.music_scope, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundCount: counts?.round_count ?? 0, rounds, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, own: false };
   const [questionRows,aliases,topics,rooms] = await batchRead([
     {sql:'SELECT * FROM questions WHERE quiz_id=? ORDER BY order_index',args:[quizId]},
     {sql:'SELECT accepted_answers.* FROM accepted_answers JOIN questions ON questions.id=accepted_answers.question_id WHERE questions.quiz_id=?',args:[quizId]},
     {sql:'SELECT id,game_round,order_index,title,song_count FROM topics WHERE quiz_id=? ORDER BY game_round,order_index',args:[quizId]},
     {sql:'SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1',args:[quizId]}
   ]);
-  const questions=questionRows.map(question=>({...question,accepted_answers:aliases.filter(a=>a.question_id===question.id).map(a=>a.answer)}));
-  return { id: q.id, gameType: q.game_type, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundCount: counts?.round_count ?? 0, rounds, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, topics, questions, own, usedInRoom: rooms.length > 0 };
+  const questions=await Promise.all(questionRows.map(async question=>({...question,search_token:question.answer_mode==='SEARCH'&&question.musicbrainz_work_id?await savedSongToken(String(question.musicbrainz_work_id),String(question.primary_answer),String(q.music_scope||'VI') as MusicScope):undefined,accepted_answers:aliases.filter(a=>a.question_id===question.id).map(a=>a.answer)})));
+  return { id: q.id, gameType: q.game_type, musicScope:q.music_scope, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundCount: counts?.round_count ?? 0, rounds, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, topics, questions, own, usedInRoom: rooms.length > 0 };
 }
 export async function listQuizzes(userId?: string) {
   const counts = '(SELECT COUNT(DISTINCT game_round) FROM questions WHERE quiz_id=quizzes.id) AS round_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id) AS question_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id AND game_round=1) AS round_one_count,(SELECT COUNT(*) FROM questions WHERE quiz_id=quizzes.id AND game_round=2) AS round_two_count';
@@ -386,14 +400,15 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
         if(single && previous.length) fail('Bạn chỉ được trả lời một lần.');
         if(previous.some(a=>a.correct===1)) fail('Bạn đã trả lời đúng.');
         if(previous.length>=30) fail('Bạn đã dùng hết 30 lần thử cho câu này.');
-        const supplied=String(value??'').trim().slice(0,120);
+        const supplied=String(value??'').trim().slice(0,q.answer_mode==='SEARCH'?1200:120);
+        const selectedSong=q.answer_mode==='SEARCH'?await verifySongSelection(supplied,String((await one('SELECT music_scope FROM quizzes WHERE id=?',String(r.quiz_id)))?.music_scope||'VI') as MusicScope):undefined;
         const options:Choice[]=JSON.parse(String(q.choice_options||'[]'));
         const chosen=q.answer_mode==='CHOICE'?options.find(c=>c.id===supplied):undefined;
         if(q.answer_mode==='CHOICE' && !chosen) fail('Lựa chọn không hợp lệ.');
-        const text=chosen?.label || supplied;if(!text) fail('Nhập đáp án.');
-        if(previous.some(a=>normalizeAnswer(String(a.text))===normalizeAnswer(text))) fail('Bạn đã thử đáp án này. Hãy nhập tên khác.');
+        const text=selectedSong?.title || chosen?.label || supplied;if(!text) fail('Nhập đáp án.');
+        if(q.answer_mode!=='SEARCH'&&previous.some(a=>normalizeAnswer(String(a.text))===normalizeAnswer(text))) fail('Bạn đã thử đáp án này. Hãy nhập tên khác.');
         const accepted=[String(q.primary_answer),...(await all('SELECT answer FROM accepted_answers WHERE question_id=?',String(q.id))).map(a=>String(a.answer))];
-        const correct=chosen ? (chosen.id===q.correct_choice_id?1:0) : (answerMatches(text,accepted)?1:0);
+        const correct=selectedSong?(selectedSong.id===q.musicbrainz_work_id?1:0):chosen ? (chosen.id===q.correct_choice_id?1:0) : (answerMatches(text,accepted)?1:0);
         await run('INSERT INTO answer_attempts(id,room_id,question_index,player_id,amount,text,correct,created_at) VALUES(?,?,?,?,?,?,?,?)',id(),roomId,index,String(p.id),simultaneous?Number(ownBid!.amount):0,text,correct,clock);
         await event(roomId,'ANSWER_SUBMITTED',{playerId:p.id});
         const allAttempts=await all('SELECT player_id,correct FROM answer_attempts WHERE room_id=? AND question_index=?',roomId,index);
@@ -413,7 +428,7 @@ export async function getState(roomId: string, auth: string) {
   if (mode.game_type === 'SONG_CLUE') return getClueState(roomId, auth);
   if (mode.paused_at === null && mode.phase_ends_at !== null && Number(mode.phase_ends_at) <= now()) await sharedRead('tick:'+roomId,()=>tx(() => tick(roomId)));
   const [rs, ps, qs, ts, bs, ans, scores, versions] = await sharedRead('snapshot:'+roomId,()=>batchRead([
-    { sql: 'SELECT rooms.*,quizzes.title AS quiz_title,quizzes.game_type AS quiz_game_type FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', args:[roomId] },
+    { sql: 'SELECT rooms.*,quizzes.title AS quiz_title,quizzes.music_scope,quizzes.game_type AS quiz_game_type FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?', args:[roomId] },
     { sql: 'SELECT *,rowid AS seat FROM players WHERE room_id=? ORDER BY score DESC,joined_at,rowid', args:[roomId] },
     { sql: 'SELECT questions.* FROM questions JOIN rooms ON rooms.quiz_id=questions.quiz_id WHERE rooms.id=? ORDER BY order_index', args:[roomId] },
     { sql: 'SELECT topics.* FROM topics JOIN rooms ON rooms.quiz_id=topics.quiz_id WHERE rooms.id=?', args:[roomId] },
@@ -471,14 +486,14 @@ export async function getState(roomId: string, auth: string) {
     topicName: topic?.title ?? 'Chủ đề chung',
     topicQuestionIndex: q.topic_id ? qs.filter(item => item.topic_id === q.topic_id && Number(item.order_index) <= index).length : qs.filter(item => gameRound(item) === currentRound && Number(item.order_index) <= index).length,
     topicQuestionCount: topic?.song_count ?? qs.filter(item => gameRound(item) === currentRound).length,
-    question: { answerMode:q.answer_mode||'TEXT', id: q.id, prompt: q.prompt, type: q.type, revealType: q.reveal_type, revealUnit: q.reveal_unit, revealMin: q.reveal_min, revealMax: q.reveal_max, revealStep: q.reveal_step,
+    question: { musicScope:r.music_scope||'VI', answerMode:q.answer_mode||'TEXT', id: q.id, prompt: q.prompt, type: q.type, revealType: q.reveal_type, revealUnit: q.reveal_unit, revealMin: q.reveal_min, revealMax: q.reveal_max, revealStep: q.reveal_step,
       mediaType: q.media_type, mediaUrl: canHear || reveal ? q.media_url : undefined,
       mediaStart: canHear || reveal ? q.media_start : undefined,
       listenSeconds: q.listen_seconds, answerSeconds: q.answer_seconds, bidSeconds: q.bid_seconds, primaryAnswer: reveal ? q.primary_answer : undefined, artist: reveal ? q.artist : undefined, hint: q.hint, resultStart: reveal ? q.result_start : undefined, resultSeconds: reveal ? q.result_seconds : undefined },
     personal,
     correctChoiceId: q.answer_mode==='CHOICE' && reveal ? String(q.correct_choice_id) : null,
     choices: q.answer_mode==='CHOICE' && me && (reveal || (r.phase==='OPEN_ANSWERING') || (personal?.stage==='ANSWER' || personal?.stage==='WAIT')) ? choicesForPlayer(JSON.parse(String(q.choice_options||'[]')),String(me.id)) : [],
-    titleHint: q.answer_mode!=='CHOICE' && playMode === 'OPEN' && r.quiz_game_type !== 'FILM_DUEL' && r.phase === 'OPEN_ANSWERING' && titleHintLimit(String(q.primary_answer)) > 0 ? { opensAt: titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at)), revealed: Number(r.paused_at ?? now()) >= titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at)), mask: maskedTitle(String(q.primary_answer), JSON.parse(String(q.title_hint_indices || '[]')), Number(r.paused_at ?? now()) >= titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at))) } : null,
+    titleHint: q.answer_mode==='TEXT' && playMode === 'OPEN' && r.quiz_game_type !== 'FILM_DUEL' && r.phase === 'OPEN_ANSWERING' && titleHintLimit(String(q.primary_answer)) > 0 ? { opensAt: titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at)), revealed: Number(r.paused_at ?? now()) >= titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at)), mask: maskedTitle(String(q.primary_answer), JSON.parse(String(q.title_hint_indices || '[]')), Number(r.paused_at ?? now()) >= titleHintAt(Number(r.phase_started_at), Number(r.phase_ends_at))) } : null,
     activeBid: r.active_bid, activeChallengerIds: ((playMode === 'OPEN' && r.phase !== 'LOBBY') || personal!==null || r.active_bid !== null) ? challengerIds : [],
     turnNotice,
     players, me: me ? { id: me.id, nickname: me.nickname } : null, isHost: host,
