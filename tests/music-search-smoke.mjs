@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import {MUSIC_SEARCH_VERSION,MUSIC_CATALOG_VERSION} from '../src/lib/musicSearch.ts';
+import {MUSIC_SEARCH_VERSION,MUSIC_CATALOG_VERSION,musicBrainzArtistQuery,musicBrainzRecordingQuery,musicBrainzQuery} from '../src/lib/musicSearch.ts';
 import {createClient} from '@libsql/client';
+import {musicMetadataCacheKey} from '../src/lib/musicProvider.ts';
 import {registerTestAccount} from './register-test-account.mjs';
 assert.ok(process.env.DATABASE_PATH?.includes('rounds-smoke'));assert.ok(!process.env.TURSO_DATABASE_URL);
 const base=process.env.SMOKE_BASE_URL||'http://localhost:3219';assert.match(base,/^http:\/\/localhost:/);
@@ -23,6 +24,19 @@ await db.execute({sql:"INSERT OR REPLACE INTO music_search_control(id,value,next
 const waiting=await request('/api/music/search?q=uncached-test-artist&scope=US_UK',undefined,'',true);
 assert.equal(waiting.status,202);assert.equal(waiting.data.pending,true);assert.equal(waiting.data.items,undefined);assert.ok(waiting.data.retryAfter>=1);
 await db.execute({sql:"UPDATE music_search_control SET next_at=0 WHERE id='upstream'",args:[]});
+
+// A partial title in the catalog must not suppress an exact artist lookup.
+const artistId='10000000-0000-4000-8000-000000000001',recordingId='10000000-0000-4000-8000-000000000002',workId='10000000-0000-4000-8000-000000000003';
+await db.execute({sql:'INSERT OR REPLACE INTO music_catalog(scope,id,title,detail,normalized_title,updated_at) VALUES(?,?,?,?,?,?)',args:[MUSIC_CATALOG_VERSION+':US_UK','10000000-0000-4000-8000-000000000004','Cacheband of My Heart',JSON.stringify({detail:'',performers:['Westlife']}),'cacheband of my heart westlife',Date.now()]});
+async function metadata(entity,query,limit,payload){await db.execute({sql:'INSERT OR REPLACE INTO music_search_cache(id,payload,expires_at) VALUES(?,?,?)',args:[musicMetadataCacheKey(entity,query,limit),JSON.stringify(payload),Date.now()+60000]});}
+await metadata('artist',musicBrainzArtistQuery('Cacheband'),5,{artists:[{id:artistId,name:'Cacheband',score:100}]});
+await metadata('recording',musicBrainzRecordingQuery('Cacheband',artistId),100,{recordings:[{id:recordingId,title:'Right band song','artist-credit':[{name:'Cacheband',artist:{id:artistId,name:'Cacheband'}}]}]});
+await metadata('work',musicBrainzQuery('Cacheband','US_UK',[recordingId],true),30,{works:[{id:workId,title:'Right band song',language:'eng',relations:[{type:'performance',recording:{id:recordingId}}]}]});
+await db.execute({sql:"UPDATE music_search_control SET value=?,next_at=? WHERE id='upstream'",args:['fixture-owner',Date.now()+45000]});
+try{
+ const corrected=await call('/api/music/search?q=Cacheband&scope=US_UK',undefined,'',true);
+ assert.equal(corrected.items.length,1);assert.deepEqual(corrected.items[0].performers,['Cacheband']);assert.equal(corrected.items[0].id,workId);
+}finally{await db.execute({sql:"UPDATE music_search_control SET next_at=0 WHERE id='upstream'",args:[]});}
 
 const vi=(await call('/api/music/search?q=fixture&scope=VI',undefined,'',true)).items;const en=(await call('/api/music/search?q=fixture&scope=US_UK',undefined,'',true)).items;
 assert.ok(vi.every(s=>s.scope==='VI'));assert.ok(en.every(s=>s.scope==='US_UK'));

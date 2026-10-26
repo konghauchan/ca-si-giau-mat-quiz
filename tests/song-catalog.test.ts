@@ -6,7 +6,7 @@ import type {SongSuggestion} from '../src/lib/musicSearch.ts';
 const song=(id:string,title:string,performers:string[]=[]):SongSuggestion=>({id,title,performers,scope:'VI',token:'signed-'+id,detail:''});
 test('downloaded catalog matches unaccented title or performer and prefers exact titles',()=>{
   const index=indexSongs([song('1','Biển nhớ',['Trịnh Công Sơn']),song('2','Biển nhớ em',['Test singer']),song('3','Bài khác',['Biển Nhớ']),song('4','Ru em từng ngón xuân nồng',['Trịnh Công Sơn'])]);
-  assert.deepEqual(matchSongs(index,'bien nho').map(item=>item.id),['1','2','3']);
+  assert.deepEqual(matchSongs(index,'bien nho').map(item=>item.id),['1','3','2']);
   assert.deepEqual(matchSongs(index,'trinh cong son').map(item=>item.id),['1','4']);
   assert.equal(matchSongs(index,'b').length,0);assert.equal(matchSongs(index,'unknown').length,0);
 });
@@ -38,4 +38,12 @@ test('a loaded artist can be found with one missing letter without another API c
   assert.deepEqual(matchSongs(index,'rihana').map(song=>song.id),['r2','r1']);
   assert.equal(matchSongs(index,'justin bieber')[0].title,'Baby');
   assert.equal(matchSongs(index,'entirely unknown').length,0);
+});
+
+test('artist matches rank ahead of partial song titles and aliases remain searchable',()=>{
+  const index=indexSongs([song('w','Queen of My Heart',['Westlife']),song('q','Bohemian Rhapsody',['Queen']),{...song('d','Lối nhỏ',['Đen']),artistAliases:['Đen Vâu']},song('c','Yellow',['Coldplay']),song('j','Cold Water',['Justin Bieber'])]);
+  assert.deepEqual(matchSongs(index,'queen').map(song=>song.id),['q','w']);
+  assert.deepEqual(matchSongs(index,'cold').map(song=>song.id),['c','j']);
+  assert.equal(matchSongs(index,'den vau')[0].id,'d');
+  assert.equal(matchSongs(indexSongs([song('wrong','Foreign song',['Denny Vaughn'])]),'den vau').length,0);
 });
