@@ -5,6 +5,7 @@ import {findMusicBrainzSongs,musicSearchCacheKey,MUSIC_SEARCH_VERSION,type Music
 import {signSong,readSong} from './songToken';
 
 const DAY=86400000;
+const catalogSnapshots=new Map<MusicScope,{expiresAt:number;promise:Promise<SongSuggestion[]>}>();
 let keyPromise:Promise<string>|undefined;
 export function songSigningKey():Promise<string> {
   return keyPromise??= (async()=>{
@@ -27,22 +28,23 @@ export async function savedSongToken(id:string,title:string,scope:MusicScope) {
   return signSong({id,title,scope,detail:''},await songSigningKey());
 }
 const inflight=new Map<string,Promise<{items:SongSuggestion[];source:string}>>();
-export async function searchSongs(query:string,scope:MusicScope) {
+export async function searchSongs(query:string,scope:MusicScope,refresh=false) {
   const normalized=normalizeAnswer(query);
   const cacheKey=musicSearchCacheKey(query,scope);
-  const active=inflight.get(cacheKey);if(active)return active;
-  const pending=search(query,normalized,scope,cacheKey);inflight.set(cacheKey,pending);
-  try{return await pending;}finally{inflight.delete(cacheKey);}
+  const inflightKey=cacheKey+(refresh?':refresh':'');
+  const active=inflight.get(inflightKey);if(active)return active;
+  const pending=search(query,normalized,scope,cacheKey,refresh);inflight.set(inflightKey,pending);
+  try{return await pending;}finally{inflight.delete(inflightKey);}
 }
-async function search(query:string,normalized:string,scope:MusicScope,cacheKey:string) {
-  const cached=await one('SELECT payload FROM music_search_cache WHERE id=? AND expires_at>?',cacheKey,Date.now());
+async function search(query:string,normalized:string,scope:MusicScope,cacheKey:string,refresh:boolean) {
+  const cached=refresh?null:await one('SELECT payload FROM music_search_cache WHERE id=? AND expires_at>?',cacheKey,Date.now());
   if(cached)return {items:await suggestions(JSON.parse(String(cached.payload))),source:'cache'};
   // Reuse public provider metadata only. Never index private quiz answers.
   const words=normalized.split(' ').filter(Boolean).slice(0,8);
   const catalogScope=MUSIC_SEARCH_VERSION+':'+scope;
   const local=await (await db()).execute({sql:`SELECT id,title,detail FROM music_catalog WHERE scope=? AND updated_at>? ${words.map(()=> 'AND normalized_title LIKE ?').join(' ')} ORDER BY updated_at DESC LIMIT 8`,args:[catalogScope,Date.now()-30*DAY,...words.map(w=>'%'+w+'%')]});
   const localWorks:SongWork[]=local.rows.map(r=>{const saved=JSON.parse(String(r.detail));return {id:String(r.id),title:String(r.title),detail:String(saved.detail),performers:Array.isArray(saved.performers)?saved.performers:[],scope};}).sort((a,b)=>Number(!!b.performers?.length)-Number(!!a.performers?.length));
-  if(localWorks.length>=8)return {items:await suggestions(localWorks),source:'catalog'};
+  if(localWorks.length&&!refresh)return {items:await suggestions(localWorks),source:'catalog'};
   // This lease is in Turso, shared across Vercel instances. No unbounded queue.
   const lease=randomBytes(12).toString('hex');const clock=Date.now();
   const gate=await (await db()).execute({sql:`INSERT INTO music_search_control(id,value,next_at) VALUES('upstream',?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value,next_at=excluded.next_at WHERE music_search_control.next_at<=? RETURNING id`,args:[lease,clock+30000,clock]});
@@ -60,6 +62,7 @@ async function search(query:string,normalized:string,scope:MusicScope,cacheKey:s
     });
     await run('INSERT INTO music_search_cache(id,payload,expires_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at',cacheKey,JSON.stringify(works),Date.now()+(works.length?7*DAY:3600000));
     if(works.length)await (await db()).batch(works.map(work=>({sql:'INSERT INTO music_catalog(scope,id,title,detail,normalized_title,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(scope,id) DO UPDATE SET title=excluded.title,detail=excluded.detail,normalized_title=excluded.normalized_title,updated_at=excluded.updated_at',args:[catalogScope,work.id,work.title,JSON.stringify({detail:work.detail,performers:work.performers||[]}),normalizeAnswer([work.title,...(work.performers||[])].join(' ')),Date.now()]})),'write');
+    catalogSnapshots.delete(scope);
     return {items:await suggestions(works),source:'musicbrainz'};
   }catch(error){
     if(localWorks.length)return {items:await suggestions(localWorks),source:'catalog'};
@@ -76,4 +79,19 @@ export async function limitMusicSearch(identity:string) {
   const id='music:'+createHash('sha256').update(identity).digest('hex');const clock=Date.now();
   const result=await (await db()).execute({sql:`INSERT INTO auth_rate_limits(key,attempts,reset_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET attempts=CASE WHEN reset_at<=? THEN 1 ELSE attempts+1 END,reset_at=CASE WHEN reset_at<=? THEN excluded.reset_at ELSE reset_at END WHERE reset_at<=? OR attempts<90 RETURNING key`,args:[id,clock+60000,clock,clock,clock]});
   if(!result.rows.length)throw new MusicSearchBusy(10);
+}
+
+// Scoped public provider metadata only: never join quizzes, questions or answers.
+export function publicSongCatalog(scope:MusicScope):Promise<SongSuggestion[]> {
+  const current=catalogSnapshots.get(scope);if(current&&current.expiresAt>Date.now())return current.promise;
+  const promise=(async()=>{
+    const rows=await (await db()).execute({sql:'SELECT id,title,detail FROM music_catalog WHERE scope=? AND updated_at>? ORDER BY id LIMIT 5000',args:[MUSIC_SEARCH_VERSION+':'+scope,Date.now()-30*DAY]});
+    const works:SongWork[]=rows.rows.map(row=>{const value=JSON.parse(String(row.detail));return {id:String(row.id),title:String(row.title),scope,detail:String(value.detail),performers:Array.isArray(value.performers)?value.performers:[]};});
+    const signed=await suggestions(works);const result:SongSuggestion[]=[];let bytes=0;
+    for(const item of signed){const size=Buffer.byteLength(JSON.stringify(item),'utf8')+1;if(size>65536)continue;if(bytes+size>3*1024*1024)break;bytes+=size;result.push(item);}
+    return result;
+  })();
+  const entry={expiresAt:Date.now()+30000,promise};catalogSnapshots.set(scope,entry);
+  void promise.catch(()=>{if(catalogSnapshots.get(scope)===entry)catalogSnapshots.delete(scope);});
+  return promise;
 }

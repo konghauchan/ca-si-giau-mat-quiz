@@ -7,7 +7,7 @@
    - **US–UK**: tiếng Anh quốc tế (`eng`), gồm cả nghệ sĩ Canada, Úc…; loại tác phẩm đồng thời được gắn `vie` để không trộn nhạc Việt vào nhóm này.
 2. Trong vòng chơi, chọn cách trả lời **Tìm tên bài hát · MusicBrainz**.
 3. Ở từng câu, chọn đáp án từ MusicBrainz. Đáp án chính được điền từ kết quả; nghệ sĩ biểu diễn vẫn nhập riêng. Tên tác giả của tác phẩm không được dùng thay tên ca sĩ.
-4. Người chơi gõ tên bài hoặc ca sĩ với ít nhất hai ký tự, chọn kết quả rồi chốt. Chọn kết quả chưa gửi đáp án.
+4. Người chơi gõ tên bài hoặc ca sĩ với ít nhất hai ký tự. Bấm vào bài, hoặc dùng mũi tên rồi Enter, sẽ gửi đáp án ngay. Phần tạo quiz chỉ liên kết đáp án, không tự lưu quiz.
 
 Nghe chung được thử tiếp sau khi sai; đấu giá và giành quyền qua gợi ý chỉ có một lượt. ABCD và kiểu gõ đáp án vẫn dùng luật hiện có. MusicBrainz cung cấp metadata, YouTube vẫn phát nhạc.
 
@@ -21,7 +21,7 @@ Nghe chung được thử tiếp sau khi sai; đấu giá và giành quyền qua
 
 ## Tải và giới hạn
 
-- Chờ người chơi ngừng gõ 500 ms trước khi tìm; hủy kết quả cũ khi đổi từ khóa/phạm vi hoặc hết lượt.
+- Lọc danh mục đã tải ngay khi gõ; chỉ chờ 150 ms khi cần tìm bài chưa có; hủy kết quả cũ khi đổi từ khóa/phạm vi hoặc hết lượt.
 - Bộ nhớ đệm theo `(phạm vi, từ khóa)` lưu trong Turso, dùng chung nhiều Vercel instances. Kết quả có bài giữ 7 ngày; không có bài giữ 1 giờ. Danh mục metadata công khai giữ tối đa 30 ngày, không thu thập đáp án từ quiz riêng tư.
 - Gộp các truy vấn trùng đang chạy; lease trong database giới hạn toàn ứng dụng, bảo đảm các lần gọi MusicBrainz cách nhau hơn một giây. Lease tự hết hạn khi instance dừng.
 - Khi nhiều từ khóa mới cùng lúc, trả dữ liệu có sẵn hoặc thông báo bận và nút tìm lại. **30 kết quả từ cache đã được kiểm tra; không cam kết 30 truy vấn mới/giây qua API công cộng.** Muốn phục vụ tải tìm kiếm lớn liên tục cần danh mục/chỉ mục MusicBrainz tự vận hành hoặc thỏa thuận dịch vụ phù hợp.
@@ -45,3 +45,11 @@ Nghe chung được thử tiếp sau khi sai; đấu giá và giành quyền qua
 - Khi chỉ có một ca sĩ được xác định, phần tạo quiz điền tên đó vào trường nghệ sĩ để người tạo kiểm tra với video YouTube.
 - Mã chấm vẫn là Work MBID nên các quiz đã lưu không phải liên kết lại.
 - Cache/catalog mới dùng namespace performers-v2, không tái sử dụng kết quả cũ thiếu ca sĩ. Chỉ mục metadata công khai gồm tên bài và ca sĩ; giữ nguyên bộ lọc ngôn ngữ và giới hạn API.
+
+## Tìm nhanh và gửi ngay khi chọn
+
+- Tải trước tối đa 5.000 mục (giới hạn phản hồi 3 MB) metadata công khai đúng phạm vi từ Turso khi vào vòng có SEARCH (kể cả lobby/intro/nghe). Danh mục được chuẩn hóa và sắp xếp một lần trên thiết bị; gõ tiếp chỉ quét chỉ mục và lấy tối đa 8 kết quả.
+- Snapshot metadata dùng chung trong server 30 giây, gộp các lượt tải cùng lúc; trình duyệt tái sử dụng 5 phút. Mỗi lần tìm ngoài bổ sung kết quả vào chỉ mục thiết bị. Không gửi danh sách câu/đáp án riêng của quiz; endpoint catalog không truy vấn nội dung quiz để tạo kết quả.
+- Server trả metadata có sẵn ngay cả khi ít hơn 8 kết quả. Nút “Tìm thêm trên MusicBrainz” cho tìm bổ sung; từ khóa chưa có vẫn cần API bên ngoài và có thể chậm/bận.
+- Chọn bằng chuột hoặc Enter gửi đúng lựa chọn ngay, khóa tức thì để chặn double click. Luật và thời hạn vẫn do server quyết định. Gửi thất bại cho thử lại; nghe chung sai vẫn được nhập tiếp, đấu giá và gợi ý giữ một lần theo luật.
+- Tốc độ gần tức thì áp dụng cho dữ liệu đã tải, không phải toàn bộ thư viện MusicBrainz. Không đổi mốc tính điểm sang đồng hồ máy người chơi.
