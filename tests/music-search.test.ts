@@ -72,3 +72,10 @@ test('real MusicBrainz Backstreet metadata returns twenty songs from a partial a
   assert.equal(found.length,20);assert.equal(new Set(found.map(s=>s.id)).size,20);
   for(const title of ['As Long as You Love Me','I Want It That Way','Larger Than Life','All I Have to Give'])assert.deepEqual(found.find(s=>s.title===title)?.performers,['Backstreet Boys']);
 });
+
+test('Rihana is recognized as Rihanna without hardcoded artist IDs',()=>{
+  const artist={id,name:'Rihanna',score:100};
+  assert.equal(matchingArtist([artist],'rihana')?.name,'Rihanna');
+  assert.match(musicBrainzArtistQuery('rihana'),/artist:\(rihana~1\)/);
+  assert.equal(matchingArtist([artist],'justin bieber'),undefined);
+});

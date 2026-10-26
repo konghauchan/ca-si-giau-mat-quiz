@@ -32,3 +32,10 @@ test('partial artist, possessive and spaced typing all list songs without a comp
   assert.equal(matchSongs(index,'something else').length,0);
 });
 
+
+test('a loaded artist can be found with one missing letter without another API call',()=>{
+  const index=indexSongs([song('r1','Umbrella',['Rihanna']),song('r2','Diamonds',['Rihanna']),song('j1','Baby',['Justin Bieber'])]);
+  assert.deepEqual(matchSongs(index,'rihana').map(song=>song.id),['r2','r1']);
+  assert.equal(matchSongs(index,'justin bieber')[0].title,'Baby');
+  assert.equal(matchSongs(index,'entirely unknown').length,0);
+});

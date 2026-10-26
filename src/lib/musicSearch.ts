@@ -8,12 +8,25 @@ export type SongSuggestion = SongWork & { token: string };
 export type MusicBrainzWork = { id?: string; title?: string; type?: string; language?: string; languages?: string[]; disambiguation?: string; relations?: Array<{type?:string;artist?:{name?:string};recording?:{id?:string}}> };
 export type MusicBrainzArtist = {id?:string;name?:string;score?:number;aliases?:Array<{name?:string}>};
 export type MusicBrainzRecording = {id?:string;title?:string;'artist-credit'?:Array<{name?:string;artist?:{id?:string;name?:string}}>};
-export const MUSIC_SEARCH_VERSION='artist-prefix-v3';
+export const MUSIC_SEARCH_VERSION='shared-metadata-v4';
+export const MUSIC_CATALOG_VERSION='artist-prefix-v3';
 export const MUSIC_RESULT_LIMIT=20;
 const validId=(id:string)=>/^[a-f0-9-]{36}$/i.test(id);
 // Search normalization is deliberately separate from answer matching/scoring.
 export function normalizeMusicSearch(query:string) {
   return normalizeAnswer(query.replace(/['’]s\b/gi,'').replace(/['’]/g,''));
+}
+export function musicWordMatches(word:string,candidate:string):boolean {
+  if(candidate.includes(word))return true;
+  if(word.length<4||Math.abs(word.length-candidate.length)>1)return false;
+  let a=0,b=0,edits=0;
+  while(a<word.length&&b<candidate.length){
+    if(word[a]===candidate[b]){a++;b++;continue;}
+    if(++edits>1)return false;
+    if(word.length>=candidate.length)a++;
+    if(candidate.length>=word.length)b++;
+  }
+  return edits+(word.length-a)+(candidate.length-b)<=1;
 }
 export const musicSearchCacheKey=(query:string,scope:MusicScope)=>`${MUSIC_SEARCH_VERSION}:${scope}:${normalizeMusicSearch(query)}`;
 export function searchWords(query: string) {
@@ -29,14 +42,15 @@ function scopeFilter(scope:MusicScope) {
   return `lang:${scope === 'VI' ? 'vie' : 'eng'}${scope === 'US_UK' ? ' AND NOT lang:vie' : ''}`;
 }
 export function musicBrainzArtistQuery(query:string) {
-  const term=searchTerm(query),compact=searchWords(query).join('');
-  return `(artist:(${term}) OR alias:(${term})${searchWords(query).length>1?` OR artist:${compact}* OR alias:${compact}*`:''})`;
+  const words=searchWords(query),term=searchTerm(query),compact=words.join('');
+  const fuzzy=words.map(word=>word.length>=4?word+'~1':word+'*').join(' AND ');
+  return `(artist:(${term}) OR alias:(${term}) OR artist:(${fuzzy}) OR alias:(${fuzzy})${words.length>1?` OR artist:${compact}* OR alias:${compact}*`:''})`;
 }
 export function matchingArtist(artists:MusicBrainzArtist[],query:string):MusicBrainzArtist|undefined {
   const words=searchWords(query),compact=words.join('');
   return artists.filter(artist=>artist.id&&validId(artist.id)&&[artist.name,...(artist.aliases||[]).map(alias=>alias.name)].some(name=>{
     const text=normalizeMusicSearch(name||'');
-    return words.every(word=>text.includes(word))||text.replaceAll(' ','').startsWith(compact);
+    return words.every(word=>text.split(' ').some(candidate=>musicWordMatches(word,candidate)))||text.replaceAll(' ','').startsWith(compact);
   })).sort((a,b)=>Number(b.score||0)-Number(a.score||0))[0];
 }
 export function musicBrainzRecordingQuery(query:string,artistId?:string) {
@@ -82,7 +96,7 @@ export async function findMusicBrainzSongs(query:string,scope:MusicScope,request
   // Prefer plain studio credits to live/remix variants when choosing a display credit.
   const variant=/\b(live|remix|mix|instrumental|karaoke)\b/i;
   const recordings=[...data.recordings].sort((a,b)=>Number(variant.test(a.title||''))-Number(variant.test(b.title||''))||(a['artist-credit']?.length||0)-(b['artist-credit']?.length||0));
-  const result=await request('work',musicBrainzQuery(query,scope,recordings.flatMap(r=>r.id?[r.id]:[])),100);
+  const result=await request('work',musicBrainzQuery(artist?.name||query,scope,recordings.flatMap(r=>r.id?[r.id]:[])),100);
   if(!Array.isArray(result.works))throw new Error('Phản hồi tác phẩm MusicBrainz không hợp lệ.');
   return scopedWorks(result.works,scope,recordings);
 }
