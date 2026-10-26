@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {MUSIC_SEARCH_VERSION} from '../src/lib/musicSearch.ts';
 import {createClient} from '@libsql/client';
 import {registerTestAccount} from './register-test-account.mjs';
 assert.ok(process.env.DATABASE_PATH?.includes('rounds-smoke'));assert.ok(!process.env.TURSO_DATABASE_URL);
@@ -11,9 +12,9 @@ async function call(endpoint,body,token='',account=false){const result=await req
 await call('/api/quiz',undefined,'',true);
 const viet=[{id:'00000000-0000-4000-8000-000000000001',title:'Bài thử tiếng Việt',detail:'Tác giả: Kiểm thử',scope:'VI'},{id:'00000000-0000-4000-8000-000000000002',title:'Bài thử tiếng Việt',detail:'Bài trùng tên khác tác giả',scope:'VI'}];
 const english=[{id:'00000000-0000-4000-8000-000000000003',title:'English test song',detail:'Test work',scope:'US_UK'}];
-for(const [scope,items] of [['VI',viet],['US_UK',english]])await db.execute({sql:'INSERT OR REPLACE INTO music_search_cache(id,payload,expires_at) VALUES(?,?,?)',args:['performers-v2:'+scope+':fixture',JSON.stringify(items),Date.now()+60000]});
+for(const [scope,items] of [['VI',viet],['US_UK',english]])await db.execute({sql:'INSERT OR REPLACE INTO music_search_cache(id,payload,expires_at) VALUES(?,?,?)',args:[MUSIC_SEARCH_VERSION+':'+scope+':fixture',JSON.stringify(items),Date.now()+60000]});
 assert.notEqual((await request('/api/music/search?q=fixture&scope=VI')).status,200);
-for(const song of [...viet,...english])await db.execute({sql:'INSERT OR REPLACE INTO music_catalog(scope,id,title,detail,normalized_title,updated_at) VALUES(?,?,?,?,?,?)',args:['performers-v2:'+song.scope,song.id,song.title,JSON.stringify({detail:song.detail,performers:['Test artist']}),song.title.toLowerCase()+' test artist',Date.now()]});
+for(const song of [...viet,...english])await db.execute({sql:'INSERT OR REPLACE INTO music_catalog(scope,id,title,detail,normalized_title,updated_at) VALUES(?,?,?,?,?,?)',args:[MUSIC_SEARCH_VERSION+':'+song.scope,song.id,song.title,JSON.stringify({detail:song.detail,performers:['Test artist']}),song.title.toLowerCase()+' test artist',Date.now()]});
 assert.notEqual((await request('/api/music/catalog?scope=VI')).status,200);
 const creatorCatalog=await call('/api/music/catalog?scope=VI',undefined,'',true);assert.equal(creatorCatalog.scope,'VI');assert.ok(creatorCatalog.items.every(item=>item.scope==='VI'&&item.token));
 

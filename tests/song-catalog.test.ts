@@ -21,3 +21,14 @@ test('same work is not duplicated, cross-scope results are ignored and preload i
     await primeSongCatalog('VI');assert.equal(calls,1);
   }finally{globalThis.fetch=original;}
 });
+
+test('partial artist, possessive and spaced typing all list songs without a complete name',()=>{
+  const entries=Array.from({length:24},(_,i)=>({...song('backstreet-'+i,'Song '+i,['Backstreet Boys']),scope:'US_UK' as const}));
+  const index=indexSongs([...entries,song('other','Unrelated song',['Unrelated artist'])]);
+  for(const query of ['backstreet','backst',"backstreet's boy",'back street']){
+    const matches=matchSongs(index,query);assert.equal(matches.length,20);assert.ok(matches.every(item=>item.performers?.includes('Backstreet Boys')));
+  }
+  assert.equal(matchSongs(index,'Song 12')[0].id,'backstreet-12');
+  assert.equal(matchSongs(index,'something else').length,0);
+});
+

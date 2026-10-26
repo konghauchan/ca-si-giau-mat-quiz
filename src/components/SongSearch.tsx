@@ -1,15 +1,16 @@
 'use client';
 import {useEffect,useId,useRef,useState} from 'react';
-import {musicScopeLabel,type MusicScope,type SongSuggestion} from '@/lib/musicSearch';
+import {musicScopeLabel,MUSIC_RESULT_LIMIT,type MusicScope,type SongSuggestion} from '@/lib/musicSearch';
 import {cachedSongMatches,primeSongCatalog,rememberSongs} from '@/lib/musicCatalogClient';
 
 export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAnswer,selectedTitle}:{scope:MusicScope;roomId?:string;gameToken?:string;disabled?:boolean;onSelect?:(song:SongSuggestion)=>void;onAnswer?:(token:string,song:SongSuggestion)=>Promise<boolean|void>;selectedTitle?:string}) {
   const id=useId();const input=useRef<HTMLInputElement>(null);const submitting=useRef(false);const generation=useRef(0);
+  const pendingSearch=useRef<{controller:AbortController}|null>(null);
   const [query,setQuery]=useState('');const [items,setItems]=useState<SongSuggestion[]>([]);const [selected,setSelected]=useState<SongSuggestion|null>(null);
   const [active,setActive]=useState(-1);const [loading,setLoading]=useState(false);const [error,setError]=useState('');const [sent,setSent]=useState(false);const [busy,setBusy]=useState(false);
   const [catalogVersion,setCatalogVersion]=useState(0);const [retry,setRetry]=useState(0);const [forcedTerm,setForcedTerm]=useState('');
-  useEffect(()=>{generation.current++;setQuery('');setSelected(null);setItems([]);setSent(false);setBusy(false);setLoading(false);setActive(-1);setError('');submitting.current=false;},[scope,roomId]);
-  useEffect(()=>()=>{generation.current++;},[]);
+  useEffect(()=>{generation.current++;pendingSearch.current?.controller.abort();pendingSearch.current=null;setQuery('');setSelected(null);setItems([]);setSent(false);setBusy(false);setLoading(false);setActive(-1);setError('');submitting.current=false;},[scope,roomId]);
+  useEffect(()=>()=>{generation.current++;pendingSearch.current?.controller.abort();pendingSearch.current=null;},[]);
   useEffect(()=>{let alive=true;void primeSongCatalog(scope,{roomId,gameToken}).then(()=>{if(alive)setCatalogVersion(v=>v+1);});return ()=>{alive=false;};},[scope,roomId,gameToken]);
   useEffect(()=>{
     const controller=new AbortController();let alive=true;
@@ -18,16 +19,27 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
     setItems(local);setActive(-1);setError('');
     if(local.length&&!refresh){setLoading(false);return ()=>controller.abort();}
     setLoading(true);
+    // Let one cold lookup finish while typing continues. Reuse its metadata for
+    // the latest query instead of discarding it and competing for the API lease.
+    if(pendingSearch.current)return ()=>{alive=false;};
+    let started=false;
     const timer=setTimeout(async()=>{
+      started=true;const requestGeneration=generation.current;const job={controller};pendingSearch.current=job;
       try {
         const params=new URLSearchParams({q:query.trim(),scope});if(roomId)params.set('roomId',roomId);if(refresh)params.set('refresh','1');
         const response=await fetch('/api/music/search?'+params,{headers:gameToken?{'x-game-token':gameToken}:{},signal:controller.signal,cache:'no-store'});
         const data=await response.json();if(!response.ok)throw new Error(data.error||'Chưa tìm được bài hát.');
-        if(alive){rememberSongs(scope,data.items);const merged=[...new Map([...data.items,...local].map((song:SongSuggestion)=>[song.id,song])).values()] as SongSuggestion[];setItems(merged.slice(0,8));setError(merged.length?'':'Chưa tìm thấy bài trong phạm vi này. Kiểm tra phạm vi nhạc hoặc thử tên bài/ca sĩ đầy đủ.');}
+        if(requestGeneration===generation.current){
+          rememberSongs(scope,data.items);
+          if(alive){const merged=[...new Map([...data.items,...local].map((song:SongSuggestion)=>[song.id,song])).values()] as SongSuggestion[];setItems(merged.slice(0,MUSIC_RESULT_LIMIT));setError(merged.length?'':'Chưa tìm thấy bài trong phạm vi này. Kiểm tra phạm vi nhạc hoặc thử một phần tên bài/ca sĩ khác.');}
+        }
       }catch(cause){if(alive&&!controller.signal.aborted)setError((cause as Error).message);}
-      finally{if(alive)setLoading(false);}
+      finally{
+        if(pendingSearch.current===job)pendingSearch.current=null;
+        if(requestGeneration===generation.current){if(alive)setLoading(false);else setCatalogVersion(value=>value+1);}
+      }
     },150);
-    return ()=>{alive=false;clearTimeout(timer);controller.abort();};
+    return ()=>{alive=false;clearTimeout(timer);if(!started)controller.abort();};
   },[query,scope,roomId,gameToken,disabled,selected,retry,forcedTerm,catalogVersion]);
   async function submit(song:SongSuggestion){
     if(!onAnswer||disabled||submitting.current||sent)return;
@@ -47,7 +59,7 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
   function searchMore(){setForcedTerm(query.trim());setRetry(value=>value+1);}
   return <div className="song-search">
     <div className="field"><label htmlFor={id}>Tìm bài hát hoặc ca sĩ trên MusicBrainz</label><small>{musicScopeLabel(scope)} · {onAnswer?'Chọn bài là gửi đáp án ngay.':'Tìm theo tên bài hát hoặc ca sĩ'}</small>
-      <input ref={input} autoFocus={!!onAnswer} id={id} role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={items.length>0} aria-controls={id+'-list'} aria-activedescendant={active>=0?id+'-option-'+active:undefined} value={query} maxLength={80} disabled={disabled||busy||sent} placeholder="Nhập tên bài hát hoặc ca sĩ…" onChange={event=>{const value=event.target.value;setQuery(value);setSelected(null);setSent(false);setForcedTerm('');setError('');setActive(-1);setItems(cachedSongMatches(scope,value));}} onKeyDown={event=>{
+      <input ref={input} autoFocus={!!onAnswer} id={id} role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={items.length>0} aria-controls={id+'-list'} aria-activedescendant={active>=0?id+'-option-'+active:undefined} value={query} maxLength={80} disabled={disabled||busy||sent} placeholder="Nhập một phần tên bài hát hoặc ca sĩ…" onChange={event=>{const value=event.target.value;setQuery(value);setSelected(null);setSent(false);setForcedTerm('');setError('');setActive(-1);setItems(cachedSongMatches(scope,value));}} onKeyDown={event=>{
         if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();setActive(i=>items.length?(event.key==='ArrowDown'?(i+1)%items.length:i<0?items.length-1:(i-1+items.length)%items.length):-1);}
         else if(event.key==='Escape'){setItems([]);setActive(-1);}
         else if(event.key==='Enter'){event.preventDefault();if(active>=0&&items[active])choose(items[active]);}
