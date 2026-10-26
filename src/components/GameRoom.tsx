@@ -18,6 +18,7 @@ import { ClueRoom, type ClueGameState } from './ClueRoom';
 import { modeDescription } from '@/lib/quizCategory';
 import {SongSearch} from '@/components/SongSearch';
 import type {MusicScope} from '@/lib/musicSearch';
+import {primeSongCatalog} from '@/lib/musicCatalogClient';
 import { ChoiceAnswers } from './ChoiceAnswers';
 import type {Choice} from '@/lib/multiplayer';
 import { scoreWithTitleHint } from '@/lib/titleHint';
@@ -46,6 +47,8 @@ export function GameRoom({ kind }: { kind: 'host' | 'player' }) {
   const params = useParams<{ roomId: string }>(); const roomId = params.roomId;
   const token = gameToken(roomId, kind);
   const {state:rawState,setState,patchState,error,setError} = useRoomState<GameState>(roomId,token);
+  const searchScope=rawState?.question.musicScope;const searchMode=rawState?.question.answerMode;
+  useEffect(()=>{if(searchMode==='SEARCH'&&token)void primeSongCatalog(searchScope||'VI',{roomId,gameToken:token});},[searchScope,searchMode,roomId,token]);
   const personal=rawState?.personal;
   const state:GameState|null=rawState?personal?{...rawState,phase:['LISTEN','PREPARE'].includes(personal.stage)?'MEDIA_PLAYING':'ANSWERING',phaseStartedAt:['LISTEN','PREPARE'].includes(personal.stage)?personal.mediaStartsAt:personal.listenEndsAt,phaseEndsAt:personal.stage==='PREPARE'?personal.mediaStartsAt:personal.stage==='LISTEN'?personal.listenEndsAt:personal.stage==='ANSWER'?personal.answerEndsAt:rawState.phaseEndsAt,activeBid:rawState.myBid}:rawState:null; const [busy,setBusy]=useState(false); const [pendingAction,setPendingAction]=useState('');
   const [selectedBid, setSelectedBid] = useState<number | null>(null); const [answer, setAnswer] = useState('');
