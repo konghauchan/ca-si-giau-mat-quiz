@@ -6,7 +6,17 @@
     "queries": [
       "Justin Bieber",
       "Rihanna",
-      "Backstreet Boys"
+      "Backstreet Boys",
+      "Taylor Swift",
+      "Adele",
+      "Ed Sheeran",
+      "Bruno Mars",
+      "Westlife",
+      "Maroon 5",
+      "Coldplay",
+      "Mỹ Tâm",
+      "Queen",
+      "Đen Vâu"
     ]
   },
   "songs": [
@@ -560,6 +570,1642 @@
         "Backstreet Boys"
       ],
       "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "c8975007-ba64-3e81-9a3c-69a3ba2fab95",
+      "title": "Love Story",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác giả: Taylor Swift"
+    },
+    {
+      "id": "8a999d24-acbb-4992-b580-030b2fe83e90",
+      "title": "I Knew You Were Trouble.",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "bcffb49d-9d17-43aa-9e0d-88ce7dc4ebfb",
+      "title": "Teardrops on My Guitar",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "4f0b6123-2bbd-3672-a928-b1949a42654d",
+      "title": "You Belong with Me",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác giả: Liz Rose, Taylor Swift"
+    },
+    {
+      "id": "d45231e1-49b5-4684-b7d8-e304b15982f7",
+      "title": "Should’ve Said No",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác giả: Taylor Swift"
+    },
+    {
+      "id": "ff0bc1b4-ba5e-3a4f-8447-17da5cb7c722",
+      "title": "Speak Now",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác giả: Taylor Swift"
+    },
+    {
+      "id": "698a8b54-c881-4f70-a7a7-599c8a85523b",
+      "title": "I Wish You Would",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "36330f36-f59a-47d4-9cfe-9434b8d25e88",
+      "title": "Vigilante Shit",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "b0dcd90d-817f-4798-a120-3d14fac465a7",
+      "title": "Dancing With Our Hands Tied",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "aa42d642-3771-4180-9c53-00ba22df5a4b",
+      "title": "We Are Never Ever Getting Back Together",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "aae062a3-a98c-48e0-ab5f-d52a7953c414",
+      "title": "Anti‐Hero",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "c70e6295-12ed-39ca-b069-cd485920ac11",
+      "title": "Dear John",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác giả: Taylor Swift"
+    },
+    {
+      "id": "f4dd8235-123f-4f53-ac07-1fc070016c06",
+      "title": "Style",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "667f5519-d5d5-3b0a-8c78-5d8d36b98dfe",
+      "title": "American Girl",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác giả: Tom Petty"
+    },
+    {
+      "id": "9f24824b-1777-45e1-a829-bba8f0ca5b27",
+      "title": "betty",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "3e70b356-83a0-4fbf-8df4-3e5755c6d9fe",
+      "title": "Clean",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "eebdb998-f0c2-4de6-9b5b-c3629a5d0bef",
+      "title": "I Know Places",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "a6503d19-0752-408b-9934-1ae426cf9a45",
+      "title": "champagne problems",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "9f2009b4-a116-45a5-87c9-f8c9ebc1c946",
+      "title": "I Can Do It With a Broken Heart",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "9ed14afd-649f-4094-8106-8bd0984cadd7",
+      "title": "illicit affairs",
+      "scope": "US_UK",
+      "performers": [
+        "Taylor Swift"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "bbc9ce47-5d26-3489-ae0b-b06c4b8c6450",
+      "title": "Rolling in the Deep",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "d2363d8e-b39e-3032-bf33-f7c82d0d2818",
+      "title": "Hometown Glory",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác giả: Wil Malone, Adele"
+    },
+    {
+      "id": "09f420e3-0110-4886-b284-e3c7f13ddfc3",
+      "title": "Someone Like You",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "891fef21-b00d-3b5e-a92a-7e0a9abe49b0",
+      "title": "Chasing Pavements",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác giả: Eg White, Adele"
+    },
+    {
+      "id": "48f4272b-60d4-32e7-ba51-1f254dfc1887",
+      "title": "Set Fire to the Rain",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "55a38fa3-b0b8-4c74-ab22-4022e70a67da",
+      "title": "Make You Feel My Love",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác giả: Bob Dylan"
+    },
+    {
+      "id": "e38a9213-ca0f-40b0-8982-b93621f64e30",
+      "title": "Skyfall",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "13fe407e-f984-3ce2-8ac6-ce051a3ff5fe",
+      "title": "Cold Shoulder",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "657338da-aa3a-420d-a72c-bb3f95a35377",
+      "title": "Rumour Has It",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "621a3247-d06e-3091-841b-f66b31976b27",
+      "title": "My Same",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác giả: Adele"
+    },
+    {
+      "id": "1e3f4681-e70d-36c1-a547-7740977352f2",
+      "title": "Tired",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác giả: Eg White, Adele"
+    },
+    {
+      "id": "2882ab84-680d-3621-97d6-d9db817d4f4d",
+      "title": "Best for Last",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác giả: Adele"
+    },
+    {
+      "id": "4b67d24d-b423-35d9-bd4e-de91705f3ff7",
+      "title": "Right as Rain",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "46f8639b-f20c-4264-9212-35249b95fc35",
+      "title": "I’ll Be Waiting",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "34029ae2-7479-4694-b1df-82746d75073d",
+      "title": "Fool That I Am",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác giả: Floyd Hunt"
+    },
+    {
+      "id": "97fe8e70-573e-3e5c-b061-3d9958f88912",
+      "title": "I Can’t Make You Love Me",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "3d8de399-b90d-38a6-b879-d153a6a55b28",
+      "title": "Daydreamer",
+      "scope": "US_UK",
+      "performers": [
+        "Mick Boogie",
+        "Adele"
+      ],
+      "detail": "Tác giả: Adele"
+    },
+    {
+      "id": "d1720641-c0cd-4337-a6d7-bd9f076521b8",
+      "title": "Now and Then",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác giả: Adele"
+    },
+    {
+      "id": "0a2d5f43-d369-4323-be09-d70066163444",
+      "title": "Painting Pictures",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác giả: Adele"
+    },
+    {
+      "id": "e2a1bc95-c818-42ab-8119-94238b8a4cce",
+      "title": "When We Were Young",
+      "scope": "US_UK",
+      "performers": [
+        "Adele"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "90cb643b-fe46-47f4-a2da-24c71ce596b4",
+      "title": "Lay It All on Me",
+      "scope": "US_UK",
+      "performers": [
+        "Rudimental",
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "cdd8ac9b-9bfb-42f4-83b7-25b6e0e47e05",
+      "title": "The A Team",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác giả: Ed Sheeran"
+    },
+    {
+      "id": "5db39b46-fd04-4519-886f-1dbf77fd03b7",
+      "title": "You Need Me, I Don't Need You",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác giả: Ed Sheeran"
+    },
+    {
+      "id": "abc4f652-20a1-4a6e-a96d-468b8b3db2a6",
+      "title": "Grade 8",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "ee76d06b-a143-449a-99bc-fd98e50aba3d",
+      "title": "Bad Habits",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "5366d5ea-2380-4502-9406-3a2df90fa45b",
+      "title": "Drunk",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "afb7797e-2ca8-4285-a485-63cf0d291a36",
+      "title": "The City",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "8077c4f0-a9cb-49db-bb9d-b873d1bac1a6",
+      "title": "Kiss Me",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "184b7f06-a18c-42ef-b476-b42cfc7019b5",
+      "title": "Lego House",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "d9af8987-fc0b-43ab-8b0f-5a0fbcd8a64a",
+      "title": "I See Fire",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác giả: Ed Sheeran"
+    },
+    {
+      "id": "14c8f30b-7e83-495f-9b83-6c842ef3ee5d",
+      "title": "Give Me Love",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "c6c8757b-46ec-40e5-bb0f-1241b3af2860",
+      "title": "Cold Coffee",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "a0824059-160a-4b4f-a8bb-83d216aeb0a9",
+      "title": "Shape of You",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "6d5edfad-da51-46e9-bd2a-8e6c0fe0352d",
+      "title": "Sing",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "a4c29bd6-8000-4e94-ac53-bba7fd1b7e9f",
+      "title": "Bloodstream",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "e095d840-5fe0-46a5-9aa9-f032e586fac8",
+      "title": "Don’t",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "e31f4c8a-3178-4cba-b408-4887a753160c",
+      "title": "2step",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran",
+        "Lil Baby"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "6dc7a5b0-4f1d-4b41-a494-2ed205f34087",
+      "title": "Deepest Shame",
+      "scope": "US_UK",
+      "performers": [
+        "Plan B",
+        "Ed Sheeran",
+        "Chipmunk",
+        "Devlin"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "762280fd-aec5-4e74-8942-a07ec601d689",
+      "title": "I’m a Mess",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác giả: Ed Sheeran"
+    },
+    {
+      "id": "f54b2ddd-921f-4600-8a31-31b6dc5ddfb0",
+      "title": "U.N.I.",
+      "scope": "US_UK",
+      "performers": [
+        "Ed Sheeran"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "37d11d2e-bb76-4610-b4ed-97caa417bd78",
+      "title": "Locked Out of Heaven",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "cc193a0c-e710-35fd-90d9-701083a1be35",
+      "title": "Just the Way You Are",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "f7809bf1-09e8-4486-9cbb-fcec4cd19e5a",
+      "title": "Treasure",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "f9faf7b7-6855-46ab-bfbe-4aa5b25eddf9",
+      "title": "Nothin’ on You",
+      "scope": "US_UK",
+      "performers": [
+        "B.O.B",
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "95a8cd8d-4fef-4cab-82cd-a03a965e01fb",
+      "title": "The Lazy Song",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "7c086c6e-6ecc-408d-a4b5-f9536ea71beb",
+      "title": "Lighters",
+      "scope": "US_UK",
+      "performers": [
+        "Eminem",
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "0583a7b9-8003-38ef-aa41-ec50a875ac5f",
+      "title": "Billionaire",
+      "scope": "US_UK",
+      "performers": [
+        "Travie McCoy",
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "db9805fc-b60e-4de3-a878-82b33bf7b1ab",
+      "title": "Versace on the Floor",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars",
+        "David Guetta"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "dccb3a3a-0e20-40f4-8601-5352fe837882",
+      "title": "Moonshine",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "f37088a0-125d-4500-97ba-ed2f84e8eab4",
+      "title": "Grenade",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "8b8bcca7-cf75-4163-8c8b-cd21f7b67e06",
+      "title": "That's What I Like",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "24d43217-de13-490d-9d3d-665f14aa1288",
+      "title": "Finesse",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars",
+        "Cardi B"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "2fa4db4f-2297-42ce-bfe5-fa01ece436b7",
+      "title": "Talking to the Moon",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "bbafe661-dac7-3c16-b1dd-18442446eaf5",
+      "title": "Marry You",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "829820fd-f49e-4c2b-a41e-beb0a33ff7e1",
+      "title": "Gorilla",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "f80b0fb7-5463-4cbd-8db8-2f7ee33c635a",
+      "title": "Bubble Butt",
+      "scope": "US_UK",
+      "performers": [
+        "Major Lazer",
+        "Bruno Mars",
+        "Tyga",
+        "Mystic"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "e4e13c63-c690-45aa-b1a3-6db99ba91e87",
+      "title": "APT.",
+      "scope": "US_UK",
+      "performers": [
+        "ROSÉ",
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "f9d79a2f-381e-4309-bb94-c7a9c2e02bfc",
+      "title": "Please Me",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars",
+        "Cardi B"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "c62f7e22-a04f-475e-af94-97a660d313bc",
+      "title": "Uptown Funk",
+      "scope": "US_UK",
+      "performers": [
+        "Mark Ronson",
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "77e100ac-7541-4e52-8ff7-64e7f973c759",
+      "title": "24K Magic",
+      "scope": "US_UK",
+      "performers": [
+        "Bruno Mars"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "ee92217b-37b4-34a3-88f9-026e8feae43d",
+      "title": "Uptown Girl",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác giả: Billy Joel"
+    },
+    {
+      "id": "6d28e1b7-2627-3a5a-aa3c-007fb0dde9ef",
+      "title": "You Raise Me Up",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác giả: Rolf Løvland, Brendan Graham"
+    },
+    {
+      "id": "d8460c88-1901-38e0-8bbd-b1caa722c9e1",
+      "title": "World of Our Own",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Westlife song · Tác giả: Steve Mac, Wayne Hector"
+    },
+    {
+      "id": "5ef82d71-e749-4d28-a119-845a5cfd8e60",
+      "title": "Bop Bop Baby",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "b6ca19f5-5c34-4c29-80eb-37e6d12f7721",
+      "title": "Tonight",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "9141537d-0e68-40d8-84ba-483229a461e0",
+      "title": "Home",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "774224c0-ec63-336b-a6a5-60e73bdbc870",
+      "title": "Flying Without Wings",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác giả: Steve Mac, Wayne Hector"
+    },
+    {
+      "id": "afacd4c0-5ce7-49ec-abfd-71c3cb77cad3",
+      "title": "Dynamite",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "3ecb2727-67cb-4a02-af78-5a5ab888f7cd",
+      "title": "My Love",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác giả: Pelle Nylén, Jörgen Elofsson, Per Magnusson"
+    },
+    {
+      "id": "765c3dae-eeab-3cd8-8e0a-4d5e733f5597",
+      "title": "Brandy",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "more popularly known as Mandy · Tác giả: Scott English, Richard Kerr"
+    },
+    {
+      "id": "d4de917c-89fa-3d97-8df3-79c6e0e5847c",
+      "title": "I Have a Dream",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "c8584cbf-5d24-4660-94ef-7639c9323292",
+      "title": "Westlife Hits Medley: Flying Without Wings / My Love / Mandy",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "9535a4ba-b012-4f68-b18c-3d01481eb216",
+      "title": "Starlight",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "1ee0945a-cbb1-46c0-bb3c-988f53ce1bc6",
+      "title": "Better Man",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "887b5923-9633-433e-aaf7-a02cd14d72c8",
+      "title": "Tell Me It's Love",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "75023ccc-0e51-3746-8d31-04b9f7c45309",
+      "title": "Angel",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác giả: Sarah McLachlan"
+    },
+    {
+      "id": "576a35c8-e980-3111-91fc-08b77ebf85b6",
+      "title": "Queen of My Heart",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác giả: Steve Mac, John McLaughlin, Wayne Hector"
+    },
+    {
+      "id": "ed2f5961-362d-4e24-93b9-90440d62b33b",
+      "title": "Obvious",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "3eea54d5-3dbd-49b1-a228-a9f05c861a94",
+      "title": "Safe",
+      "scope": "US_UK",
+      "performers": [
+        "Westlife"
+      ],
+      "detail": "Westlife · Tác phẩm âm nhạc"
+    },
+    {
+      "id": "2baeb8c9-03ca-4b2b-ade6-2556f5ee7d9f",
+      "title": "Back at One",
+      "scope": "US_UK",
+      "performers": [
+        "Lulu",
+        "Westlife"
+      ],
+      "detail": "Tác giả: Brian McKnight"
+    },
+    {
+      "id": "ac02a29b-5fc6-3ad3-b280-38ffecf4bafa",
+      "title": "This Love",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: James Valentine, Mickey Madden, Ryan Dusick"
+    },
+    {
+      "id": "f994f5d8-aef0-344e-a0a5-7395464f4dec",
+      "title": "Shiver",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: Adam Levine, Jesse Carmichael"
+    },
+    {
+      "id": "3f7bb3f9-0898-4ec3-a2d9-a352ba95a731",
+      "title": "Moves Like Jagger",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5",
+        "Christina Aguilera"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "c33d5c55-160e-4718-9e6a-e4d6ed3e1ef3",
+      "title": "Payphone",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5",
+        "Wiz Khalifa"
+      ],
+      "detail": "Tác giả: Shellback, Robopop, Ammar Malik"
+    },
+    {
+      "id": "aa889fb4-faf3-3508-b84f-85863fe9f6f2",
+      "title": "Sunday Morning",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: Adam Levine, Jesse Carmichael"
+    },
+    {
+      "id": "4d9a8767-9d46-4ff4-8a69-a587f32901b7",
+      "title": "Maps",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "02269164-9532-3431-82fe-2b603a194775",
+      "title": "She Will Be Loved",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: Adam Levine, James Valentine"
+    },
+    {
+      "id": "9ede0a5b-9468-37d3-b947-263d9e67909f",
+      "title": "Misery",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: Jesse Carmichael, Adam Levine, Sam Farrar"
+    },
+    {
+      "id": "c67523c8-f66d-439c-8591-912aad87a039",
+      "title": "Wasted Years",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "6b441073-515e-3d54-bc67-30f1201bde45",
+      "title": "Harder to Breathe",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "57783f8c-45c4-33e0-b0a8-a2a446a60459",
+      "title": "Not Coming Home",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: Adam Levine, Jesse Carmichael"
+    },
+    {
+      "id": "b5cc9500-ab25-3e6d-8664-d0674e71765e",
+      "title": "Through With You",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: Adam Levine, Jesse Carmichael"
+    },
+    {
+      "id": "ccd06004-2afc-418c-b1a1-26238646cfce",
+      "title": "Memories",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "c4670181-ad3d-4319-b418-8e8907a1bfb0",
+      "title": "Girls Like You",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5",
+        "Cardi B"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "5114b116-7cee-3773-a3c8-f890af7c10c1",
+      "title": "Makes Me Wonder",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: Jesse Carmichael, Adam Levine, Mickey Madden"
+    },
+    {
+      "id": "db7cf0d8-9021-3f9d-93a1-31995522f2d5",
+      "title": "Wake Up Call",
+      "scope": "US_UK",
+      "performers": [
+        "M̸̛̺̯̏̃̑ͅã̴̖̍̄̄r̵̤͙͒̆o̴͎̥̝͝ö̵̙̥̩́̏̍͜n̸̢̼̳͓͗͘ ̴̧͉̯͑̏5̷̜̜̆̌͝"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "bd801d37-70ed-44ee-8836-c72460c5e4cf",
+      "title": "The Sun",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: Adam Levine"
+    },
+    {
+      "id": "5b63b6a3-fc0a-481e-b86f-868cab23f429",
+      "title": "Don’t Wanna Know",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "b205a735-4165-3dcd-87c4-1e94de1dbd3e",
+      "title": "Secret",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: Adam Levine, Jesse Carmichael"
+    },
+    {
+      "id": "9eef6e4f-d7d0-3cb5-8906-b0204853405a",
+      "title": "Won’t Go Home Without You",
+      "scope": "US_UK",
+      "performers": [
+        "Maroon 5"
+      ],
+      "detail": "Tác giả: Adam Levine"
+    },
+    {
+      "id": "73787af6-ba89-34ad-97d6-ee3f206ac661",
+      "title": "In My Place",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "ae256069-b3b1-34a4-88f5-3f2298139c5c",
+      "title": "Trouble",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "62781ea5-0a85-3ece-a8d4-da832131a988",
+      "title": "Yellow",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "4effe07f-4d53-3975-8fa0-18a94559401e",
+      "title": "Clocks",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "852f5686-4c30-36ec-9731-305e24060121",
+      "title": "God Put a Smile Upon Your Face",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "d5d8e2a2-3bcd-3d06-9ae8-3b392b786b52",
+      "title": "Politik",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "06bf7adc-f574-305b-b79a-263d9e99a55a",
+      "title": "The Scientist",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "b36afced-203f-3cb7-b66c-569ba7a3c56d",
+      "title": "Don’t Panic",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "a8daf0fd-927f-3f34-8dd3-2960eea97e4c",
+      "title": "High Speed",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác giả: Chris Martin, Guy Berryman, Jonny Buckland"
+    },
+    {
+      "id": "3df23b8e-4be8-3604-9bda-f7732b6c6b1c",
+      "title": "Shiver",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "afcdfd94-e74b-37d0-a0c1-4d4353a5f6be",
+      "title": "White Shadows",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "13d0d184-daae-3c1c-becc-c8f73dfa5df5",
+      "title": "Everything’s Not Lost",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "135a391b-8779-397f-be3a-5de74e3e0359",
+      "title": "Parachutes",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác giả: Chris Martin, Guy Berryman, Jonny Buckland"
+    },
+    {
+      "id": "5b5ab76f-359b-3f90-be40-71cc9d859da9",
+      "title": "Speed of Sound",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "0943ee45-75e1-36ce-86e7-ac526faad50c",
+      "title": "Spies",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "a9ba1b76-a2f0-4ba8-90b0-b24fc867aadb",
+      "title": "Life Is for Living",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "5f669501-b15d-4185-812a-4e0a57521c26",
+      "title": "See You Soon",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "deda597e-5166-4544-af4b-5f31e78c11bd",
+      "title": "Such a Rush",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "c12c3ba0-e7bc-4b7c-8024-49dca70d62a3",
+      "title": "How You See the World",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "dfddf3a5-2f5c-4e0c-8400-935ac9e6b6b6",
+      "title": "1.36",
+      "scope": "US_UK",
+      "performers": [
+        "Coldplay"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "8bfbb824-ab0d-47e0-b254-71d511d46f6e",
+      "title": "Như một giấc mơ (LIKE A DREAM)",
+      "scope": "VI",
+      "performers": [
+        "Mỹ Tâm"
+      ],
+      "detail": "Vẫn biết vẫn nhớ hay là mong cũng thế thôi · Tác giả: Mỹ Tâm"
+    },
+    {
+      "id": "c804904f-a689-39a1-90fe-4a595631ed79",
+      "title": "Về chốn thiên đường",
+      "scope": "VI",
+      "performers": [
+        "Mỹ Tâm"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "4256ffaf-2f3f-46e0-b45c-886365d7e30a",
+      "title": "Cây đàn sinh viên",
+      "scope": "VI",
+      "performers": [
+        "Mỹ Tâm"
+      ],
+      "detail": "Đời sinh viên có cây đàn ghi ta · Tác giả: Quốc An, Thuận Thiên"
+    },
+    {
+      "id": "76c621b5-9782-483a-a629-e5877fae30fa",
+      "title": "Tình Quê",
+      "scope": "VI",
+      "performers": [
+        "Mỹ Tâm"
+      ],
+      "detail": "Tác giả: Trần Quế Sơn"
+    },
+    {
+      "id": "29c11fea-7d39-45a8-85a4-0b905ba1757b",
+      "title": "Em Chờ Anh",
+      "scope": "VI",
+      "performers": [
+        "Mỹ Tâm"
+      ],
+      "detail": "Tác giả: Lê Quang"
+    },
+    {
+      "id": "3623f3af-2b21-37ff-8b5a-825b815c6f4f",
+      "title": "We Will Rock You",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Brian May",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "dad1c2a9-3d32-319f-bfc8-4783b8731be0",
+      "title": "Crazy Little Thing Called Love",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Freddie Mercury",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "bb356ec2-9032-43e9-b8de-b1b96307edb9",
+      "title": "Brighton Rock",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Brian May",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "0b3da969-5466-3cef-8cbb-bfc882ba9fcf",
+      "title": "We Are the Champions",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Brian May, Freddie Mercury",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "41c94a08-a551-3c86-bb17-d9a52e3a618b",
+      "title": "Bohemian Rhapsody",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Freddie Mercury",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "7c00a7d0-e29c-3afd-aa3d-fc8ed10b9dc3",
+      "title": "Son and Daughter",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Brian May",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "5bcf0d6b-bd37-4fa2-bd0d-6deeec17ed2f",
+      "title": "You Take My Breath Away",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Freddie Mercury",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "48795cf7-ed42-3b76-81d9-94314d562349",
+      "title": "Tie Your Mother Down",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Brian May",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "cae6da82-f797-427b-8447-de4b0c6a08b3",
+      "title": "Staying Power",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Freddie Mercury",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "b0367aa3-7acd-43d1-a0d3-e339e0347442",
+      "title": "Action This Day",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Roger Taylor",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "c783b0b7-cbc4-3be6-89dc-a13883fe5c51",
+      "title": "Jailhouse Rock",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Mike Stoller, Jerry Leiber",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "4ca8aa2d-b1b0-3473-8f0b-2a388054e947",
+      "title": "Lucille",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác phẩm âm nhạc",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "fd9e2746-807e-36f1-b78e-600efc31f57a",
+      "title": "Who Wants to Live Forever?",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Brian May",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "014613a6-910e-3cd5-ae15-7449e03f41e2",
+      "title": "One Vision",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác phẩm âm nhạc",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "f7c9f75a-5456-35ff-b89f-8d5f470a2f13",
+      "title": "Love of My Life",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Freddie Mercury",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "5349ec56-331d-367b-9453-017834bccdb7",
+      "title": "Killer Queen",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Freddie Mercury",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "fa6d714b-4190-3397-bb31-b2dfd52aa8eb",
+      "title": "I Want to Break Free",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: John Deacon",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "cb6c5931-436c-38c5-9d24-044f37d1fe35",
+      "title": "Death on Two Legs (Dedicated To…)",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Freddie Mercury",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "1e807fa4-b844-3222-b7cd-c6cfa773a445",
+      "title": "Hammer to Fall",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác giả: Brian May",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "8543fd6f-ccb8-46c6-b92e-4e26712daafe",
+      "title": "Bijou",
+      "scope": "US_UK",
+      "performers": [
+        "Queen"
+      ],
+      "detail": "Tác phẩm âm nhạc",
+      "artistAliases": [
+        "Queen",
+        "皇后乐队",
+        "クイーン"
+      ]
+    },
+    {
+      "id": "d787fe9b-bc34-47b7-972e-156b503a1105",
+      "title": "Đưa Nhau Đi Trốn",
+      "scope": "VI",
+      "performers": [
+        "Đen",
+        "Linh Cáo"
+      ],
+      "detail": "Tác giả: AN produtions-808lab, Đen",
+      "artistAliases": [
+        "Đen",
+        "Đen Vâu",
+        "Nguyễn Đức Cường"
+      ]
+    },
+    {
+      "id": "fbbbd2b9-98e3-4f67-b652-762208fae4be",
+      "title": "Một thời để nhớ",
+      "scope": "VI",
+      "performers": [
+        "Ngọt Band",
+        "Đen"
+      ],
+      "detail": "Tác giả: Nguyễn Văn Hiên",
+      "artistAliases": [
+        "Đen",
+        "Đen Vâu",
+        "Nguyễn Đức Cường"
+      ]
     }
   ]
 }

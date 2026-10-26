@@ -1,17 +1,18 @@
 'use client';
 import {useEffect,useId,useRef,useState} from 'react';
-import {musicScopeLabel,MUSIC_RESULT_LIMIT,type MusicScope,type SongSuggestion} from '@/lib/musicSearch';
+import {musicScopeLabel,MUSIC_RESULT_LIMIT,hasStrongSongMatch,type MusicScope,type SongSuggestion} from '@/lib/musicSearch';
 import {cachedSongMatches,primeSongCatalog,rememberSongs} from '@/lib/musicCatalogClient';
 import {loadSongMatches} from '@/lib/musicSearchClient';
 
 export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAnswer,selectedTitle}:{scope:MusicScope;roomId?:string;gameToken?:string;disabled?:boolean;onSelect?:(song:SongSuggestion)=>void;onAnswer?:(token:string,song:SongSuggestion)=>Promise<boolean|void>;selectedTitle?:string}) {
+  const isAnswering=!!onAnswer;
   const id=useId();const input=useRef<HTMLInputElement>(null);const submitting=useRef(false);const generation=useRef(0);
-  const pendingSearch=useRef<{controller:AbortController}|null>(null);
+  const pendingSearch=useRef<{controller:AbortController}|null>(null);const completedSearch=useRef('');const completedNotice=useRef('');
   const [query,setQuery]=useState('');const [items,setItems]=useState<SongSuggestion[]>([]);const [selected,setSelected]=useState<SongSuggestion|null>(null);
   const [active,setActive]=useState(-1);const [loading,setLoading]=useState(false);const [error,setError]=useState('');const [sent,setSent]=useState(false);const [busy,setBusy]=useState(false);
   const [waiting,setWaiting]=useState(false);
   const [catalogVersion,setCatalogVersion]=useState(0);const [retry,setRetry]=useState(0);const [forcedTerm,setForcedTerm]=useState('');
-  useEffect(()=>{generation.current++;pendingSearch.current?.controller.abort();pendingSearch.current=null;setQuery('');setSelected(null);setItems([]);setSent(false);setBusy(false);setLoading(false);setWaiting(false);setActive(-1);setError('');submitting.current=false;},[scope,roomId]);
+  useEffect(()=>{generation.current++;pendingSearch.current?.controller.abort();pendingSearch.current=null;completedSearch.current='';completedNotice.current='';setQuery('');setSelected(null);setItems([]);setSent(false);setBusy(false);setLoading(false);setWaiting(false);setActive(-1);setError('');submitting.current=false;},[scope,roomId]);
   useEffect(()=>{if(disabled)pendingSearch.current?.controller.abort();},[disabled]);
   useEffect(()=>()=>{generation.current++;pendingSearch.current?.controller.abort();pendingSearch.current=null;},[]);
   useEffect(()=>{let alive=true;void primeSongCatalog(scope,{roomId,gameToken}).then(()=>{if(alive)setCatalogVersion(v=>v+1);});return ()=>{alive=false;};},[scope,roomId,gameToken]);
@@ -20,7 +21,7 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
     if(disabled||selected||query.trim().length<2){setItems([]);setLoading(false);return ()=>controller.abort();}
     const local=cachedSongMatches(scope,query);const refresh=forcedTerm===query.trim()&&retry>0;
     setItems(local);setActive(-1);setError('');
-    if(local.length&&!refresh){setLoading(false);return ()=>controller.abort();}
+    if(!refresh&&(hasStrongSongMatch(local,query)||completedSearch.current===query.trim())){setLoading(false);if(completedSearch.current===query.trim()&&!hasStrongSongMatch(local,query))setError(completedNotice.current||(!local.length?'Chưa tìm thấy bài trong phạm vi này.':''));return ()=>controller.abort();}
     setLoading(true);setWaiting(false);
     // Let one cold lookup finish while typing continues. Reuse its metadata for
     // the latest query instead of discarding it and competing for the API lease.
@@ -30,10 +31,11 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
       started=true;const requestGeneration=generation.current;const job={controller};pendingSearch.current=job;
       try {
         const params=new URLSearchParams({q:query.trim(),scope});if(roomId)params.set('roomId',roomId);if(refresh)params.set('refresh','1');
-        const found=await loadSongMatches('/api/music/search?'+params,gameToken?{'x-game-token':gameToken}:{},controller.signal,()=>{if(alive)setWaiting(true);});
+        let notice='';
+        const found=await loadSongMatches('/api/music/search?'+params,gameToken?{'x-game-token':gameToken}:{},controller.signal,()=>{if(alive)setWaiting(true);},{onNotice:message=>{notice=message+(!isAnswering?' Bạn có thể chọn kiểu Gõ đáp án hoặc ABCD cho vòng này.':'');}});
         if(requestGeneration===generation.current){
-          rememberSongs(scope,found);
-          if(alive){const merged=[...new Map([...found,...local].map((song:SongSuggestion)=>[song.id,song])).values()] as SongSuggestion[];setItems(merged.slice(0,MUSIC_RESULT_LIMIT));setError(merged.length?'':'Chưa tìm thấy bài trong phạm vi này. Kiểm tra phạm vi nhạc hoặc thử một phần tên bài/ca sĩ khác.');}
+          completedSearch.current=query.trim();completedNotice.current=notice;rememberSongs(scope,found);
+          if(alive){const merged=[...new Map([...found,...local].map((song:SongSuggestion)=>[song.id,song])).values()] as SongSuggestion[];setItems(merged.slice(0,MUSIC_RESULT_LIMIT));setError(notice||(merged.length?'':'Chưa tìm thấy bài trong phạm vi này. Kiểm tra phạm vi nhạc hoặc thử một phần tên bài/ca sĩ khác.'));}
         }
       }catch(cause){if(alive&&!controller.signal.aborted)setError((cause as Error).message);}
       finally{
@@ -42,7 +44,7 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
       }
     },300);
     return ()=>{alive=false;clearTimeout(timer);if(!started)controller.abort();};
-  },[query,scope,roomId,gameToken,disabled,selected,retry,forcedTerm,catalogVersion]);
+  },[query,scope,roomId,gameToken,disabled,selected,retry,forcedTerm,catalogVersion,isAnswering]);
   async function submit(song:SongSuggestion){
     if(!onAnswer||disabled||submitting.current||sent)return;
     const requestGeneration=generation.current;submitting.current=true;setBusy(true);setError('');

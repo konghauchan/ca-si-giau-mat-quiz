@@ -20,14 +20,16 @@ function compactMetadata(entity:MusicEntity,data:MusicMetadata,query:string):Mus
   const ids=new Set([...query.matchAll(/rid:([a-f0-9-]{36})/gi)].map(match=>match[1]));
   return {works:data.works!.slice(0,100).map(w=>({id:w.id,title:w.title,type:w.type,language:w.language,languages:w.languages,disambiguation:w.disambiguation,relations:w.relations?.filter(r=>r.type==='composer'||r.type==='lyricist'||r.type==='performance'&&ids.has(r.recording?.id||'')).slice(0,120).map(r=>({type:r.type,artist:r.artist?{name:r.artist.name}:undefined,recording:r.recording?{id:r.recording.id}:undefined}))}))};
 }
+export const musicMetadataCacheKey=(entity:MusicEntity,query:string,limit:number)=>'music-provider-v1:'+createHash('sha256').update(JSON.stringify([entity,query,limit])).digest('hex');
 // Cache each public metadata step across instances. Waiting clients resume at the
 // first unfinished step instead of repeating artist/recording requests.
 export async function requestMusicMetadata(entity:MusicEntity,query:string,limit:number,store:Store):Promise<MusicMetadata> {
   const now=store.now||Date.now;
-  const key='music-provider-v1:'+createHash('sha256').update(JSON.stringify([entity,query,limit])).digest('hex');
+  const key=musicMetadataCacheKey(entity,query,limit);
   const cached=await store.read(key,now());if(cached)return cached;
   const lease=randomBytes(12).toString('hex');
-  if(!await store.claim(lease,now()+10000,now())){
+  const timeout=entity==='work'?15000:7000;
+  if(!await store.claim(lease,now()+timeout+3000,now())){
     const completed=await store.read(key,now());if(completed)return completed;
     throw new MusicSearchPending();
   }
@@ -35,7 +37,7 @@ export async function requestMusicMetadata(entity:MusicEntity,query:string,limit
   try {
     const url=new URL('https://musicbrainz.org/ws/2/'+entity);
     url.search=new URLSearchParams({query,fmt:'json',limit:String(limit)}).toString();
-    const response=await store.fetch(url,{headers:{'User-Agent':'DoNhacQuiz/1.1 (https://do-nhac.vercel.app)','Accept':'application/json'},signal:AbortSignal.timeout(7000),cache:'no-store'});
+    const response=await store.fetch(url,{headers:{'User-Agent':'DoNhacQuiz/1.1 (https://do-nhac.vercel.app)','Accept':'application/json'},signal:AbortSignal.timeout(timeout),cache:'no-store'});
     nextAt=now()+1100;
     if(response.status===429||response.status===503){nextAt=now()+5000;await response.body?.cancel();throw new MusicSearchPending(5);}
     if(!response.ok)throw new Error('Chưa kết nối được MusicBrainz. Hãy thử lại.');

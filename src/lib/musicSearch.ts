@@ -3,12 +3,12 @@ import { normalizeAnswer } from './core.ts';
 export type MusicScope = 'VI' | 'US_UK';
 export const MUSIC_SCOPES = ['VI', 'US_UK'] as const;
 export const musicScopeLabel = (scope: MusicScope) => scope === 'VI' ? 'Nhạc Việt · tiếng Việt' : 'US–UK · tiếng Anh quốc tế';
-export type SongWork = { id: string; title: string; detail: string; scope: MusicScope; performers?:string[] };
+export type SongWork = { id: string; title: string; detail: string; scope: MusicScope; performers?:string[]; artistAliases?:string[] };
 export type SongSuggestion = SongWork & { token: string };
 export type MusicBrainzWork = { id?: string; title?: string; type?: string; language?: string; languages?: string[]; disambiguation?: string; relations?: Array<{type?:string;artist?:{name?:string};recording?:{id?:string}}> };
 export type MusicBrainzArtist = {id?:string;name?:string;score?:number;aliases?:Array<{name?:string}>};
 export type MusicBrainzRecording = {id?:string;title?:string;'artist-credit'?:Array<{name?:string;artist?:{id?:string;name?:string}}>};
-export const MUSIC_SEARCH_VERSION='shared-metadata-v4';
+export const MUSIC_SEARCH_VERSION='artist-identity-v5';
 export const MUSIC_CATALOG_VERSION='artist-prefix-v3';
 export const MUSIC_RESULT_LIMIT=20;
 const validId=(id:string)=>/^[a-f0-9-]{36}$/i.test(id);
@@ -42,25 +42,48 @@ function scopeFilter(scope:MusicScope) {
   return `lang:${scope === 'VI' ? 'vie' : 'eng'}${scope === 'US_UK' ? ' AND NOT lang:vie' : ''}`;
 }
 export function musicBrainzArtistQuery(query:string) {
+  const words=searchWords(query),phrase=words.join(' '),compact=words.join('');
+  if(!phrase)throw new Error('Nhập tên bài hát hoặc ca sĩ cần tìm.');
+  return `(artist:"${phrase}" OR alias:"${phrase}"${compact!==phrase?` OR artist:"${compact}" OR alias:"${compact}"`:''})`;
+}
+export function musicBrainzArtistFallbackQuery(query:string) {
   const words=searchWords(query),term=searchTerm(query),compact=words.join('');
   const fuzzy=words.map(word=>word.length>=4?word+'~1':word+'*').join(' AND ');
   return `(artist:(${term}) OR alias:(${term}) OR artist:(${fuzzy}) OR alias:(${fuzzy})${words.length>1?` OR artist:${compact}* OR alias:${compact}*`:''})`;
 }
+// Local name/alias evidence outranks the provider's fuzzy relevance score.
+// Prefixes follow word boundaries; fuzzy matching gets one edit for the WHOLE name.
+export function artistNameRank(query:string,name:string):number {
+  return artistTextRank(normalizeMusicSearch(query),normalizeMusicSearch(name));
+}
+export function artistTextRank(term:string,text:string):number {
+  if(!term||!text)return Infinity;
+  const compact=term.replaceAll(' ',''),candidate=text.replaceAll(' ','');
+  if(compact===candidate)return 0;
+  if(text.startsWith(term)||candidate.startsWith(compact))return 1;
+  if(!term.includes(' ')&&text.split(' ').some(word=>word.startsWith(term)))return 2;
+  if(compact.length>=4&&Math.abs(compact.length-candidate.length)<=1&&musicWordMatches(compact,candidate))return 3;
+  return Infinity;
+}
 export function matchingArtist(artists:MusicBrainzArtist[],query:string):MusicBrainzArtist|undefined {
-  const words=searchWords(query),compact=words.join('');
-  return artists.filter(artist=>artist.id&&validId(artist.id)&&[artist.name,...(artist.aliases||[]).map(alias=>alias.name)].some(name=>{
-    const text=normalizeMusicSearch(name||'');
-    return words.every(word=>text.split(' ').some(candidate=>musicWordMatches(word,candidate)))||text.replaceAll(' ','').startsWith(compact);
-  })).sort((a,b)=>Number(b.score||0)-Number(a.score||0))[0];
+  return artists.flatMap(artist=>{
+    if(!artist.id||!validId(artist.id))return [];
+    const rank=Math.min(...[artist.name,...(artist.aliases||[]).map(alias=>alias.name)].filter((name):name is string=>!!name).map(name=>artistNameRank(query,name)));
+    return Number.isFinite(rank)?[{artist,rank}]:[];
+  }).sort((a,b)=>a.rank-b.rank||Number(b.artist.score||0)-Number(a.artist.score||0))[0]?.artist;
+}
+export function hasStrongSongMatch(songs:SongWork[],query:string):boolean {
+  return songs.some(song=>[...(song.performers||[]),...(song.artistAliases||[])].some(name=>Number.isFinite(artistNameRank(query,name))));
 }
 export function musicBrainzRecordingQuery(query:string,artistId?:string) {
   const term=searchTerm(query);
   // Exact artist identity avoids spending all candidate slots on fuzzy names.
   return artistId&&validId(artistId)?`arid:${artistId}`:`(recording:(${term}) OR artist:(${term})^5 OR artistname:(${term})^5)`;
 }
-export function musicBrainzQuery(query: string, scope: MusicScope,recordingIds:string[]=[] ) {
+export function musicBrainzQuery(query: string, scope: MusicScope,recordingIds:string[]=[],linkedOnly=false ) {
   const term=searchTerm(query);
   const ids=[...new Set(recordingIds.filter(validId))].slice(0,100);
+  if(linkedOnly&&ids.length)return `(${ids.map(id=>'rid:'+id).join(' OR ')}) AND ${scopeFilter(scope)}`;
   const title=`(work:(${term}) OR alias:(${term}))`;
   return `${ids.length?`(${title} OR (${ids.map(id=>'rid:'+id).join(' OR ')})^10)`:title} AND ${scopeFilter(scope)}`;
 }
@@ -84,19 +107,28 @@ export function scopedWorks(works: MusicBrainzWork[], scope: MusicScope,recordin
 }
 
 type SearchResponse={artists?:MusicBrainzArtist[];recordings?:MusicBrainzRecording[];works?:MusicBrainzWork[]};
-export async function findMusicBrainzSongs(query:string,scope:MusicScope,request:(entity:'artist'|'recording'|'work',query:string,limit:number)=>Promise<SearchResponse>) {
+export async function findMusicBrainzSongs(query:string,scope:MusicScope,request:(entity:'artist'|'recording'|'work',query:string,limit:number)=>Promise<SearchResponse>,onMissing?:(artist:string,recordings:number)=>void) {
   let artist:MusicBrainzArtist|undefined;
   if(normalizeMusicSearch(query).length>=3){
     const data=await request('artist',musicBrainzArtistQuery(query),5);
     if(!Array.isArray(data.artists))throw new Error('Phản hồi nghệ sĩ MusicBrainz không hợp lệ.');
     artist=matchingArtist(data.artists,query);
+    const exact=artist&&[artist.name,...(artist.aliases||[]).map(alias=>alias.name)].some(name=>!!name&&artistNameRank(query,name)===0);
+    if(!exact){
+      const fallback=await request('artist',musicBrainzArtistFallbackQuery(query),5);
+      if(!Array.isArray(fallback.artists))throw new Error('Phản hồi nghệ sĩ MusicBrainz không hợp lệ.');
+      artist=matchingArtist([...new Map([...data.artists,...fallback.artists].map(artist=>[artist.id,artist])).values()],query);
+    }
   }
   const data=await request('recording',musicBrainzRecordingQuery(query,artist?.id),100);
   if(!Array.isArray(data.recordings))throw new Error('Phản hồi bản thu MusicBrainz không hợp lệ.');
   // Prefer plain studio credits to live/remix variants when choosing a display credit.
   const variant=/\b(live|remix|mix|instrumental|karaoke)\b/i;
   const recordings=[...data.recordings].sort((a,b)=>Number(variant.test(a.title||''))-Number(variant.test(b.title||''))||(a['artist-credit']?.length||0)-(b['artist-credit']?.length||0));
-  const result=await request('work',musicBrainzQuery(artist?.name||query,scope,recordings.flatMap(r=>r.id?[r.id]:[])),100);
+  const result=await request('work',musicBrainzQuery(artist?.name||query,scope,recordings.flatMap(r=>r.id?[r.id]:[]),!!artist),30);
   if(!Array.isArray(result.works))throw new Error('Phản hồi tác phẩm MusicBrainz không hợp lệ.');
-  return scopedWorks(result.works,scope,recordings);
+  const songs=scopedWorks(result.works,scope,recordings);
+  if(!songs.length&&artist?.name)onMissing?.(artist.name,recordings.length);
+  const aliases=artist?[artist.name,...(artist.aliases||[]).map(a=>a.name)].filter((name):name is string=>!!name&&name.length<=120):[];
+  return songs.map(song=>song.performers?.some(name=>aliases.some(alias=>normalizeMusicSearch(alias)===normalizeMusicSearch(name)))?{...song,artistAliases:[...new Set(aliases)].slice(0,30)}:song);
 }

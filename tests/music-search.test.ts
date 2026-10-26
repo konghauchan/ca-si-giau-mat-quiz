@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {musicBrainzQuery,musicBrainzRecordingQuery,musicBrainzArtistQuery,matchingArtist,musicSearchCacheKey,findMusicBrainzSongs,scopedWorks} from '../src/lib/musicSearch.ts';
+import {musicBrainzQuery,musicBrainzRecordingQuery,musicBrainzArtistQuery,musicBrainzArtistFallbackQuery,matchingArtist,musicSearchCacheKey,findMusicBrainzSongs,scopedWorks,hasStrongSongMatch} from '../src/lib/musicSearch.ts';
 import {signSong,readSong} from '../src/lib/songToken.ts';
 const id='00000000-0000-4000-8000-000000000001';
 test('music search uses lyric language, escapes query operators and requires all words',()=>{
@@ -48,7 +48,7 @@ test('artist prefixes tolerate possessives and spacing, with higher relevance wi
   const artists=[{id,name:'Backstreet Girls',score:77},{id:id.replace(/1$/,'2'),name:'Backstreet Boys',score:100}];
   for(const query of ['backstreet','backst',"backstreet's boy",'back street'])assert.equal(matchingArtist(artists,query)?.name,'Backstreet Boys');
   assert.equal(matchingArtist(artists,'as long as you'),undefined);
-  assert.match(musicBrainzArtistQuery('back street'),/artist:backstreet\*/);
+  assert.match(musicBrainzArtistFallbackQuery('back street'),/artist:backstreet\*/);
   assert.doesNotMatch(musicBrainzArtistQuery("backstreet's boy"),/s\*/);
 });
 test('song-title fallback still searches title and returns a scrollable list beyond eight works',async()=>{
@@ -59,7 +59,7 @@ test('song-title fallback still searches title and returns a scrollable list bey
     if(entity==='recording'){assert.match(query,/recording:/);assert.equal(limit,100);return {recordings:[]};}
     assert.match(query,/work:/);return {works};
   });
-  assert.deepEqual(calls,['artist','recording','work']);assert.equal(found.length,20);
+  assert.deepEqual(calls,['artist','artist','recording','work']);assert.equal(found.length,20);
 });
 
 test('real MusicBrainz Backstreet metadata returns twenty songs from a partial artist name',async()=>{
@@ -76,6 +76,42 @@ test('real MusicBrainz Backstreet metadata returns twenty songs from a partial a
 test('Rihana is recognized as Rihanna without hardcoded artist IDs',()=>{
   const artist={id,name:'Rihanna',score:100};
   assert.equal(matchingArtist([artist],'rihana')?.name,'Rihanna');
-  assert.match(musicBrainzArtistQuery('rihana'),/artist:\(rihana~1\)/);
+  assert.match(musicBrainzArtistFallbackQuery('rihana'),/artist:\(rihana~1\)/);
   assert.equal(matchingArtist([artist],'justin bieber'),undefined);
+});
+
+test('exact Vietnamese alias beats a higher-scored fuzzy foreign artist',()=>{
+  const artists=[{id,name:'Denny Vaughn',score:100},{id:id.replace(/1$/,'2'),name:'Đen',aliases:[{name:'Đen Vâu'}],score:77}];
+  assert.equal(matchingArtist(artists,'Đen Vâu')?.name,'Đen');
+  assert.equal(matchingArtist([artists[0]],'Đen Vâu'),undefined);
+  assert.match(musicBrainzArtistQuery('Đen Vâu'),/alias:"den vau"/);
+});
+test('Da LAB does not mean Daly and Labyrinth even with a high provider score',()=>{
+  const wrong={id,name:'Ross Daly & Labyrinth',score:100};
+  const right={id:id.replace(/1$/,'2'),name:'Da LAB',score:70};
+  assert.equal(matchingArtist([wrong,right],'Da LAB')?.name,'Da LAB');
+  assert.equal(matchingArtist([wrong],'Da LAB'),undefined);
+});
+test('a matching title alone never completes an artist search',()=>{
+  const song={id,title:'Queen of My Heart',scope:'US_UK' as const,detail:'',performers:['Westlife']};
+  assert.equal(hasStrongSongMatch([song],'Queen'),false);
+  assert.equal(hasStrongSongMatch([{...song,title:'Queen'}],'Queen'),false);
+  assert.equal(hasStrongSongMatch([song],'Westlife'),true);
+  assert.equal(hasStrongSongMatch([{...song,performers:['Đen'],artistAliases:['Đen Vâu']}],'den vau'),true);
+});
+test('missing scoped works produce an accurate diagnostic rather than invented answer IDs',async()=>{
+  const missing:Array<[string,number]>=[];
+  const result=await findMusicBrainzSongs('Sơn Tùng M-TP','VI',async(entity)=>entity==='artist'?{artists:[{id,name:'Sơn Tùng M-TP'}]}:entity==='recording'?{recordings:[{id,title:'Bài tiếng Việt','artist-credit':[{name:'Sơn Tùng M-TP'}]}]}:{works:[{id,title:'English work',language:'eng'}]},(artist,count)=>missing.push([artist,count]));
+  assert.deepEqual(result,[]);assert.deepEqual(missing,[['Sơn Tùng M-TP',1]]);
+});
+
+test('Queen uses the exact query before any prefix/fuzzy query can override the artist',async()=>{
+  assert.equal(musicBrainzArtistQuery('Queen'),'(artist:"queen" OR alias:"queen")');
+  let artists=0;
+  const found=await findMusicBrainzSongs('Queen','US_UK',async(entity,query)=>{
+    if(entity==='artist'){artists++;return {artists:[{id,name:'Queen',score:100}]};}
+    if(entity==='recording'){assert.equal(query,'arid:'+id);return {recordings:[{id,title:'Bohemian Rhapsody','artist-credit':[{name:'Queen'}]}]};}
+    assert.doesNotMatch(query,/work:queen/);return {works:[{id,title:'Bohemian Rhapsody',language:'eng',relations:[{type:'performance',recording:{id}}]}]};
+  });
+  assert.equal(artists,1);assert.deepEqual(found[0].performers,['Queen']);
 });

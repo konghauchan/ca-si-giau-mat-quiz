@@ -7,7 +7,7 @@ function pause(ms:number,signal:AbortSignal){return new Promise<void>((resolve,r
 });}
 // A shared provider lease is pending work, not an empty list or a failed answer.
 // Bound retries and honor cancellation so an old question cannot keep polling.
-export async function loadSongMatches(url:string,headers:HeadersInit,signal:AbortSignal,onPending:()=>void,options:{fetch?:typeof fetch;pause?:typeof pause;now?:()=>number;maxWaitMs?:number}={}):Promise<SongSuggestion[]> {
+export async function loadSongMatches(url:string,headers:HeadersInit,signal:AbortSignal,onPending:()=>void,options:{fetch?:typeof fetch;pause?:typeof pause;now?:()=>number;maxWaitMs?:number;onNotice?:(message:string)=>void}={}):Promise<SongSuggestion[]> {
   const request=options.fetch||fetch,wait=options.pause||pause,now=options.now||Date.now;
   const deadline=now()+(options.maxWaitMs??20000);
   for(;;){
@@ -20,6 +20,7 @@ export async function loadSongMatches(url:string,headers:HeadersInit,signal:Abor
     }
     if(!response.ok)throw new Error(data.error||'Chưa tìm được bài hát.');
     if(!Array.isArray(data.items))throw new Error('Danh sách bài hát không hợp lệ.');
+    if(typeof data.notice==='string')options.onNotice?.(data.notice);
     return data.items;
   }
 }

@@ -68,3 +68,8 @@ test('public starter catalog finds Justin Bieber and misspelled Rihanna without 
   }
   assert.equal(new Set(defaultSongs.map(song=>song.id)).size,defaultSongs.length);
 });
+
+test('metadata gaps keep the server diagnostic through the client response',async()=>{
+  let notice='';const items=await loadSongMatches('/search',{},new AbortController().signal,()=>{},{fetch:async()=>new Response(JSON.stringify({items:[],notice:'Thiếu liên kết tác phẩm'})),onNotice:value=>notice=value});
+  assert.deepEqual(items,[]);assert.equal(notice,'Thiếu liên kết tác phẩm');
+});

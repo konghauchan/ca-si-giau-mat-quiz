@@ -40,7 +40,7 @@ Nghe chung được thử tiếp sau khi sai; đấu giá và giành quyền qua
 
 ## Tìm theo ca sĩ
 
-- Tìm trong Recording theo tên bài hoặc artist-credit/artistname, rồi lấy các Work liên kết với bản thu để kiểm tra ngôn ngữ. Tìm nghệ sĩ trước nếu có từ 3 ký tự, sau đó Recording và Work. Mỗi bước có cache riêng dùng chung; chỉ gọi MusicBrainz khi bước đó chưa có dữ liệu, cách nhau hơn một giây.
+- Tìm trong Recording theo tên bài hoặc artist-credit/artistname, rồi lấy các Work liên kết với bản thu để kiểm tra ngôn ngữ. Tìm nghệ sĩ bằng tên/alias chính xác trước; chỉ tìm prefix/fuzzy nếu chưa có khớp chính xác, sau đó Recording và Work. Mỗi bước có cache riêng dùng chung; chỉ gọi MusicBrainz khi bước đó chưa có dữ liệu, cách nhau hơn một giây.
 - Ca sĩ lấy từ artist-credit của bản thu, không suy từ tên người sáng tác của Work. Một tác phẩm chỉ hiển thị nhóm ca sĩ của một bản thu phù hợp, tránh gộp các bản cover. Thiếu thông tin sẽ ghi “Chưa có thông tin ca sĩ”.
 - Khi chỉ có một ca sĩ được xác định, phần tạo quiz điền tên đó vào trường nghệ sĩ để người tạo kiểm tra với video YouTube.
 - Mã chấm vẫn là Work MBID nên các quiz đã lưu không phải liên kết lại.
@@ -60,7 +60,7 @@ Nghe chung được thử tiếp sau khi sai; đấu giá và giành quyền qua
 - Chỉ cần một phần tên bài/ca sĩ, ví dụ `backstreet`, `backst`, `backstreet’s boy`, `back street`. Chuẩn hóa riêng cho tìm kiếm; không đổi luật chấm đáp án.
 - Khi cần dữ liệu mới: tìm nghệ sĩ theo tên/alias → lấy tối đa 100 bản thu bằng MBID nghệ sĩ → tìm Work từ các mã bản thu, vẫn lọc theo ngôn ngữ lời. Nếu không nhận diện được nghệ sĩ thì tìm bản thu theo tên bài/ca sĩ như thường.
 - Trả tối đa 20 tác phẩm khác nhau để cuộn chọn; không yêu cầu gõ đủ 100% tên. Hiển thị credit của một bản thu phù hợp; không nối ca sĩ của nhiều bản cover thành một nhóm. Credit song ca thực sự vẫn giữ các ca sĩ trong cùng bản thu.
-- Query cache dùng namespace shared-metadata-v4 để bỏ qua kết quả rỗng cũ; giữ catalog artist-prefix-v3 đã tích lũy. Khóa chung chỉ giữ một HTTP request, tối đa 10 giây (timeout 7 giây). Nếu 429/503 thì cùng chờ 5 giây trước khi thử tiếp, không cache lỗi thành danh sách rỗng. Không vượt giới hạn một request/giây của dịch vụ.
+- Query cache dùng namespace artist-identity-v5 để bỏ qua kết quả rỗng cũ; giữ catalog artist-prefix-v3 đã tích lũy. Khóa chung chỉ giữ một HTTP request: timeout 7 giây cho Artist/Recording, 15 giây cho Work và lease dài hơn timeout 3 giây. Nếu 429/503 thì cùng chờ 5 giây trước khi thử tiếp, không cache lỗi thành danh sách rỗng. Không vượt giới hạn một request/giây của dịch vụ.
 - Danh mục đã tải lọc ngay trên máy; lần tìm nghệ sĩ mới vẫn phụ thuộc độ trễ/khả dụng và độ đầy đủ metadata MusicBrainz. Không cam kết truy vấn lạnh tức thì.
 - Fixture công khai `tests/fixtures/backstreet-search.json` giữ metadata thực đã lấy ngày 26/10/2026 để kiểm tra đúng trường hợp Backstreet; không cần gọi dịch vụ công cộng khi chạy unit test.
 
@@ -71,7 +71,18 @@ Nghe chung được thử tiếp sau khi sai; đấu giá và giành quyền qua
 
 - Tách trạng thái chờ provider (202 / MUSIC_SEARCH_PENDING) khỏi vượt số lượt tìm của một người (429). Client tự cập nhật theo retryAfter, tối đa khoảng 20 giây, dừng khi hết lượt/đổi phòng/phạm vi/unmount. Không cộng thêm thời gian chơi và không gửi đáp án khi mới tìm.
 - Artist, Recording và Work có cache metadata công khai từng bước 24 giờ (rỗng 1 giờ), dùng chung Turso/Vercel. Người chờ tiếp tục từ bước chưa hoàn tất, không lặp lại cả chuỗi. Chỉ lưu trường cần cho tìm và lọc ngôn ngữ, không lưu payload bản phát hành thừa.
-- Danh mục khởi đầu công khai gồm 60 tác phẩm của Justin Bieber, Rihanna, Backstreet Boys, lấy từ MusicBrainz ngày 26/10/2026. Metadata đóng gói cùng server, thêm vào catalog được ký/tải từ lobby; không lấy nội dung từ quiz riêng tư, không chứa token ký sẵn và không gọi provider cho các mục đã có.
+- Danh mục khởi đầu công khai gồm 227 tác phẩm đã kiểm tra của 13 nghệ sĩ/nhóm nhạc, lấy từ MusicBrainz ngày 26/10/2026. Metadata đóng gói cùng server, thêm vào catalog được ký/tải từ lobby; không lấy nội dung từ quiz riêng tư, không chứa token ký sẵn và không gọi provider cho các mục đã có.
 - Tên nghệ sĩ tìm gần đúng một chữ: rihana → Rihanna. Tìm theo tên/alias MusicBrainz và lọc gần đúng trong danh mục đã tải; không hardcode tên sai thành mã nghệ sĩ.
 - Bài mới ngoài danh mục vẫn phụ thuộc API MusicBrainz. 30 tên hoàn toàn mới cùng lúc không thể được bảo đảm tức thì bằng API công cộng; cần tiếp tục mở rộng catalog/chỉ mục riêng cho quy mô đó.
 - Regression gồm khóa provider bị giữ, 503/timeout, chia sẻ một bước metadata cho 30 client, tự cập nhật và hủy polling; API kiểm tra 30 người trong phòng US–UK tìm Justin Bieber/rihana và gửi lựa chọn khi provider đang bị khóa.
+
+
+## Nhận diện nghệ sĩ và dữ liệu thiếu
+
+- Tên và alias khớp chính xác được ưu tiên trước prefix, rồi mới tới sai tối đa một chữ cho toàn bộ tên. Điểm provider chỉ phân xử cùng mức khớp: Đen Vâu phải chọn Đen qua alias; Da LAB không thể là Ross Daly & Labyrinth.
+- Query chính xác tách khỏi query wildcard/fuzzy. Không cộng nhiều boost alias làm nhân vật Queen che mất ban nhạc Queen. Tìm Work của nghệ sĩ theo các mã bản thu đã chọn, không trộn thêm Work có tiêu đề trùng tên nghệ sĩ.
+- Có một tựa bài khớp chưa làm tìm kiếm kết thúc. Cache yếu được hiện ngay nhưng giao diện vẫn tìm thêm; kết quả của nghệ sĩ khớp xếp trước tựa bài khớp một phần. Queen of My Heart không chặn Queen, Cold Water không chặn Coldplay.
+- Alias của nghệ sĩ được đưa vào chỉ mục công khai, không dùng để chấm. Chọn bài vẫn gửi ngay và server chấm Work MBID như trước.
+- Work response giới hạn 30 mục (candidate Recording vẫn 100) để giảm payload quan hệ lớn; hiển thị tối đa 20 bài. Danh mục 227 mục được tải từ lobby, giúp những nghệ sĩ đã chuẩn bị không phụ thuộc truy vấn lạnh khi trả lời.
+- Khi đã nhận đúng nghệ sĩ và có bản thu nhưng không có Work đủ metadata ngôn ngữ, trả notice rõ ràng và giữ nó khi catalog tải xong. Không chế mã Work từ Recording hoặc đoán tiếng Việt theo quốc tịch. Phần tạo hướng dẫn dùng Gõ đáp án/ABCD nếu thiếu dữ liệu nguồn.
+- Kiểm tra thực tế: Queen trả 20 bài đúng ban nhạc; Đen Vâu trả 2 Work hợp lệ. Da LAB có bản thu đúng nghệ sĩ nhưng chưa có Work đủ điều kiện trong lượt kiểm tra; Sơn Tùng M-TP có 36 bản thu, truy vấn Work không lọc ngôn ngữ chỉ tìm thấy COME MY WAY (tiếng Anh), nên không đưa vào Nhạc Việt.
