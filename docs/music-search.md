@@ -7,7 +7,7 @@
    - **US–UK**: tiếng Anh quốc tế (`eng`), gồm cả nghệ sĩ Canada, Úc…; loại tác phẩm đồng thời được gắn `vie` để không trộn nhạc Việt vào nhóm này.
 2. Trong vòng chơi, chọn cách trả lời **Tìm tên bài hát · MusicBrainz**.
 3. Ở từng câu, chọn đáp án từ MusicBrainz. Đáp án chính được điền từ kết quả; nghệ sĩ biểu diễn vẫn nhập riêng. Tên tác giả của tác phẩm không được dùng thay tên ca sĩ.
-4. Người chơi gõ ít nhất hai ký tự, chọn kết quả rồi chốt. Chọn kết quả chưa gửi đáp án.
+4. Người chơi gõ tên bài hoặc ca sĩ với ít nhất hai ký tự, chọn kết quả rồi chốt. Chọn kết quả chưa gửi đáp án.
 
 Nghe chung được thử tiếp sau khi sai; đấu giá và giành quyền qua gợi ý chỉ có một lượt. ABCD và kiểu gõ đáp án vẫn dùng luật hiện có. MusicBrainz cung cấp metadata, YouTube vẫn phát nhạc.
 
@@ -37,3 +37,11 @@ Nghe chung được thử tiếp sau khi sai; đấu giá và giành quyền qua
 - [MusicBrainz search: Work.lang và Recording.country](https://musicbrainz.org/doc/MusicBrainz_API/Search)
 - [Rate limiting](https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting)
 - [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API)
+
+## Tìm theo ca sĩ
+
+- Tìm trong Recording theo tên bài hoặc artist-credit/artistname, rồi lấy các Work liên kết với bản thu để kiểm tra ngôn ngữ. Mỗi truy vấn chưa có cache dùng tối đa hai lần gọi MusicBrainz, cách nhau hơn một giây.
+- Ca sĩ lấy từ artist-credit của bản thu, không suy từ tên người sáng tác của Work. Một tác phẩm có thể hiển thị nhiều ca sĩ từ các bản thu liên kết. Thiếu thông tin sẽ ghi “Chưa có thông tin ca sĩ”.
+- Khi chỉ có một ca sĩ được xác định, phần tạo quiz điền tên đó vào trường nghệ sĩ để người tạo kiểm tra với video YouTube.
+- Mã chấm vẫn là Work MBID nên các quiz đã lưu không phải liên kết lại.
+- Cache/catalog mới dùng namespace performers-v2, không tái sử dụng kết quả cũ thiếu ca sĩ. Chỉ mục metadata công khai gồm tên bài và ca sĩ; giữ nguyên bộ lọc ngôn ngữ và giới hạn API.

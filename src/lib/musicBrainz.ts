@@ -1,7 +1,7 @@
 import {randomBytes,createHash} from 'node:crypto';
 import {db,one,run} from './db';
 import {normalizeAnswer} from './core';
-import {musicBrainzQuery,scopedWorks,type MusicScope,type SongWork,type SongSuggestion} from './musicSearch';
+import {findMusicBrainzSongs,musicSearchCacheKey,MUSIC_SEARCH_VERSION,type MusicScope,type SongWork,type SongSuggestion} from './musicSearch';
 import {signSong,readSong} from './songToken';
 
 const DAY=86400000;
@@ -29,7 +29,7 @@ export async function savedSongToken(id:string,title:string,scope:MusicScope) {
 const inflight=new Map<string,Promise<{items:SongSuggestion[];source:string}>>();
 export async function searchSongs(query:string,scope:MusicScope) {
   const normalized=normalizeAnswer(query);
-  const cacheKey=scope+':'+normalized;
+  const cacheKey=musicSearchCacheKey(query,scope);
   const active=inflight.get(cacheKey);if(active)return active;
   const pending=search(query,normalized,scope,cacheKey);inflight.set(cacheKey,pending);
   try{return await pending;}finally{inflight.delete(cacheKey);}
@@ -39,22 +39,27 @@ async function search(query:string,normalized:string,scope:MusicScope,cacheKey:s
   if(cached)return {items:await suggestions(JSON.parse(String(cached.payload))),source:'cache'};
   // Reuse public provider metadata only. Never index private quiz answers.
   const words=normalized.split(' ').filter(Boolean).slice(0,8);
-  const local=await (await db()).execute({sql:`SELECT id,title,detail FROM music_catalog WHERE scope=? AND updated_at>? ${words.map(()=> 'AND normalized_title LIKE ?').join(' ')} ORDER BY updated_at DESC LIMIT 8`,args:[scope,Date.now()-30*DAY,...words.map(w=>'%'+w+'%')]});
-  const localWorks=local.rows.map(r=>({id:String(r.id),title:String(r.title),detail:String(r.detail),scope}));
+  const catalogScope=MUSIC_SEARCH_VERSION+':'+scope;
+  const local=await (await db()).execute({sql:`SELECT id,title,detail FROM music_catalog WHERE scope=? AND updated_at>? ${words.map(()=> 'AND normalized_title LIKE ?').join(' ')} ORDER BY updated_at DESC LIMIT 8`,args:[catalogScope,Date.now()-30*DAY,...words.map(w=>'%'+w+'%')]});
+  const localWorks:SongWork[]=local.rows.map(r=>{const saved=JSON.parse(String(r.detail));return {id:String(r.id),title:String(r.title),detail:String(saved.detail),performers:Array.isArray(saved.performers)?saved.performers:[],scope};}).sort((a,b)=>Number(!!b.performers?.length)-Number(!!a.performers?.length));
   if(localWorks.length>=8)return {items:await suggestions(localWorks),source:'catalog'};
   // This lease is in Turso, shared across Vercel instances. No unbounded queue.
   const lease=randomBytes(12).toString('hex');const clock=Date.now();
-  const gate=await (await db()).execute({sql:`INSERT INTO music_search_control(id,value,next_at) VALUES('upstream',?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value,next_at=excluded.next_at WHERE music_search_control.next_at<=? RETURNING id`,args:[lease,clock+12000,clock]});
+  const gate=await (await db()).execute({sql:`INSERT INTO music_search_control(id,value,next_at) VALUES('upstream',?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value,next_at=excluded.next_at WHERE music_search_control.next_at<=? RETURNING id`,args:[lease,clock+30000,clock]});
   if(!gate.rows.length){if(localWorks.length)return {items:await suggestions(localWorks),source:'catalog'};throw new MusicSearchBusy();}
   try {
-    const url=new URL('https://musicbrainz.org/ws/2/work');
-    url.search=new URLSearchParams({query:musicBrainzQuery(query,scope),fmt:'json',limit:'15'}).toString();
-    const response=await fetch(url,{headers:{'User-Agent':'DoNhacQuiz/1.0 (https://do-nhac.vercel.app)','Accept':'application/json'},signal:AbortSignal.timeout(7000),cache:'no-store'});
-    if(!response.ok)throw new MusicSearchBusy(response.status===429||response.status===503?5:2);
-    const data=await response.json();if(!Array.isArray(data.works))throw new Error('Phản hồi MusicBrainz không hợp lệ.');
-    const works=scopedWorks(data.works,scope);
+    let lastRequest=0;
+    const works=await findMusicBrainzSongs(query,scope,async(entity,searchQuery,limit)=>{
+      const wait=1100-(Date.now()-lastRequest);if(wait>0)await new Promise(resolve=>setTimeout(resolve,wait));
+      const url=new URL('https://musicbrainz.org/ws/2/'+entity);
+      url.search=new URLSearchParams({query:searchQuery,fmt:'json',limit:String(limit)}).toString();
+      const response=await fetch(url,{headers:{'User-Agent':'DoNhacQuiz/1.0 (https://do-nhac.vercel.app)','Accept':'application/json'},signal:AbortSignal.timeout(7000),cache:'no-store'});
+      lastRequest=Date.now();
+      if(!response.ok)throw new MusicSearchBusy(response.status===429||response.status===503?5:2);
+      return response.json();
+    });
     await run('INSERT INTO music_search_cache(id,payload,expires_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at',cacheKey,JSON.stringify(works),Date.now()+(works.length?7*DAY:3600000));
-    if(works.length)await (await db()).batch(works.map(work=>({sql:'INSERT INTO music_catalog(scope,id,title,detail,normalized_title,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(scope,id) DO UPDATE SET title=excluded.title,detail=excluded.detail,normalized_title=excluded.normalized_title,updated_at=excluded.updated_at',args:[scope,work.id,work.title,work.detail,normalizeAnswer(work.title),Date.now()]})),'write');
+    if(works.length)await (await db()).batch(works.map(work=>({sql:'INSERT INTO music_catalog(scope,id,title,detail,normalized_title,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(scope,id) DO UPDATE SET title=excluded.title,detail=excluded.detail,normalized_title=excluded.normalized_title,updated_at=excluded.updated_at',args:[catalogScope,work.id,work.title,JSON.stringify({detail:work.detail,performers:work.performers||[]}),normalizeAnswer([work.title,...(work.performers||[])].join(' ')),Date.now()]})),'write');
     return {items:await suggestions(works),source:'musicbrainz'};
   }catch(error){
     if(localWorks.length)return {items:await suggestions(localWorks),source:'catalog'};

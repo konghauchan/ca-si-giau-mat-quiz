@@ -11,7 +11,7 @@ async function call(endpoint,body,token='',account=false){const result=await req
 await call('/api/quiz',undefined,'',true);
 const viet=[{id:'00000000-0000-4000-8000-000000000001',title:'Bài thử tiếng Việt',detail:'Tác giả: Kiểm thử',scope:'VI'},{id:'00000000-0000-4000-8000-000000000002',title:'Bài thử tiếng Việt',detail:'Bài trùng tên khác tác giả',scope:'VI'}];
 const english=[{id:'00000000-0000-4000-8000-000000000003',title:'English test song',detail:'Test work',scope:'US_UK'}];
-for(const [scope,items] of [['VI',viet],['US_UK',english]])await db.execute({sql:'INSERT OR REPLACE INTO music_search_cache(id,payload,expires_at) VALUES(?,?,?)',args:[scope+':fixture',JSON.stringify(items),Date.now()+60000]});
+for(const [scope,items] of [['VI',viet],['US_UK',english]])await db.execute({sql:'INSERT OR REPLACE INTO music_search_cache(id,payload,expires_at) VALUES(?,?,?)',args:['performers-v2:'+scope+':fixture',JSON.stringify(items),Date.now()+60000]});
 assert.notEqual((await request('/api/music/search?q=fixture&scope=VI')).status,200);
 const vi=(await call('/api/music/search?q=fixture&scope=VI',undefined,'',true)).items;const en=(await call('/api/music/search?q=fixture&scope=US_UK',undefined,'',true)).items;
 assert.ok(vi.every(s=>s.scope==='VI'));assert.ok(en.every(s=>s.scope==='US_UK'));
