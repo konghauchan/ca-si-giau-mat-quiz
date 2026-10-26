@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS auth_rate_limits (
 CREATE TABLE IF NOT EXISTS quizzes (
   id TEXT PRIMARY KEY, owner_token TEXT NOT NULL, owner_user_id TEXT REFERENCES users(id), title TEXT NOT NULL,
   game_type TEXT NOT NULL DEFAULT 'MUSIC_BID',
+  music_scope TEXT NOT NULL DEFAULT 'VI',
   description TEXT NOT NULL DEFAULT '', visibility TEXT NOT NULL DEFAULT 'private',
   cover_url TEXT,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS topics (
 CREATE TABLE IF NOT EXISTS questions (
   id TEXT PRIMARY KEY, quiz_id TEXT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
   clues_json TEXT NOT NULL DEFAULT '[]',
+  musicbrainz_work_id TEXT,
   order_index INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'music', prompt TEXT NOT NULL,
   reveal_type TEXT NOT NULL DEFAULT 'media_time', reveal_unit TEXT NOT NULL DEFAULT 'seconds',
   reveal_min INTEGER NOT NULL DEFAULT 1, reveal_max INTEGER NOT NULL DEFAULT 10,
@@ -99,3 +101,16 @@ CREATE TABLE IF NOT EXISTS narration_cache (
 CREATE TABLE IF NOT EXISTS narration_usage (
   scope TEXT NOT NULL, day TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(scope,day)
 );
+
+CREATE TABLE IF NOT EXISTS music_search_control (
+  id TEXT PRIMARY KEY, value TEXT NOT NULL, next_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS music_search_cache (
+  id TEXT PRIMARY KEY, payload TEXT NOT NULL, expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS music_catalog (
+  scope TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, detail TEXT NOT NULL,
+  normalized_title TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(scope,id)
+);
+CREATE INDEX IF NOT EXISTS idx_music_search_expiry ON music_search_cache(expires_at);
+CREATE INDEX IF NOT EXISTS idx_music_catalog_scope ON music_catalog(scope,updated_at);

@@ -28,7 +28,8 @@ export const questionSchema = z.object({
   resultStart: z.number().min(0).max(36000).nullable().optional(),
   resultSeconds: z.number().int().min(1).max(60).nullable().optional(),
   titleHintIndices: z.array(z.number().int().min(0).max(119)).max(36).optional(),
-  answerMode: z.enum(['TEXT','CHOICE']).default('TEXT'),
+  searchToken: z.string().max(1200).optional(),
+  answerMode: z.enum(['TEXT','CHOICE','SEARCH']).default('TEXT'),
   distractors: z.array(z.string().trim().min(1).max(120)).max(3).optional(),
   primaryAnswer: z.string().min(1).max(120),
   acceptedAnswers: z.array(z.string().max(120)).max(20),
@@ -48,6 +49,7 @@ export const topicSchema = z.object({
 
 export const quizSchema = z.object({
   id: z.string().uuid().optional(),
+  musicScope: z.enum(['VI','US_UK']).default('VI'),
   coverSourceId: z.string().uuid().optional(),
   gameType: z.enum(['MUSIC_BID', 'SONG_CLUE', 'MUSIC_DUEL', 'FILM_DUEL']).default('MUSIC_BID'),
   title: z.string().min(1).max(100),
@@ -61,6 +63,10 @@ export const quizSchema = z.object({
     if ((quiz.gameType === 'MUSIC_DUEL' || quiz.gameType === 'FILM_DUEL') && q.playMode === 'CLUE' && q.clues?.length !== 6) ctx.addIssue({code:'custom',path:['questions',index,'clues'],message:'Bài này cần đủ 6 gợi ý.'});
     if ((quiz.gameType === 'MUSIC_DUEL' || quiz.gameType === 'FILM_DUEL') && !q.playMode) ctx.addIssue({code:'custom',path:['questions',index,'playMode'],message:'Chọn luật cho vòng chơi.'});
     if (q.titleHintIndices && (new Set(q.titleHintIndices).size !== q.titleHintIndices.length || q.titleHintIndices.length > titleHintLimit(q.primaryAnswer) || q.titleHintIndices.some(i=>!isTitleLetter(titleCharacters(q.primaryAnswer)[i] || '')))) ctx.addIssue({code:'custom',path:['questions',index,'titleHintIndices'],message:'Chữ gợi ý không hợp lệ. Hãy chọn lại chữ trong tên bài hát.'});
+    if(q.answerMode==='SEARCH') {
+      if(quiz.gameType==='FILM_DUEL') ctx.addIssue({code:'custom',path:['questions',index,'answerMode'],message:'Tìm bài hát chỉ dành cho Đọ Nhạc.'});
+      if(!q.searchToken) ctx.addIssue({code:'custom',path:['questions',index,'searchToken'],message:'Chọn đáp án từ MusicBrainz theo phạm vi nhạc của quiz.'});
+    }
     if(q.answerMode==='CHOICE') {
       if(q.distractors?.length!==3) ctx.addIssue({code:'custom',path:['questions',index,'distractors'],message:'Cần nhập đủ 3 đáp án nhiễu.'});
       const labels=[q.primaryAnswer,...(q.distractors||[])].map(normalizeAnswer);

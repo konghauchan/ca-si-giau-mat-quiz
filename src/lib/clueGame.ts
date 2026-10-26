@@ -1,3 +1,5 @@
+import {verifySongSelection} from './musicBrainz';
+import type {MusicScope} from './musicSearch';
 import crypto from 'node:crypto';
 import {choicesForPlayer,type Choice} from './multiplayer';
 import { ROUND_INTRO_MS } from './roundIntro';
@@ -58,12 +60,13 @@ export async function clueCommand(roomId: string, auth: string, action: string, 
     } else if (action === 'buzz') s = claimBuzzer(s, cfg[s.questionIndex], String(p.id), Date.now());
     else if (action === 'nextClue') s = voteClue(s, cfg[s.questionIndex], String(p.id), ids, Date.now());
     else if (action === 'answer') {
-      const supplied=String(value??'').trim().slice(0,120);
+      const supplied=String(value??'').trim().slice(0,q.answer_mode==='SEARCH'?1200:120);
+      const selectedSong=q.answer_mode==='SEARCH'?await verifySongSelection(supplied,String((await one('SELECT music_scope FROM quizzes WHERE id=?',String(r.quiz_id)))?.music_scope||'VI') as MusicScope):undefined;
       const options:Choice[]=JSON.parse(String(q.choice_options||'[]'));const chosen=q.answer_mode==='CHOICE'?options.find(c=>c.id===supplied):undefined;
       if(q.answer_mode==='CHOICE'&&!chosen)throw new Error('Lựa chọn không hợp lệ.');
-      const text=chosen?.label||supplied;if(!text)throw new Error('Nhập đáp án.');
+      const text=selectedSong?.title||chosen?.label||supplied;if(!text)throw new Error('Nhập đáp án.');
       const aliases = await all('SELECT answer FROM accepted_answers WHERE question_id=?', String(q.id));
-      const correct = chosen ? chosen.id===q.correct_choice_id : answerMatches(text, [String(q.primary_answer), ...aliases.map(a => String(a.answer))]);
+      const correct = selectedSong ? selectedSong.id===q.musicbrainz_work_id : chosen ? chosen.id===q.correct_choice_id : answerMatches(text, [String(q.primary_answer), ...aliases.map(a => String(a.answer))]);
       s = q.answer_mode==='CHOICE' ? queueClueAnswer(s,String(p.id),correct,text,Date.now()) : answerClue(s, String(p.id), correct, text, Date.now());
       await run('INSERT INTO answer_attempts(id,room_id,question_index,player_id,amount,text,correct,created_at) VALUES(?,?,?,?,?,?,?,?)', crypto.randomUUID(), roomId, s.questionIndex, String(p.id), s.lockedScore, text, correct ? 1 : 0, Date.now());
       if (correct && q.answer_mode!=='CHOICE') {
@@ -78,7 +81,7 @@ export async function getClueState(roomId: string, auth: string, currentOnly = f
   const head = await one('SELECT phase_ends_at FROM rooms WHERE id=?', roomId);
   if (!currentOnly && head?.phase_ends_at != null && Number(head.phase_ends_at) <= Date.now()) await tickClue(roomId);
   const [rr, pp, qq, ss, vv] = await batchRead([
-    { sql:'SELECT rooms.*,quizzes.title,quizzes.game_type AS quiz_game_type FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?',args:[roomId] },
+    { sql:'SELECT rooms.*,quizzes.title,quizzes.music_scope,quizzes.game_type AS quiz_game_type FROM rooms JOIN quizzes ON quizzes.id=rooms.quiz_id WHERE rooms.id=?',args:[roomId] },
     { sql:'SELECT *,rowid AS seat FROM players WHERE room_id=? ORDER BY score DESC,joined_at,rowid',args:[roomId] },
     { sql:'SELECT questions.* FROM questions JOIN rooms ON rooms.quiz_id=questions.quiz_id WHERE rooms.id=? ORDER BY order_index',args:[roomId] },
     { sql:'SELECT player_id,delta FROM score_events WHERE room_id=? AND question_index=(SELECT question_index FROM rooms WHERE id=?)',args:[roomId,roomId] },
@@ -97,7 +100,7 @@ export async function clueSnapshot(roomId: string, auth: string, r: Row, pp: Row
     clue:{index:s.clueIndex,scores:clues.map(c=>c.score),items:s.phase==='QUESTION_INTRO'||s.phase==='LOBBY'?[]:clues.slice(0,s.clueIndex+1),value:clues[s.clueIndex].score,votes:s.votes.length,hasVoted:s.votes.includes(String(me.id)),requiredVotes:requiredVotes(pp.length-s.eliminated.length),holder:s.holder,lockedScore:s.lockedScore,outcome:s.outcome,answerLocked:!!s.pendingAnswer,submittedAnswer:s.holder===me.id?s.answer:undefined,eliminated:s.eliminated.includes(String(me.id))},
     correctChoiceId: q.answer_mode==='CHOICE' && reveal ? String(q.correct_choice_id) : null,
     choices: q.answer_mode==='CHOICE' && (reveal || (s.phase==='CLUE_ANSWERING' && s.holder===me.id)) ? choicesForPlayer(JSON.parse(String(q.choice_options||'[]')),String(me.id)):[],
-    question:{answerMode:q.answer_mode||'TEXT',id:String(q.id),primaryAnswer:reveal?String(q.primary_answer):undefined,artist:reveal?String(q.artist):undefined,answerSeconds:Number(q.answer_seconds)}};
+    question:{musicScope:r.music_scope||'VI',answerMode:q.answer_mode||'TEXT',id:String(q.id),primaryAnswer:reveal?String(q.primary_answer):undefined,artist:reveal?String(q.artist):undefined,answerSeconds:Number(q.answer_seconds)}};
 }
 
 // Mixed quizzes share the room clock and question order with the music engine.

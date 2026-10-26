@@ -19,8 +19,8 @@ async function initialize(): Promise<Client> {
     try {
       // A deployed function should not run DDL on every cold start. Check the
       // columns it needs with one read, and migrate only an older database.
-      await client.execute(`SELECT q.deleted_at,q.replacement_id,q.cover_url,q.game_type,q.owner_user_id,s.answer_mode,s.choice_options,s.correct_choice_id,s.title_hint_indices,s.clues_json,s.game_round,s.listen_seconds,s.answer_seconds,s.bid_seconds,s.topic_id,s.result_start,s.result_seconds,r.paused_at,r.clue_state,p.ready,p.avatar_id,a.id,u.id,us.token_hash
-        FROM quizzes q,questions s,rooms r,players p,answer_attempts a,users u,user_sessions us,narration_cache nc,narration_usage nu LIMIT 0`);
+      await client.execute(`SELECT q.music_scope,s.musicbrainz_work_id,q.deleted_at,q.replacement_id,q.cover_url,q.game_type,q.owner_user_id,s.answer_mode,s.choice_options,s.correct_choice_id,s.title_hint_indices,s.clues_json,s.game_round,s.listen_seconds,s.answer_seconds,s.bid_seconds,s.topic_id,s.result_start,s.result_seconds,r.paused_at,r.clue_state,p.ready,p.avatar_id,a.id,u.id,us.token_hash
+        FROM quizzes q,questions s,rooms r,players p,answer_attempts a,users u,user_sessions us,narration_cache nc,narration_usage nu,music_search_control msc,music_search_cache mscache,music_catalog mc LIMIT 0`);
       return client;
     } catch (error) {
       if (!/no such (?:table|column)/i.test(String(error))) { client.close(); throw error; }
@@ -37,6 +37,8 @@ async function initialize(): Promise<Client> {
       const columns = (await migration.execute(`PRAGMA table_info(${table})`)).rows;
       if (!columns.some(column => column.name === name)) await migration.execute(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
     }
+    await addColumn('quizzes', 'music_scope', "TEXT NOT NULL DEFAULT 'VI'");
+    await addColumn('questions', 'musicbrainz_work_id', 'TEXT');
     await addColumn('quizzes', 'game_type', "TEXT NOT NULL DEFAULT 'MUSIC_BID'");
     await addColumn('questions', 'answer_mode', "TEXT NOT NULL DEFAULT 'TEXT'");
     await addColumn('questions', 'choice_options', "TEXT NOT NULL DEFAULT '[]'");
