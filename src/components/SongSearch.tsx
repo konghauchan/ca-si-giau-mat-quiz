@@ -16,7 +16,7 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
         const params=new URLSearchParams({q:query.trim(),scope});if(roomId)params.set('roomId',roomId);
         const response=await fetch('/api/music/search?'+params,{headers:gameToken?{'x-game-token':gameToken}:{},signal:controller.signal,cache:'no-store'});
         const data=await response.json();if(!response.ok)throw new Error(data.error||'Chưa tìm được bài hát.');
-        if(alive){setItems(data.items);setError(data.items.length?'':'Chưa tìm thấy bài phù hợp. Thử tên khác hoặc tên đầy đủ có dấu.');}
+        if(alive){setItems(data.items);setError(data.items.length?'':'Chưa tìm thấy bài trong phạm vi này. Kiểm tra phạm vi nhạc hoặc thử tên bài/ca sĩ đầy đủ.');}
       }catch(cause){if(alive&&!controller.signal.aborted)setError((cause as Error).message);}
       finally{if(alive)setLoading(false);}
     },500);
@@ -31,14 +31,14 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
     finally{submitting.current=false;setBusy(false);}
   }
   return <div className="song-search">
-    <div className="field"><label htmlFor={id}>Tìm tên bài hát trên MusicBrainz</label><small>{musicScopeLabel(scope)} · Tìm theo tên bài hát</small>
-      <input ref={input} autoFocus={!!onAnswer} id={id} role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={items.length>0} aria-controls={id+'-list'} aria-activedescendant={active>=0?id+'-option-'+active:undefined} value={query} maxLength={80} disabled={disabled||busy||sent} placeholder="Nhập ít nhất 2 ký tự…" onChange={event=>{setQuery(event.target.value);setSelected(null);setSent(false);}} onKeyDown={event=>{
+    <div className="field"><label htmlFor={id}>Tìm bài hát hoặc ca sĩ trên MusicBrainz</label><small>{musicScopeLabel(scope)} · Tìm theo tên bài hát hoặc ca sĩ</small>
+      <input ref={input} autoFocus={!!onAnswer} id={id} role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={items.length>0} aria-controls={id+'-list'} aria-activedescendant={active>=0?id+'-option-'+active:undefined} value={query} maxLength={80} disabled={disabled||busy||sent} placeholder="Nhập tên bài hát hoặc ca sĩ…" onChange={event=>{setQuery(event.target.value);setSelected(null);setSent(false);}} onKeyDown={event=>{
         if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();setActive(i=>items.length?(event.key==='ArrowDown'?(i+1)%items.length:i<0?items.length-1:(i-1+items.length)%items.length):-1);}
         else if(event.key==='Escape'){setItems([]);setActive(-1);}
         else if(event.key==='Enter'){event.preventDefault();if(active>=0&&items[active])choose(items[active]);else if(selected)void submit();}
       }}/>
     </div>
-    {items.length>0&&<ul className="song-search-results" role="listbox" id={id+'-list'} aria-label="Các bài hát phù hợp">{items.map((song,index)=><li role="option" aria-selected={active===index} id={id+'-option-'+index} key={song.id} className={active===index?'active':''} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(song)}><strong>{song.title}</strong><small>{song.detail}</small></li>)}</ul>}
+    {items.length>0&&<ul className="song-search-results" role="listbox" id={id+'-list'} aria-label="Các bài hát phù hợp">{items.map((song,index)=><li role="option" aria-selected={active===index} id={id+'-option-'+index} key={song.id} className={active===index?'active':''} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(song)}><strong>{song.title}</strong><span className="song-search-performers">{song.performers?.length?`Ca sĩ: ${song.performers.join(', ')}`:"Chưa có thông tin ca sĩ"}</span><small>{song.detail}</small></li>)}</ul>}
     <p className="song-search-status" role="status" aria-live="polite">{sent?'Đã gửi lựa chọn.':loading?'Đang tìm bài hát…':selected?`Đã chọn: ${selected.title}`:selectedTitle?`Đáp án đã liên kết: ${selectedTitle}`:''}</p>
     {error&&<div className="notice info" role="status">{error} <button type="button" className="button ghost" disabled={disabled||loading} onClick={()=>setRetry(v=>v+1)}>Tìm lại</button></div>}
     {onAnswer&&<button type="button" className="button primary big full" disabled={!selected||disabled||busy||sent} onClick={()=>void submit()}>{busy?'Đang gửi…':sent?'Đã gửi đáp án':'Chốt bài hát đã chọn'}</button>}
