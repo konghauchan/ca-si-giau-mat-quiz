@@ -1,9 +1,13 @@
 import {randomBytes,createHash} from 'node:crypto';
 import {db,one,run} from './db';
-import {findMusicBrainzSongs,musicSearchCacheKey,MUSIC_SEARCH_VERSION,MUSIC_RESULT_LIMIT,normalizeMusicSearch,type MusicScope,type SongWork,type SongSuggestion} from './musicSearch';
+import {findMusicBrainzSongs,musicSearchCacheKey,MUSIC_CATALOG_VERSION,MUSIC_RESULT_LIMIT,normalizeMusicSearch,type MusicScope,type SongWork,type SongSuggestion} from './musicSearch';
 import {signSong,readSong} from './songToken';
+import {defaultSongs,defaultSongMatches} from './defaultSongCatalog';
+import {requestMusicMetadata,MusicSearchPending,type MusicMetadata} from './musicProvider';
+export {MusicSearchPending} from './musicProvider';
 
 const DAY=86400000;
+let nextCleanup=0;
 const catalogSnapshots=new Map<MusicScope,{expiresAt:number;promise:Promise<SongSuggestion[]>}>();
 let keyPromise:Promise<string>|undefined;
 export function songSigningKey():Promise<string> {
@@ -13,7 +17,7 @@ export function songSigningKey():Promise<string> {
   })().catch(error=>{keyPromise=undefined;throw error;});
 }
 export class MusicSearchBusy extends Error {
-  constructor(public retryAfter=2){super('Kho tìm kiếm đang bận. Vui lòng thử lại sau ít giây.');}
+  constructor(public retryAfter=2){super('Bạn đang tìm quá nhiều lần. Vui lòng chờ ít giây.');}
 }
 async function suggestions(works:SongWork[]):Promise<SongSuggestion[]> {
   const key=await songSigningKey();return works.map(work=>({...work,token:signSong(work,key)}));
@@ -36,45 +40,34 @@ export async function searchSongs(query:string,scope:MusicScope,refresh=false) {
   try{return await pending;}finally{inflight.delete(inflightKey);}
 }
 async function search(query:string,normalized:string,scope:MusicScope,cacheKey:string,refresh:boolean) {
+  const defaults=defaultSongMatches(query,scope);
+  if(defaults.length&&!refresh)return {items:await suggestions(defaults),source:'catalog'};
   const cached=refresh?null:await one('SELECT payload FROM music_search_cache WHERE id=? AND expires_at>?',cacheKey,Date.now());
   if(cached)return {items:await suggestions(JSON.parse(String(cached.payload))),source:'cache'};
   // Reuse public provider metadata only. Never index private quiz answers.
   const words=normalized.split(' ').filter(Boolean).slice(0,8);
-  const catalogScope=MUSIC_SEARCH_VERSION+':'+scope;
+  const catalogScope=MUSIC_CATALOG_VERSION+':'+scope;
   const local=await (await db()).execute({sql:`SELECT id,title,detail FROM music_catalog WHERE scope=? AND updated_at>? ${words.map(()=> "AND (normalized_title LIKE ? OR REPLACE(normalized_title,' ','') LIKE ?)").join(' ')} ORDER BY updated_at DESC LIMIT ${MUSIC_RESULT_LIMIT}`,args:[catalogScope,Date.now()-30*DAY,...words.flatMap(w=>['%'+w+'%','%'+w+'%'])]});
-  const localWorks:SongWork[]=local.rows.map(r=>{const saved=JSON.parse(String(r.detail));return {id:String(r.id),title:String(r.title),detail:String(saved.detail),performers:Array.isArray(saved.performers)?saved.performers:[],scope};}).sort((a,b)=>Number(!!b.performers?.length)-Number(!!a.performers?.length));
+  const storedWorks:SongWork[]=local.rows.map(r=>{const saved=JSON.parse(String(r.detail));return {id:String(r.id),title:String(r.title),detail:String(saved.detail),performers:Array.isArray(saved.performers)?saved.performers:[],scope};}).sort((a,b)=>Number(!!b.performers?.length)-Number(!!a.performers?.length));
+  const localWorks=[...new Map([...defaults,...storedWorks].map(song=>[song.id,song])).values()].slice(0,MUSIC_RESULT_LIMIT);
   if(localWorks.length&&!refresh)return {items:await suggestions(localWorks),source:'catalog'};
-  // This lease is in Turso, shared across Vercel instances. No unbounded queue.
-  const lease=randomBytes(12).toString('hex');const clock=Date.now();
-  const gate=await (await db()).execute({sql:`INSERT INTO music_search_control(id,value,next_at) VALUES('upstream',?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value,next_at=excluded.next_at WHERE music_search_control.next_at<=? RETURNING id`,args:[lease,clock+45000,clock]});
-  if(!gate.rows.length){if(localWorks.length)return {items:await suggestions(localWorks),source:'catalog'};throw new MusicSearchBusy();}
   try {
-    let lastRequest=0,retriesLeft=1;
-    const works=await findMusicBrainzSongs(query,scope,async(entity,searchQuery,limit)=>{
-      const wait=1100-(Date.now()-lastRequest);if(wait>0)await new Promise(resolve=>setTimeout(resolve,wait));
-      const url=new URL('https://musicbrainz.org/ws/2/'+entity);
-      url.search=new URLSearchParams({query:searchQuery,fmt:'json',limit:String(limit)}).toString();
-      for(;;){
-        const response=await fetch(url,{headers:{'User-Agent':'DoNhacQuiz/1.0 (https://do-nhac.vercel.app)','Accept':'application/json'},signal:AbortSignal.timeout(7000),cache:'no-store'});
-        lastRequest=Date.now();
-        if((response.status===429||response.status===503)&&retriesLeft>0){retriesLeft--;await response.body?.cancel();await new Promise(resolve=>setTimeout(resolve,2000));continue;}
-        if(!response.ok)throw new MusicSearchBusy(response.status===429||response.status===503?5:2);
-        return response.json();
-      }
-    });
+    const works=await findMusicBrainzSongs(query,scope,(entity,searchQuery,limit)=>requestMusicMetadata(entity,searchQuery,limit,{
+      read:async(key,clock)=>{const row=await one('SELECT payload FROM music_search_cache WHERE id=? AND expires_at>?',key,clock);return row?JSON.parse(String(row.payload)) as MusicMetadata:undefined;},
+      claim:async(lease,expiresAt,clock)=>{const gate=await (await db()).execute({sql:`INSERT INTO music_search_control(id,value,next_at) VALUES('upstream',?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value,next_at=excluded.next_at WHERE music_search_control.next_at<=? RETURNING id`,args:[lease,expiresAt,clock]});return !!gate.rows.length;},
+      write:async(key,data,expiresAt)=>run('INSERT INTO music_search_cache(id,payload,expires_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at',key,JSON.stringify(data),expiresAt),
+      release:async(lease,nextAt)=>run("UPDATE music_search_control SET next_at=? WHERE id='upstream' AND value=?",nextAt,lease),
+      fetch,
+    }));
     await run('INSERT INTO music_search_cache(id,payload,expires_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at',cacheKey,JSON.stringify(works),Date.now()+(works.length?7*DAY:3600000));
     if(works.length)await (await db()).batch(works.map(work=>({sql:'INSERT INTO music_catalog(scope,id,title,detail,normalized_title,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(scope,id) DO UPDATE SET title=excluded.title,detail=excluded.detail,normalized_title=excluded.normalized_title,updated_at=excluded.updated_at',args:[catalogScope,work.id,work.title,JSON.stringify({detail:work.detail,performers:work.performers||[]}),normalizeMusicSearch([work.title,...(work.performers||[])].join(' ')),Date.now()]})),'write');
     catalogSnapshots.delete(scope);
+    if(Date.now()>nextCleanup){nextCleanup=Date.now()+60000;await (await db()).batch([{sql:'DELETE FROM music_search_cache WHERE expires_at<?',args:[Date.now()-DAY]},{sql:'DELETE FROM music_catalog WHERE updated_at<?',args:[Date.now()-30*DAY]}],'write');}
     return {items:await suggestions(works),source:'musicbrainz'};
   }catch(error){
     if(localWorks.length)return {items:await suggestions(localWorks),source:'catalog'};
-    if(error instanceof MusicSearchBusy)throw error;
+    if(error instanceof MusicSearchBusy||error instanceof MusicSearchPending)throw error;
     throw new Error('Chưa kết nối được MusicBrainz. Hãy thử lại.');
-  }finally {
-    await run("UPDATE music_search_control SET next_at=? WHERE id='upstream' AND value=?",Date.now()+1100,lease);
-    // Bound expired metadata/cache growth without one write per keystroke.
-    await run('DELETE FROM music_search_cache WHERE expires_at<?',Date.now()-DAY);
-    await run('DELETE FROM music_catalog WHERE updated_at<?',Date.now()-30*DAY);
   }
 }
 export async function limitMusicSearch(identity:string) {
@@ -87,9 +80,10 @@ export async function limitMusicSearch(identity:string) {
 export function publicSongCatalog(scope:MusicScope):Promise<SongSuggestion[]> {
   const current=catalogSnapshots.get(scope);if(current&&current.expiresAt>Date.now())return current.promise;
   const promise=(async()=>{
-    const rows=await (await db()).execute({sql:'SELECT id,title,detail FROM music_catalog WHERE scope=? AND updated_at>? ORDER BY id LIMIT 5000',args:[MUSIC_SEARCH_VERSION+':'+scope,Date.now()-30*DAY]});
+    const rows=await (await db()).execute({sql:'SELECT id,title,detail FROM music_catalog WHERE scope=? AND updated_at>? ORDER BY id LIMIT 5000',args:[MUSIC_CATALOG_VERSION+':'+scope,Date.now()-30*DAY]});
     const works:SongWork[]=rows.rows.map(row=>{const value=JSON.parse(String(row.detail));return {id:String(row.id),title:String(row.title),scope,detail:String(value.detail),performers:Array.isArray(value.performers)?value.performers:[]};});
-    const signed=await suggestions(works);const result:SongSuggestion[]=[];let bytes=0;
+    const combined=[...new Map([...defaultSongs.filter(song=>song.scope===scope),...works].map(song=>[song.id,song])).values()].slice(0,5000);
+    const signed=await suggestions(combined);const result:SongSuggestion[]=[];let bytes=0;
     for(const item of signed){const size=Buffer.byteLength(JSON.stringify(item),'utf8')+1;if(size>65536)continue;if(bytes+size>3*1024*1024)break;bytes+=size;result.push(item);}
     return result;
   })();

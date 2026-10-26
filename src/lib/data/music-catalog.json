@@ -1,0 +1,565 @@
+{
+  "source": {
+    "provider": "MusicBrainz",
+    "url": "https://musicbrainz.org/",
+    "retrievedAt": "2026-10-26",
+    "queries": [
+      "Justin Bieber",
+      "Rihanna",
+      "Backstreet Boys"
+    ]
+  },
+  "songs": [
+    {
+      "id": "ebe8e15d-ec1f-45f7-a7e6-004b3adf8cca",
+      "title": "Boyfriend",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "282c08bb-9bd8-37be-9e36-f816d16f9a48",
+      "title": "Baby",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "63b9a815-fab0-4aaf-80ee-eb92c5bdd179",
+      "title": "Beauty and a Beat",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber",
+        "Nicki Minaj"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "52d1bfba-926e-4bc7-936e-efcff378c5a7",
+      "title": "Let Me Love You",
+      "scope": "US_UK",
+      "performers": [
+        "DJ Snake",
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "1441712f-c9f0-4733-ad7b-da57c26940e7",
+      "title": "Cold Water",
+      "scope": "US_UK",
+      "performers": [
+        "Major Lazer",
+        "Justin Bieber",
+        "MØ"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "f6475e6e-604f-4194-bc48-9defef8dfd74",
+      "title": "Sorry",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "72a791b7-d1c8-4b0b-b080-3795fd0dd300",
+      "title": "Down to Earth",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "a4825619-a6cd-470e-a0c1-3979ee37ff66",
+      "title": "Friends",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber",
+        "BloodPop®"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "c5f491e9-63c7-4ef6-bcb6-7958be7a5743",
+      "title": "Anyone",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "75435bb7-e208-4f7c-a4f5-e120c8c865a7",
+      "title": "Intentions",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "ffa00362-e02d-4637-bc7e-ee8feaa3339c",
+      "title": "Favorite Girl",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác giả: Anesha Birchett, Antea Shelton, Delisha Thomas"
+    },
+    {
+      "id": "2e3d4c26-5708-4182-88e5-deb426bfad23",
+      "title": "U Smile",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "27bac763-63c8-4e71-83ca-32934d217888",
+      "title": "Where Are Ü Now",
+      "scope": "US_UK",
+      "performers": [
+        "Jack Ü",
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "07c72f99-78f6-4f2b-ad84-1cdf6bab8a43",
+      "title": "Peaches",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "00324746-fc24-337b-a9fb-edb8a317be5b",
+      "title": "The Christmas Song",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber",
+        "Usher"
+      ],
+      "detail": "Chestnuts Roasting on an Open Fire · Tác giả: Mel Tormé, Robert Wells"
+    },
+    {
+      "id": "6dc530f2-38ab-433c-8760-7ef733676464",
+      "title": "As Long as You Love Me",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "4ee6c736-b901-499d-9c24-8cabaf29b215",
+      "title": "All That Matters",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác giả: Poo Bear, DK The Punisher, Andre Harris"
+    },
+    {
+      "id": "2ff197c1-bfff-486d-b22d-fb2d95a419cb",
+      "title": "Company",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "4cfb00aa-57f7-48c8-8cbf-352094c058fc",
+      "title": "Wish You Would",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber",
+        "Quavo"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "3a8c1556-e02c-4862-963e-73feb498c406",
+      "title": "Bigger",
+      "scope": "US_UK",
+      "performers": [
+        "Justin Bieber"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "29ea4fd7-7d23-3c95-8758-563622f3a9a2",
+      "title": "Pon de Replay",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "309abfe5-d608-44ee-932b-c6a6fa774e73",
+      "title": "Disturbia",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "51ecbcfc-5b83-408e-b8dd-905f842967bf",
+      "title": "Diamonds",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "79a84f34-1092-3e86-86de-3debcaeeb87d",
+      "title": "Russian Roulette",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "67238dab-b08d-489d-bbd8-294251370c85",
+      "title": "Rude Boy",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "ce4a5217-f510-3faf-a50b-6de840f425e7",
+      "title": "SOS",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác giả: Ed Cobb"
+    },
+    {
+      "id": "2228a437-abfb-41e0-a9c9-b7c44ba262b7",
+      "title": "If It's Lovin' That You Want",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "224e0b37-b622-49f8-92b9-38e48387cd1d",
+      "title": "Where Have You Been",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "76416d53-1e9a-4901-b2d0-f96c7fa89088",
+      "title": "You da One",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "fa23d6f6-58a3-4410-99fa-1e88e2c32174",
+      "title": "Unfaithful",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "e47cf906-a762-4aae-be94-3d5e59a55d29",
+      "title": "Rehab",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "bc334c3b-6dfc-402b-bedc-8f14df8782dc",
+      "title": "Birthday Cake",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "70076392-c768-484e-b109-b61639ae3071",
+      "title": "Dem Haters",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna",
+        "Dwane Husbands"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "a505f520-f503-34e4-9838-a8c459bd0188",
+      "title": "Umbrella",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác giả: Christopher Stewart, The‐Dream, Kuk Harrell"
+    },
+    {
+      "id": "b7c8631c-6544-32c8-9ef3-529b464602a1",
+      "title": "Don’t Stop the Music",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "daddd7a6-9130-3ecc-8e76-cf2e2b54e8bf",
+      "title": "Hard",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna",
+        "Jeezy"
+      ],
+      "detail": "Tác giả: The‐Dream"
+    },
+    {
+      "id": "a4415d15-f783-43a6-a8eb-fddb68013856",
+      "title": "Bitch Better Have My Money",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "4e9dccc6-431a-3eda-8755-41f24bf205eb",
+      "title": "Take a Bow",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "beeea41a-b1db-4066-b0a2-a3f6e91de520",
+      "title": "Good Girl Gone Bad",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "a822b273-3e34-4ff8-8361-7ee4090206f3",
+      "title": "Desperado",
+      "scope": "US_UK",
+      "performers": [
+        "Rihanna"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "cf9ba53c-9ed7-3049-855b-c2a3acada9b4",
+      "title": "We've Got It Goin' On",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "8f5c5482-6b05-3300-91e3-99627b52ee51",
+      "title": "Get Down (You're the One for Me)",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "b99491ac-5129-349d-a8b4-9a090b16fd4a",
+      "title": "The Call",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys",
+        "Clipse"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "1c3c4e98-c9c4-4bf5-8186-54b6781474ce",
+      "title": "Straight Through My Heart",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "40368ba3-3541-43e3-995f-bf08c1143e71",
+      "title": "Drowning",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "1fb7ef05-79b1-35f2-a984-d989f637119b",
+      "title": "Quit Playing Games (With My Heart)",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "bf6b8122-4182-33ea-ae8f-0f1484fdca8a",
+      "title": "I Want It That Way",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác giả: Max Martin, Andreas Carlsson"
+    },
+    {
+      "id": "8be706de-9f40-3b0b-839d-eeed8ad0ee59",
+      "title": "Show Me the Meaning of Being Lonely",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "7509d33c-f5d7-3be7-a332-65fc307aef9d",
+      "title": "Incomplete",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "b6201eee-0767-3167-9f9e-86dccc4ad350",
+      "title": "Everybody (Backstreet’s Back)",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "36e8fe5f-f1d1-4506-be5a-4ffbc3dbc18c",
+      "title": "In a World Like This",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "bde61971-ba98-465f-98f3-29042b315d0e",
+      "title": "The One",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "9e2e3a89-256d-3e25-9d25-f954d8342369",
+      "title": "I’ll Never Break Your Heart",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "6cad1ded-a889-4ad4-a9f3-7b43e4bb06af",
+      "title": "Larger Than Life",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "bcbf05d7-1780-38f0-beb2-78a4f80c7bd4",
+      "title": "10,000 Promises",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "4fcf3ee8-e85f-3e2a-b8aa-5e0adc40f521",
+      "title": "Hey, Mr. DJ (Keep Playin' This Song)",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "39acd781-0382-4f53-b259-af4a45daab1d",
+      "title": "Love Somebody",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "5cd55b52-1f0d-4fee-9e9e-1c25f4bd07da",
+      "title": "Nobody Else",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "00b0271d-9663-4af7-92e9-d19f073b5ad5",
+      "title": "Passionate",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    },
+    {
+      "id": "1b878583-5921-331b-be39-7638aa24a4a6",
+      "title": "More Than That",
+      "scope": "US_UK",
+      "performers": [
+        "Backstreet Boys"
+      ],
+      "detail": "Tác phẩm âm nhạc"
+    }
+  ]
+}
