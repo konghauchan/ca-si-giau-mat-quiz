@@ -41,7 +41,7 @@ def resolve_artist(provider, entry):
     winners = [a for a in exact if int(a.get('score', 0)) == score]
     if len(winners) != 1:
         raise ValueError('Ambiguous artist identity, specify country/type/MBID: ' + name)
-    return {'id': winners[0]['id'], 'name': winners[0]['name'], 'requested': name,
+    return {'id': winners[0]['id'], 'name': winners[0]['name'], 'requested': entry.get('searchName', name),
             'country': winners[0].get('country'), 'disambiguation': winners[0].get('disambiguation', '')}
 
 
@@ -89,6 +89,28 @@ def collect(args):
     state = json.loads(checkpoint.read_text(encoding='utf-8')) if checkpoint.exists() else {'artists': {}, 'songs': {}}
     entries = [(era, entry) for era, group in roster.items() if isinstance(group, list) for entry in group]
     state_lock = threading.Lock()
+    identities_path = state_dir / 'identities.json'
+    identities = json.loads(identities_path.read_text(encoding='utf-8')) if identities_path.exists() else {}
+
+    def identify(pair):
+        _, entry = pair
+        name = entry if isinstance(entry, str) else entry['name']
+        saved = identities.get(name)
+        if saved and saved.get('entry') == entry and saved.get('artist'):
+            return
+        try:
+            report = state['artists'].get(name, {})
+            artist = report.get('artist') or resolve_artist(provider, entry)
+            value = {'entry': entry, 'artist': artist}
+        except ValueError as error:
+            value = {'entry': entry, 'error': str(error)}
+        with state_lock:
+            identities[name] = value
+            bulk.atomic_json(identities_path, identities)
+            print(json.dumps({'identity': name, **value}), flush=True)
+
+    with ThreadPoolExecutor(max_workers=getattr(args, 'workers', 1)) as executor:
+        list(executor.map(identify, entries))
 
     def process_artist(pair):
         era, entry = pair
@@ -99,7 +121,9 @@ def collect(args):
         if report and 'artist' not in report:
             report = None
         try:
-            artist = report['artist'] if report else resolve_artist(provider, entry)
+            if identities[name].get('error'):
+                raise ValueError(identities[name]['error'])
+            artist = report['artist'] if report else identities[name]['artist']
         except ValueError as error:
             with state_lock:
                 print(json.dumps({'artist': name, 'error': str(error)}), flush=True)
@@ -132,10 +156,11 @@ def collect(args):
     with ThreadPoolExecutor(max_workers=getattr(args, 'workers', 1)) as executor:
         list(executor.map(process_artist, entries))
     complete = all(state['artists'].get(entry if isinstance(entry, str) else entry['name'], {}).get('complete') for _, entry in entries)
+    requested_names = {entry if isinstance(entry, str) else entry['name'] for _, entry in entries}
     source = {'provider': 'MusicBrainz', 'url': 'https://musicbrainz.org/', 'license': 'CC0-1.0',
               'retrievedAt': bulk.time.strftime('%Y-%m-%dT%H:%M:%SZ', bulk.time.gmtime()),
               'selection': roster['description'], 'artistsRequested': len(entries), 'complete': complete,
-              'count': len(state['songs']), 'artistReports': state['artists']}
+              'count': len(state['songs']), 'artistReports': {k: v for k, v in state['artists'].items() if k in requested_names}}
     result = {'source': source, 'songs': sorted(state['songs'].values(), key=lambda s: s['id'])}
     bulk.atomic_json(ROOT / args.output, result, line_items=True)
     print(json.dumps({'complete': complete, 'artists': len(entries), 'works': len(result['songs']), 'output': str(args.output)}), flush=True)
