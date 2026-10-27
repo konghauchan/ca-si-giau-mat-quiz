@@ -1,4 +1,4 @@
-import {verifySongSelection} from './musicBrainz';
+import {verifySongSelection} from './songSelections';
 import type {MusicScope} from './musicSearch';
 import crypto from 'node:crypto';
 import {choicesForPlayer,type Choice} from './multiplayer';

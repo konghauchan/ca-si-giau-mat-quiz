@@ -8,9 +8,11 @@ export function indexSongs(songs:SongSuggestion[]):IndexedSong[] {
 export function matchSongs(index:IndexedSong[],query:string,limit=MUSIC_RESULT_LIMIT):SongSuggestion[] {
   const term=normalizeMusicSearch(query);if(term.length<2||limit<=0)return [];
   const words=term.split(' ').filter(Boolean),compactTerm=term.replaceAll(' ','');
+  const artistRanks=new Map<string,number>();
+  function artistRank(name:string){let rank=artistRanks.get(name);if(rank===undefined){rank=artistTextRank(term,name);artistRanks.set(name,rank);}return rank;}
   const buckets:SongSuggestion[][]=Array.from({length:10},()=>[]);
   for(const item of index){
-    const artistMatch=item.artists.some(name=>Number.isFinite(artistTextRank(term,name)));
+    const artistMatch=item.artists.some(name=>Number.isFinite(artistRank(name)));
     const titleMatch=words.every(word=>item.title.includes(word))||item.title.replaceAll(' ','').includes(compactTerm);
     const combined=words.some(word=>item.title.includes(word))&&words.every(word=>item.title.includes(word)||item.artistWords.some(artist=>artist.some(name=>name.startsWith(word))));
     if(!titleMatch&&!artistMatch&&!combined)continue;

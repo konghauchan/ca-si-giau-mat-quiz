@@ -1,7 +1,7 @@
 import {MUSIC_RESULT_LIMIT} from '../src/lib/musicSearch.ts';
 import {performance} from 'node:perf_hooks';
 import {indexSongs,matchSongs} from '../src/lib/songCatalog.ts';
-const songs=Array.from({length:5000},(_,i)=>({id:String(i),title:'Biển nhớ '+i,performers:[i%2?'Trịnh Công Sơn':'Ca sĩ Việt'],scope:'VI',token:'benchmark-'+i,detail:''}));
+const songs=Array.from({length:20000},(_,i)=>({id:String(i),title:'Biển nhớ '+i,performers:[i%2?'Trịnh Công Sơn':'Ca sĩ Việt'],scope:'VI',token:'benchmark-'+i,detail:''}));
 const buildStart=performance.now();const index=indexSongs(songs);const indexMs=performance.now()-buildStart;
 const samples=[];
 for(let i=0;i<300;i++){
