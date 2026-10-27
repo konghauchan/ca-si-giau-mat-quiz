@@ -4,7 +4,7 @@ import {findMusicBrainzSongs,musicSearchCacheKey,MUSIC_CATALOG_VERSION,MUSIC_CAT
 import {signSong} from './songToken';
 import {songSigningKey} from './songSelections';
 export {songSigningKey,verifySongSelection,savedSongToken} from './songSelections';
-import {defaultSongs,defaultSongMatches} from './defaultSongCatalog';
+import {songLibrary,libraryMatches} from './songLibrary';
 import {indexSongs,matchSongs} from './songCatalog';
 import {requestMusicMetadata,MusicSearchPending,type MusicMetadata} from './musicProvider';
 export {MusicSearchPending} from './musicProvider';
@@ -28,7 +28,7 @@ export async function searchSongs(query:string,scope:MusicScope,refresh=false) {
   try{return await pending;}finally{inflight.delete(inflightKey);}
 }
 async function search(query:string,normalized:string,scope:MusicScope,cacheKey:string,refresh:boolean) {
-  const defaults=defaultSongMatches(query,scope);
+  const defaults=await libraryMatches(query,scope);
   if(hasStrongSongMatch(defaults,query)&&!refresh)return {items:await suggestions(defaults),source:'catalog'};
   const cached=refresh?null:await one('SELECT payload FROM music_search_cache WHERE id=? AND expires_at>?',cacheKey,Date.now());
   if(cached){const value=JSON.parse(String(cached.payload));return {items:await suggestions(Array.isArray(value)?value:value.works),source:'cache',notice:value.notice};}
@@ -69,11 +69,11 @@ export async function limitMusicSearch(identity:string) {
 export function publicSongCatalog(scope:MusicScope):Promise<SongSuggestion[]> {
   const current=catalogSnapshots.get(scope);if(current&&current.expiresAt>Date.now())return current.promise;
   const promise=(async()=>{
-    // This bound applies only to the temporary DB cache. All 20,000 shipped
-    // works are merged separately below and do not occupy these cache slots.
+    // Permanent releases are separate from the provider cache's 30-day TTL.
     const rows=await (await db()).execute({sql:'SELECT id,title,detail FROM music_catalog WHERE scope=? AND updated_at>? ORDER BY id LIMIT 5000',args:[MUSIC_CATALOG_VERSION+':'+scope,Date.now()-30*DAY]});
     const works:SongWork[]=rows.rows.map(row=>{const value=JSON.parse(String(row.detail));return {id:String(row.id),title:String(row.title),scope,detail:String(value.detail),performers:Array.isArray(value.performers)?value.performers:[],artistAliases:Array.isArray(value.artistAliases)?value.artistAliases:[]};});
-    const combined=[...new Map([...defaultSongs.filter(song=>song.scope===scope),...works].map(song=>[song.id,song])).values()].slice(0,MUSIC_CATALOG_LIMIT);
+    const library=await songLibrary(scope);
+    const combined=[...new Map([...works,...library.songs].map(song=>[song.id,song])).values()].slice(0,MUSIC_CATALOG_LIMIT);
     return suggestions(combined);
   })();
   const entry={expiresAt:Date.now()+30000,promise};catalogSnapshots.set(scope,entry);
