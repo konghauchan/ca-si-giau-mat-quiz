@@ -1,0 +1,17 @@
+{
+  "publicMetadataOnly": true,
+  "provider": "MusicBrainz",
+  "files": {
+    "checkpoint": {
+      "sha256": "36eeba9a851f851ba09abbce440e2b96619d5bc3d84c677ba4a782b0019d5d22",
+      "bytes": 3207146
+    },
+    "identities": {
+      "sha256": "89480ae05554e1fe14eb8ed01920e6178d06f1f75c1fa6129de5c2be08db9d72",
+      "bytes": 20527
+    }
+  },
+  "completedArtists": 198,
+  "targetArtists": 377,
+  "eligibleWorks": 16047
+}

@@ -107,7 +107,7 @@ def merge_song(previous, incoming):
 def collect(args):
     roster = json.loads((ROOT / args.roster).read_text(encoding='utf-8'))
     state_dir = ROOT / args.state_dir
-    provider = bulk.Provider(state_dir / 'responses')
+    provider = bulk.Provider(state_dir / 'responses', getattr(args, 'delay', 1.2))
     checkpoint = state_dir / 'checkpoint.json'
     state = json.loads(checkpoint.read_text(encoding='utf-8')) if checkpoint.exists() else {'artists': {}, 'songs': {}}
     entries = roster_entries(roster, getattr(args, 'only', None))
@@ -214,6 +214,7 @@ if __name__ == '__main__':
     parser.add_argument('--state-dir', default='data/artist-catalog')
     parser.add_argument('--output', default='data/artist-catalog/expansion.json')
     parser.add_argument('--workers', type=int, choices=range(1, 5), default=4)
+    parser.add_argument('--delay', type=float, default=1.2, help='Minimum seconds between request starts (at least 1.2)')
     parser.add_argument('--only', action='append', help='Collect selected roster artists; may be repeated')
     parser.add_argument('--pages-per-pass', type=int, choices=range(1, 101), default=5, metavar='1..100', help='Yield to the next artist after this many recording pages; every remaining page is still visited')
     collect(parser.parse_args())
