@@ -1,0 +1,25 @@
+{
+  "state": "collecting",
+  "fullComplete": false,
+  "completedArtists": 198,
+  "targetArtists": 377,
+  "collectedWorks": 24749,
+  "eligiblePublishedWorks": 16047,
+  "recordingsScanned": 307295,
+  "updatedAt": "2026-10-27T15:43:15Z",
+  "runId": "40533656647",
+  "files": {
+    "checkpoint": {
+      "sha256": "f277c6abc0d0e1abb0d9ea08485d6a14314fdeb97b2c815c605990a4227d0966",
+      "bytes": 3099451
+    },
+    "identities": {
+      "sha256": "f34c49e2f72d752910e98831f95eede99bf28facd2ada32a3a4eac264a053947",
+      "bytes": 19986
+    },
+    "songs": {
+      "sha256": "ca437d57c858df08d02468662d6c2fb75fbfb25df319187c55ed5b46db46f17d",
+      "bytes": 1925344
+    }
+  }
+}
