@@ -11,7 +11,7 @@ export type MusicBrainzRecording = {id?:string;title?:string;'artist-credit'?:Ar
 export const MUSIC_SEARCH_VERSION='artist-identity-v5';
 export const MUSIC_CATALOG_VERSION='artist-prefix-v3';
 export const MUSIC_RESULT_LIMIT=20;
-export const MUSIC_CATALOG_LIMIT=30000;
+export const MUSIC_CATALOG_LIMIT=100000;
 export const MUSIC_CATALOG_PAGE_SIZE=4000;
 const validId=(id:string)=>/^[a-f0-9-]{36}$/i.test(id);
 // Search normalization is deliberately separate from answer matching/scoring.
