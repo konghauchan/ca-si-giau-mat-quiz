@@ -111,6 +111,9 @@ def collect(args):
     checkpoint = state_dir / 'checkpoint.json'
     state = json.loads(checkpoint.read_text(encoding='utf-8')) if checkpoint.exists() else {'artists': {}, 'songs': {}}
     entries = roster_entries(roster, getattr(args, 'only', None))
+    pages_per_pass = getattr(args, 'pages_per_pass', 5)
+    if not isinstance(pages_per_pass, int) or not 1 <= pages_per_pass <= 100:
+        raise ValueError('pages_per_pass must be between 1 and 100')
     state_lock = threading.Lock()
     identities_path = state_dir / 'identities.json'
     identities = json.loads(identities_path.read_text(encoding='utf-8')) if identities_path.exists() else {}
@@ -157,7 +160,8 @@ def collect(args):
             return
         report = report or {'artist': artist, 'era': era, 'offset': 0, 'works': [], 'recordingsScanned': 0, 'skipped': {}, 'complete': False}
         work_ids = set(report['works'])
-        while not report['complete']:
+        pages = 0
+        while not report['complete'] and pages < pages_per_pass:
             data = provider.get('recording', artist=artist['id'], inc='artist-credits+work-rels', limit=100, offset=report['offset'])
             total = int(data['recording-count'])
             recordings = data['recordings']
@@ -178,8 +182,14 @@ def collect(args):
                 bulk.atomic_json(checkpoint, state)
                 print(json.dumps({'artist': name, 'scanned': report['recordingsScanned'], 'total': total,
                                   'works': len(work_ids), 'uniqueWorks': len(state['songs']), 'requests': provider.requests}), flush=True)
+            pages += 1
     with ThreadPoolExecutor(max_workers=getattr(args, 'workers', 1)) as executor:
-        list(executor.map(process_artist, entries))
+        pending = entries
+        while pending:
+            list(executor.map(process_artist, pending))
+            pending = [pair for pair in pending
+                       if not identities[pair[1] if isinstance(pair[1], str) else pair[1]['name']].get('error')
+                       and not state['artists'].get(pair[1] if isinstance(pair[1], str) else pair[1]['name'], {}).get('complete')]
     complete = all(state['artists'].get(entry if isinstance(entry, str) else entry['name'], {}).get('complete') for _, entry in entries)
     requested_names = {entry if isinstance(entry, str) else entry['name'] for _, entry in entries}
     selected_reports = {k: v for k, v in state['artists'].items() if k in requested_names}
@@ -205,4 +215,5 @@ if __name__ == '__main__':
     parser.add_argument('--output', default='data/artist-catalog/expansion.json')
     parser.add_argument('--workers', type=int, choices=range(1, 5), default=4)
     parser.add_argument('--only', action='append', help='Collect selected roster artists; may be repeated')
+    parser.add_argument('--pages-per-pass', type=int, choices=range(1, 101), default=5, metavar='1..100', help='Yield to the next artist after this many recording pages; every remaining page is still visited')
     collect(parser.parse_args())
