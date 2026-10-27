@@ -1,25 +1,25 @@
 {
   "state": "collecting",
   "fullComplete": false,
-  "completedArtists": 319,
+  "completedArtists": 359,
   "targetArtists": 377,
-  "collectedWorks": 34289,
-  "eligiblePublishedWorks": 26876,
-  "recordingsScanned": 453349,
-  "updatedAt": "2026-10-27T16:37:34Z",
+  "collectedWorks": 37795,
+  "eligiblePublishedWorks": 34568,
+  "recordingsScanned": 553592,
+  "updatedAt": "2026-10-27T17:14:06Z",
   "runId": "40533656647",
   "files": {
     "checkpoint": {
-      "sha256": "8dcdb266ea0346c45183576e6f2ad0430e7dc4f1253e988730b156349ff522ce",
-      "bytes": 4399958
+      "sha256": "2d3bb6757e4e4026823c192b36ec13ff167d47a45aabe18b16e9c53b002f5a9f",
+      "bytes": 4892473
     },
     "identities": {
       "sha256": "f34c49e2f72d752910e98831f95eede99bf28facd2ada32a3a4eac264a053947",
       "bytes": 19986
     },
     "songs": {
-      "sha256": "ec831095f04c3e2d050c66d04ff0a75999c64509d47fad3dbe5d7c2fd8c0b8b8",
-      "bytes": 3321853
+      "sha256": "710b1aa8cce61effc0d10acd4e05230f7faf1c633b0795662341f8cd361b63f0",
+      "bytes": 4306644
     }
   }
 }
