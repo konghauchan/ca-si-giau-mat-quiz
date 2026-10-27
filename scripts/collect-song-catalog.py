@@ -40,7 +40,17 @@ def atomic_json(path, value, line_items=False):
     else:
         rendered = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
     temporary.write_text(rendered, encoding='utf-8')
-    os.replace(temporary, path)
+    # Windows readers/antivirus can briefly deny replacing an open checkpoint.
+    # Retain the previous valid file and retry the atomic rename, never truncate
+    # it or advance the collector past an unsaved page.
+    for attempt in range(12):
+        try:
+            os.replace(temporary, path)
+            break
+        except PermissionError:
+            if attempt == 11:
+                raise
+            time.sleep(min(0.25, 0.05 * (attempt + 1)))
 
 
 class Provider:
