@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createClient,type Client} from '@libsql/client';
 import {prepareLibrary,importLibrary,verifyLibrary,readLibraryScope,LIBRARY_SCHEMA,type LibrarySong} from '../src/lib/songLibraryStore.ts';
+import {extendLibrarySongs} from '../src/lib/extendSongLibrary.ts';
 
 const song=(n:number,scope:'VI'|'US_UK'='US_UK'):LibrarySong=>({id:`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`,title:'Song '+n,scope,detail:'Test',performers:['Artist '+n]});
 test('durable library imports, preserves curated labels/source and is idempotent',async()=>{
@@ -47,4 +48,25 @@ test('rejects malformed and duplicate IDs before connecting to a database',()=>{
   assert.throws(()=>prepareLibrary({songs:[song(1),song(1)]}),/Trùng/);
   assert.throws(()=>prepareLibrary({songs:[{...song(1),id:'bad'}]}),/không hợp lệ/);
   assert.throws(()=>prepareLibrary({songs:[]}),/rỗng/);
+});
+test('artist extension preserves existing works and display credits, adds only proven search aliases',()=>{
+  const old={...song(1),title:'Curated name',artistAliases:['Old alias'],source:{provider:'MusicBrainz',recordingId:song(8).id}};
+  const incoming={...song(1),title:'Other capitalization',performers:['Cover artist'],artistAliases:['Cover artist'],source:{performerCredits:[{artistId:song(9).id,name:'Cover artist',recordingId:song(7).id}]}};
+  const result=extendLibrarySongs([old],[incoming,song(2)]);
+  assert.equal(result.added,1);assert.equal(result.updated,1);
+  assert.equal(result.songs[0].title,old.title);assert.deepEqual(result.songs[0].performers,old.performers);
+  assert.deepEqual(result.songs[0].artistAliases,['Old alias','Cover artist']);
+  assert.equal(extendLibrarySongs(result.songs,[incoming,song(2)]).added,0);
+  assert.throws(()=>extendLibrarySongs([old],[{...incoming,scope:'VI'}]),/khác phạm vi/);
+});
+test('append refuses to replace a release that changed after its base snapshot',async()=>{
+  const client=createClient({url:':memory:'});
+  try{
+    const first=prepareLibrary({songs:[song(1)]});await importLibrary(client,first);
+    const next=prepareLibrary({songs:[song(1),song(2)]});
+    await assert.rejects(importLibrary(client,next,{expectedActiveVersion:'outdated-version'}),/đã thay đổi/);
+    assert.equal((await client.execute('SELECT version FROM song_library_active')).rows[0].version,first.version);
+    assert.equal((await client.execute({sql:'SELECT completed_at FROM song_library_releases WHERE id=?',args:[next.version]})).rows[0].completed_at,null);
+    assert.equal((await importLibrary(client,next,{expectedActiveVersion:first.version})).active,true);
+  }finally{client.close();}
 });

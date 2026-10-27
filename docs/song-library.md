@@ -27,3 +27,25 @@ Mỗi lô chỉ 100 bài, tránh giữ khóa ghi xuyên suốt quá trình nhậ
 Quy trình cập nhật: xuất lại JSON bằng công cụ thu thập, kiểm tra nguồn/ngôn ngữ, chạy thử, nhập Turso, xác minh. Cache danh mục trên server làm mới trong khoảng 30 giây; browser đang mở tải lại danh mục theo TTL tối đa 5 phút hoặc khi tải lại trang. Các bảng `music_catalog` và `music_search_cache` vẫn là cache tạm; việc dọn cache không xóa danh mục lâu dài.
 
 Lưu ý: 20.000 bài gồm danh mục có ngôn ngữ rõ ràng, ưu tiên bảng xếp hạng cộng đồng ListenBrainz và độ phủ bản thu MusicBrainz; không phải bảng xếp hạng 20.000 bài có lượt nghe cao nhất toàn cầu.
+
+## Bổ sung danh mục theo nghệ sĩ
+
+`scripts/artist-catalog-roster.json` là danh sách biên tập 377 nghệ sĩ từ thời kỳ kinh điển đến 27/10/2026, giữ đủ 131 nghệ sĩ ban đầu, gồm cả Britney Spears và các nghệ sĩ Canada/Úc... Mốc thập niên dùng để nhóm theo giai đoạn nổi bật, không phải ngày ra mắt hay xếp hạng; không giới hạn năm phát hành của bài hát. Có thể thêm tên hoặc khai báo `name`, `country`, `type` để phân biệt nghệ sĩ trùng tên. `searchName` thêm tên dễ tìm như “98 Degrees” cho tên chuẩn “98°”.
+
+Metadata `_meta` lưu ngày biên tập và nguồn tham khảo gần đây: Official Charts tuần 23/10/2026, IFPI 2025 và Spotify Wrapped 2025. Chỉ nhận tác phẩm tiếng Anh; không đưa mọi nghệ sĩ toàn cầu trong các bảng xếp hạng vào phạm vi US–UK. Danh sách đầy đủ ở `docs/us-uk-artists-2026.md`.
+
+Chỉ tự chọn thực thể Artist có loại Person/Group và tên hoặc alias khớp chính xác. Không để một kết quả trùng tên chưa có loại nghệ sĩ ghi đè nghệ sĩ thật. Có thể ghim `mbid` kèm `identitySource` khi đã đối chiếu nguồn MusicBrainz, như Miley Cyrus hiện có tên chuẩn MILEY nhưng giữ nguyên mã nghệ sĩ. Cache danh tính có phiên bản; đổi bộ xác minh sẽ kiểm tra lại trước khi dùng. Nếu mã mới khác checkpoint, tác vụ dừng trường hợp đó để rà soát.
+
+```powershell
+python scripts/collect-artist-catalog.py
+node --env-file=.env.local --experimental-strip-types scripts/import-song-library.mjs --append --input=data/artist-catalog/expansion.json --snapshot=data/artist-catalog/merged-library.json
+node --env-file=.env.local --experimental-strip-types scripts/import-song-library.mjs --verify --input=data/artist-catalog/merged-library.json
+```
+
+Các nghệ sĩ trong `_meta.priority` được xếp trước (Britney Spears đầu tiên), sau đó xen kẽ các thời kỳ. Thu thập riêng một nghệ sĩ bằng `--only "Britney Spears"`, hoặc lặp lại `--only` cho một nhóm. Khi đó tệp xuất chỉ chứa tác phẩm của nhóm được chọn, dù dùng chung checkpoint với các nghệ sĩ khác. Dữ liệu đã hoàn tất được tiếp tục từ checkpoint; danh sách mục tiêu không đồng nghĩa toàn bộ danh mục đã được nhập.
+
+Công cụ duyệt tất cả trang bản thu của từng nghệ sĩ, kiểm tra mã nghệ sĩ trong credit, liên kết tác phẩm Song và ngôn ngữ tiếng Anh rõ ràng. Dùng tối đa 4 kết nối đang chờ nhưng có một cổng tốc độ chung: các lần bắt đầu request cách nhau ít nhất 1,2 giây; gặp 503/429 sẽ backoff. Checkpoint/cache cho phép chạy tiếp. Bản thiếu ngôn ngữ hoặc liên kết tác phẩm được thống kê trong `source.artistReports`, không tạo mã giả hay cam kết bao phủ bài chưa có trên MusicBrainz.
+
+Các bản cover cùng tác phẩm vẫn một Work ID. Giữ credit hiển thị hiện có, thêm nghệ sĩ của bản thu khác vào tên có thể tìm kiếm và lưu bằng chứng `source.performerCredits`; không ghép các ca sĩ của hai bản cover thành một bản song ca.
+
+`--append` đọc và xác minh danh mục Turso đang hoạt động, gộp tác phẩm mới, giữ toàn bộ bài cũ và chỉ kích hoạt nếu phiên bản gốc chưa đổi trong lúc nhập. Không lấy JSON 20.000 bài cũ để thay thế danh mục online. Tệp snapshot chứa metadata công khai để đọc lại checksum sau nhập; không chứa khóa. Tổng dung lượng danh mục tối đa hiện tại là 100.000 tác phẩm, phân trang 4.000 bài mỗi request.

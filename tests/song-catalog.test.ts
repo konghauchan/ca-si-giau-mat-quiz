@@ -48,7 +48,7 @@ test('artist matches rank ahead of partial song titles and aliases remain search
   assert.equal(matchSongs(indexSongs([song('wrong','Foreign song',['Denny Vaughn'])]),'den vau').length,0);
 });
 
-test('20,000 songs load progressively through shared pages and remain searchable beyond 5,000',async()=>{
+test('40,000 songs load progressively through shared pages and remain searchable beyond 30,000',async()=>{
   const original=globalThis.fetch;let calls=0,updates=0;
   const unsubscribe=subscribeSongCatalog('US_UK',()=>updates++);
   try {
@@ -57,16 +57,16 @@ test('20,000 songs load progressively through shared pages and remain searchable
       const offset=Number(url.searchParams.get('offset'));calls++;
       assert.equal(url.searchParams.get('roomId'),'bulk-room');
       assert.equal(new Headers(options?.headers).get('x-game-token'),'bulk-player');
-      const items=Array.from({length:1000},(_,i)=>({...song('bulk-'+(offset+i),'Catalog track '+(offset+i),['Catalog artist '+(offset+i)]),scope:'US_UK'}));
-      if(offset===1000)assert.equal(cachedSongMatches('US_UK','Catalog track 999')[0].id,'bulk-999','first page is usable before the rest arrives');
-      return new Response(JSON.stringify({scope:'US_UK',items,total:20000,nextOffset:offset+1000<20000?offset+1000:null}));
+      const items=Array.from({length:4000},(_,i)=>({...song('bulk-'+(offset+i),'Catalog track '+(offset+i),['Catalog artist '+(offset+i)]),scope:'US_UK'}));
+      if(offset===4000)assert.equal(cachedSongMatches('US_UK','Catalog track 3999')[0].id,'bulk-3999','first page is usable before the rest arrives');
+      return new Response(JSON.stringify({scope:'US_UK',items,total:40000,nextOffset:offset+4000<40000?offset+4000:null}));
     };
     await Promise.all(Array.from({length:30},()=>primeSongCatalog('US_UK',{roomId:'bulk-room',gameToken:'bulk-player'})));
-    assert.equal(calls,20);assert.equal(updates,20);
+    assert.equal(calls,10);assert.equal(updates,10);
     assert.equal(cachedSongMatches('US_UK','Catalog track 0')[0].id,'bulk-0');
-    assert.equal(cachedSongMatches('US_UK','Catalog track 19999')[0].id,'bulk-19999');
-    assert.equal(cachedSongMatches('US_UK','Catalog artist 19999')[0].id,'bulk-19999');
-    assert.equal(cachedSongMatches('VI','Catalog track 19999').length,0);
-    unsubscribe();rememberSongs('US_UK',[{...song('bulk-extra','An additional song'),scope:'US_UK'}]);assert.equal(updates,20);
+    assert.equal(cachedSongMatches('US_UK','Catalog track 39999')[0].id,'bulk-39999');
+    assert.equal(cachedSongMatches('US_UK','Catalog artist 39999')[0].id,'bulk-39999');
+    assert.equal(cachedSongMatches('VI','Catalog track 39999').length,0);
+    unsubscribe();rememberSongs('US_UK',[{...song('bulk-extra','An additional song'),scope:'US_UK'}]);assert.equal(updates,10);
   }finally{unsubscribe();globalThis.fetch=original;}
 });

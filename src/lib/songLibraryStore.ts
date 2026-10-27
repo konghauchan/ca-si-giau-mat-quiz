@@ -73,7 +73,7 @@ export async function verifyLibrary(client:Client,prepared:ReturnType<typeof pre
   if(Number(counts.rows[0].count)!==prepared.songs.length||songs.length!==prepared.songs.length||digest(songs)!==prepared.version)throw new Error('Danh mục trong database chưa đầy đủ hoặc sai checksum; chưa kích hoạt.');
   return {version:prepared.version,total:songs.length,counts:prepared.counts,checksum:prepared.version};
 }
-export async function importLibrary(client:Client,prepared:ReturnType<typeof prepareLibrary>,options:{batchSize?:number;onProgress?:(done:number,total:number)=>void}={}) {
+export async function importLibrary(client:Client,prepared:ReturnType<typeof prepareLibrary>,options:{batchSize?:number;onProgress?:(done:number,total:number)=>void;expectedActiveVersion?:string|null}={}) {
   const batchSize=options.batchSize??100;
   if(!Number.isInteger(batchSize)||batchSize<1||batchSize>250)throw new Error('Kích thước lô phải từ 1 đến 250.');
   await client.executeMultiple(LIBRARY_SCHEMA);
@@ -93,9 +93,12 @@ export async function importLibrary(client:Client,prepared:ReturnType<typeof pre
     options.onProgress?.(Math.min(offset+batchSize,prepared.songs.length),prepared.songs.length);
   }
   const report=await verifyLibrary(client,prepared);
-  await write(client,[
-    {sql:'UPDATE song_library_releases SET completed_at=? WHERE id=?',args:[Date.now(),prepared.version]},
-    {sql:"INSERT INTO song_library_active(id,version) VALUES('active',?) ON CONFLICT(id) DO UPDATE SET version=excluded.version",args:[prepared.version]}
+  const activation=options.expectedActiveVersion===undefined
+    ?{sql:"INSERT INTO song_library_active(id,version) VALUES('active',?) ON CONFLICT(id) DO UPDATE SET version=excluded.version RETURNING version",args:[prepared.version]}
+    :{sql:"INSERT INTO song_library_active(id,version) SELECT 'active',? WHERE (? IS NULL AND NOT EXISTS(SELECT 1 FROM song_library_active)) OR EXISTS(SELECT 1 FROM song_library_active WHERE version=?) ON CONFLICT(id) DO UPDATE SET version=excluded.version RETURNING version",args:[prepared.version,options.expectedActiveVersion,options.expectedActiveVersion]};
+  const published=await write(client,[activation,
+    {sql:"UPDATE song_library_releases SET completed_at=? WHERE id=? AND EXISTS(SELECT 1 FROM song_library_active WHERE version=?)",args:[Date.now(),prepared.version,prepared.version]}
   ]);
+  if(!published[0].rows.length)throw new Error('Danh mục đang hoạt động đã thay đổi trong lúc nhập. Hãy chạy lại để gộp dữ liệu mới nhất.');
   return {...report,alreadyImported:false,active:true};
 }

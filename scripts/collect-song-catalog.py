@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import time
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -46,6 +47,7 @@ class Provider:
     def __init__(self, cache, delay=1.2):
         self.cache, self.delay, self.next_at = cache, max(1.2, delay), 0
         self.requests = 0
+        self.schedule_lock = threading.Lock()
 
     def get(self, entity, **params):
         params['fmt'] = 'json'
@@ -57,8 +59,12 @@ class Provider:
         if path.exists():
             return json.loads(path.read_text(encoding='utf-8'))
         for attempt in range(7):
-            time.sleep(max(0, self.next_at - time.monotonic()))
-            self.requests += 1
+            # One global start gate, including when the artist importer uses
+            # bounded concurrent I/O. Never burst requests to MusicBrainz.
+            with self.schedule_lock:
+                time.sleep(max(0, self.next_at - time.monotonic()))
+                self.next_at = time.monotonic() + self.delay
+                self.requests += 1
             try:
                 request = urllib.request.Request(url, headers={
                     'User-Agent': 'DoNhacCatalog/1.0 (https://github.com/konghauchan/ca-si-giau-mat-quiz)',
@@ -71,12 +77,12 @@ class Provider:
                 if not isinstance(container.get(field), list):
                     raise ValueError('Invalid provider response for ' + field)
                 atomic_json(path, value)
-                self.next_at = time.monotonic() + self.delay
                 return value
             except (urllib.error.URLError, TimeoutError, ValueError, OSError) as error:
                 if isinstance(error, urllib.error.HTTPError) and error.code not in (408, 429, 500, 502, 503, 504):
                     raise
-                self.next_at = time.monotonic() + min(120, 3 * 2 ** attempt)
+                with self.schedule_lock:
+                    self.next_at = max(self.next_at, time.monotonic() + min(120, 3 * 2 ** attempt))
                 print(json.dumps({'retry': attempt + 1, 'field': field, 'error': str(error)}, ensure_ascii=True), flush=True)
                 if attempt == 6:
                     raise
