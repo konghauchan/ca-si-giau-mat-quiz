@@ -34,6 +34,8 @@ Lưu ý: 20.000 bài gồm danh mục có ngôn ngữ rõ ràng, ưu tiên bản
 
 Metadata `_meta` lưu ngày biên tập và nguồn tham khảo gần đây: Official Charts tuần 23/10/2026, IFPI 2025 và Spotify Wrapped 2025. Chỉ nhận tác phẩm tiếng Anh; không đưa mọi nghệ sĩ toàn cầu trong các bảng xếp hạng vào phạm vi US–UK. Danh sách đầy đủ ở `docs/us-uk-artists-2026.md`.
 
+Chỉ tự chọn thực thể Artist có loại Person/Group và tên hoặc alias khớp chính xác. Không để một kết quả trùng tên chưa có loại nghệ sĩ ghi đè nghệ sĩ thật. Có thể ghim `mbid` kèm `identitySource` khi đã đối chiếu nguồn MusicBrainz, như Miley Cyrus hiện có tên chuẩn MILEY nhưng giữ nguyên mã nghệ sĩ. Cache danh tính có phiên bản; đổi bộ xác minh sẽ kiểm tra lại trước khi dùng. Nếu mã mới khác checkpoint, tác vụ dừng trường hợp đó để rà soát.
+
 ```powershell
 python scripts/collect-artist-catalog.py
 node --env-file=.env.local --experimental-strip-types scripts/import-song-library.mjs --append --input=data/artist-catalog/expansion.json --snapshot=data/artist-catalog/merged-library.json

@@ -83,11 +83,20 @@ class ArtistCatalogTest(unittest.TestCase):
     def test_exact_identity_required_ambiguous_artist_is_never_guessed(self):
         class Fake:
             def get(self, *a, **kw):
-                return {'artists': [{'id': ARTIST, 'name': 'Blue', 'score': 100}, {'id': WORK, 'name': 'Blue', 'score': 100}]}
+                return {'artists': [{'id': ARTIST, 'name': 'Blue', 'type':'Group','score': 100}, {'id': WORK, 'name': 'Blue','type':'Group', 'score': 100}]}
         with self.assertRaisesRegex(ValueError, 'Ambiguous'):
             c.resolve_artist(Fake(), 'Blue')
         with self.assertRaisesRegex(ValueError, 'No exact'):
             c.resolve_artist(Fake(), 'Wrong name')
+
+    def test_untyped_homonym_cannot_override_a_renamed_artist_alias(self):
+        class Fake:
+            def get(self,*args,**params):
+                wrong={'id':WORK,'name':'Miley Cyrus','score':100,'disambiguation':'7FORM alias'}
+                real={'id':ARTIST,'name':'MILEY','type':'Person','country':'US','score':82,'aliases':[{'name':'Miley Cyrus'}]}
+                return {'artists':[wrong] if params['query'].startswith('artist:') else [wrong,real]}
+        self.assertEqual(c.resolve_artist(Fake(),'Miley Cyrus')['id'],ARTIST)
+        self.assertEqual(c.resolve_artist(Fake(),{'name':'Miley Cyrus','mbid':ARTIST,'country':'US','type':'Person'})['id'],ARTIST)
 
     def test_all_pages_are_visited_and_completed_artist_resumes_without_network(self):
         recording = self.recording()
@@ -100,7 +109,7 @@ class ArtistCatalogTest(unittest.TestCase):
             def get(self, entity, **params):
                 calls.append((entity, params.get('offset')))
                 if entity == 'artist':
-                    return {'artists': [{'id': ARTIST, 'name': 'Actual singer', 'score': 100}]}
+                    return {'artists': [{'id': ARTIST, 'name': 'Actual singer', 'type':'Person','score': 100}]}
                 return {'recording-count': 101, 'recordings': [recording] * (100 if params['offset'] == 0 else 1)}
 
         test_root = Path(__file__).resolve().parents[1] / 'data'

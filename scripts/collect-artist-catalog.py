@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('bulk_collector', ROOT / 'scripts/collect-song-catalog.py')
 bulk = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bulk)
+RESOLVER_VERSION = 2
 
 
 def normalized(value):
@@ -43,15 +44,20 @@ def resolve_artist(provider, entry):
     entry = {'name': entry} if isinstance(entry, str) else entry
     name = entry['name']
     escaped = name.replace('\\', '\\\\').replace('"', '\\"')
-    query = 'artist:"' + escaped + '"'
-    for key in ('country', 'type'):
-        if entry.get(key):
-            query += ' AND ' + key + ':' + entry[key]
-    candidates = provider.get('artist', query=query, limit=25)['artists']
-    exact = [a for a in candidates if bulk.UUID.fullmatch(a.get('id', '')) and
-             any(normalized(v) == normalized(name) for v in [a.get('name', '')] + [x.get('name', '') for x in a.get('aliases', [])]) and
-             (not entry.get('country') or a.get('country') == entry['country']) and
-             (not entry.get('type') or a.get('type') == entry['type'])]
+    pinned = entry.get('mbid')
+    if pinned and not bulk.UUID.fullmatch(pinned):
+        raise ValueError('Invalid pinned artist MBID: ' + name)
+    suffix = ''.join(' AND ' + key + ':' + entry[key] for key in ('country', 'type') if entry.get(key))
+    queries = ['arid:' + pinned] if pinned else ['artist:"' + escaped + '"' + suffix, '"' + escaped + '"' + suffix]
+    exact = []
+    for query in queries:
+        candidates = provider.get('artist', query=query, limit=25)['artists']
+        exact = [a for a in candidates if bulk.UUID.fullmatch(a.get('id', '')) and a.get('type') in ('Person', 'Group') and
+                 ((a['id'] == pinned) if pinned else any(normalized(v) == normalized(name) for v in [a.get('name', '')] + [x.get('name', '') for x in a.get('aliases', [])])) and
+                 (not entry.get('country') or a.get('country') == entry['country']) and
+                 (not entry.get('type') or a.get('type') == entry['type'])]
+        if exact:
+            break
     if not exact:
         raise ValueError('No exact artist identity: ' + name)
     score = max(int(a.get('score', 0)) for a in exact)
@@ -59,7 +65,7 @@ def resolve_artist(provider, entry):
     if len(winners) != 1:
         raise ValueError('Ambiguous artist identity, specify country/type/MBID: ' + name)
     return {'id': winners[0]['id'], 'name': winners[0]['name'], 'requested': entry.get('searchName', name),
-            'country': winners[0].get('country'), 'disambiguation': winners[0].get('disambiguation', '')}
+            'country': winners[0].get('country'), 'type': winners[0]['type'], 'disambiguation': winners[0].get('disambiguation', '')}
 
 
 def recording_songs(recording, artist):
@@ -113,12 +119,14 @@ def collect(args):
         _, entry = pair
         name = entry if isinstance(entry, str) else entry['name']
         saved = identities.get(name)
-        if saved and saved.get('entry') == entry and saved.get('artist'):
+        if saved and saved.get('entry') == entry and saved.get('artist') and saved.get('resolverVersion') == RESOLVER_VERSION:
             return
         try:
             report = state['artists'].get(name, {})
-            artist = (report.get('artist') if not saved else None) or resolve_artist(provider, entry)
-            value = {'entry': entry, 'artist': artist}
+            artist = resolve_artist(provider, entry)
+            if report.get('artist') and report['artist']['id'] != artist['id']:
+                raise ValueError('Artist identity changed; review existing checkpoint: ' + name)
+            value = {'entry': entry, 'artist': artist, 'resolverVersion': RESOLVER_VERSION}
         except ValueError as error:
             value = {'entry': entry, 'error': str(error)}
         with state_lock:
