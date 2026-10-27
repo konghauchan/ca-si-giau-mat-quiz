@@ -1,7 +1,9 @@
-import {randomBytes,createHash} from 'node:crypto';
+import {createHash} from 'node:crypto';
 import {db,one,run} from './db';
-import {findMusicBrainzSongs,musicSearchCacheKey,MUSIC_CATALOG_VERSION,MUSIC_RESULT_LIMIT,normalizeMusicSearch,hasStrongSongMatch,type MusicScope,type SongWork,type SongSuggestion} from './musicSearch';
-import {signSong,readSong} from './songToken';
+import {findMusicBrainzSongs,musicSearchCacheKey,MUSIC_CATALOG_VERSION,MUSIC_CATALOG_LIMIT,MUSIC_CATALOG_PAGE_SIZE,MUSIC_RESULT_LIMIT,normalizeMusicSearch,hasStrongSongMatch,type MusicScope,type SongWork,type SongSuggestion} from './musicSearch';
+import {signSong} from './songToken';
+import {songSigningKey} from './songSelections';
+export {songSigningKey,verifySongSelection,savedSongToken} from './songSelections';
 import {defaultSongs,defaultSongMatches} from './defaultSongCatalog';
 import {indexSongs,matchSongs} from './songCatalog';
 import {requestMusicMetadata,MusicSearchPending,type MusicMetadata} from './musicProvider';
@@ -10,26 +12,11 @@ export {MusicSearchPending} from './musicProvider';
 const DAY=86400000;
 let nextCleanup=0;
 const catalogSnapshots=new Map<MusicScope,{expiresAt:number;promise:Promise<SongSuggestion[]>}>();
-let keyPromise:Promise<string>|undefined;
-export function songSigningKey():Promise<string> {
-  return keyPromise??= (async()=>{
-    await run('INSERT OR IGNORE INTO music_search_control(id,value,next_at) VALUES(?,?,0)','signing-key',randomBytes(32).toString('hex'));
-    return String((await one('SELECT value FROM music_search_control WHERE id=?','signing-key'))!.value);
-  })().catch(error=>{keyPromise=undefined;throw error;});
-}
 export class MusicSearchBusy extends Error {
   constructor(public retryAfter=2){super('Bạn đang tìm quá nhiều lần. Vui lòng chờ ít giây.');}
 }
 async function suggestions(works:SongWork[]):Promise<SongSuggestion[]> {
   const key=await songSigningKey();return works.map(work=>({...work,token:signSong(work,key)}));
-}
-export async function verifySongSelection(token:string,scope:MusicScope) {
-  const song=readSong(token,await songSigningKey());
-  if(song.scope!==scope)throw new Error('Bài hát không thuộc phạm vi nhạc của quiz. Hãy chọn lại bài.');
-  return song;
-}
-export async function savedSongToken(id:string,title:string,scope:MusicScope) {
-  return signSong({id,title,scope,detail:''},await songSigningKey());
 }
 const inflight=new Map<string,Promise<{items:SongSuggestion[];source:string;notice?:string}>>();
 export async function searchSongs(query:string,scope:MusicScope,refresh=false) {
@@ -82,14 +69,29 @@ export async function limitMusicSearch(identity:string) {
 export function publicSongCatalog(scope:MusicScope):Promise<SongSuggestion[]> {
   const current=catalogSnapshots.get(scope);if(current&&current.expiresAt>Date.now())return current.promise;
   const promise=(async()=>{
+    // This bound applies only to the temporary DB cache. All 20,000 shipped
+    // works are merged separately below and do not occupy these cache slots.
     const rows=await (await db()).execute({sql:'SELECT id,title,detail FROM music_catalog WHERE scope=? AND updated_at>? ORDER BY id LIMIT 5000',args:[MUSIC_CATALOG_VERSION+':'+scope,Date.now()-30*DAY]});
     const works:SongWork[]=rows.rows.map(row=>{const value=JSON.parse(String(row.detail));return {id:String(row.id),title:String(row.title),scope,detail:String(value.detail),performers:Array.isArray(value.performers)?value.performers:[],artistAliases:Array.isArray(value.artistAliases)?value.artistAliases:[]};});
-    const combined=[...new Map([...defaultSongs.filter(song=>song.scope===scope),...works].map(song=>[song.id,song])).values()].slice(0,5000);
-    const signed=await suggestions(combined);const result:SongSuggestion[]=[];let bytes=0;
-    for(const item of signed){const size=Buffer.byteLength(JSON.stringify(item),'utf8')+1;if(size>65536)continue;if(bytes+size>3*1024*1024)break;bytes+=size;result.push(item);}
-    return result;
+    const combined=[...new Map([...defaultSongs.filter(song=>song.scope===scope),...works].map(song=>[song.id,song])).values()].slice(0,MUSIC_CATALOG_LIMIT);
+    return suggestions(combined);
   })();
   const entry={expiresAt:Date.now()+30000,promise};catalogSnapshots.set(scope,entry);
   void promise.catch(()=>{if(catalogSnapshots.get(scope)===entry)catalogSnapshots.delete(scope);});
   return promise;
+}
+
+// Each response stays below Vercel's payload limit. The complete catalog must
+// not be silently truncated at the old 5,000-song / 3 MB boundary.
+export async function publicSongCatalogPage(scope:MusicScope,offset=0,limit=MUSIC_CATALOG_PAGE_SIZE) {
+  const songs=await publicSongCatalog(scope);
+  const items:SongSuggestion[]=[];let bytes=0;
+  const end=Math.min(songs.length,offset+limit);
+  for(let i=offset;i<end;i++){
+    const song=songs[i];const size=Buffer.byteLength(JSON.stringify(song),'utf8')+1;
+    if(bytes+size>3*1024*1024)break;
+    items.push(song);bytes+=size;
+  }
+  const next=offset+items.length;
+  return {scope,items,total:songs.length,nextOffset:next<songs.length?next:null};
 }

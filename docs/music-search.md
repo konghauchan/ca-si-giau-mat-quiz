@@ -1,88 +1,43 @@
-# Tìm tên bài hát qua MusicBrainz
+# Danh mục bài hát Đọ Nhạc
 
 ## Cách dùng
 
-1. Tạo/chỉnh sửa Đọ Nhạc, chọn **Phạm vi tìm bài hát** cho cả quiz:
-   - **Nhạc Việt**: tác phẩm có ngôn ngữ lời `vie`.
-   - **US–UK**: tiếng Anh quốc tế (`eng`), gồm cả nghệ sĩ Canada, Úc…; loại tác phẩm đồng thời được gắn `vie` để không trộn nhạc Việt vào nhóm này.
-2. Trong vòng chơi, chọn cách trả lời **Tìm tên bài hát · MusicBrainz**.
-3. Ở từng câu, chọn đáp án từ MusicBrainz. Đáp án chính được điền từ kết quả; nghệ sĩ biểu diễn vẫn nhập riêng. Tên tác giả của tác phẩm không được dùng thay tên ca sĩ.
-4. Người chơi gõ tên bài hoặc ca sĩ với ít nhất hai ký tự. Bấm vào bài, hoặc dùng mũi tên rồi Enter, sẽ gửi đáp án ngay. Phần tạo quiz chỉ liên kết đáp án, không tự lưu quiz.
+Chọn phạm vi Nhạc Việt (ngôn ngữ lời `vie`) hoặc US–UK (tiếng Anh quốc tế `eng`, không đồng thời có `vie`). Mỗi vòng có thể chọn cách trả lời tìm bài hát. Người tạo chọn bài từ danh mục để liên kết đáp án; người chơi tìm theo một phần tên bài hoặc ca sĩ, có hỗ trợ không dấu, alias và sai một chữ trong tên nghệ sĩ.
 
-Nghe chung được thử tiếp sau khi sai; đấu giá và giành quyền qua gợi ý chỉ có một lượt. ABCD và kiểu gõ đáp án vẫn dùng luật hiện có. MusicBrainz cung cấp metadata, YouTube vẫn phát nhạc.
+Chọn một mục bằng chuột hoặc phím mũi tên + Enter là gửi đáp án ngay. Nghe chung trả lời sai được tìm tiếp; đấu giá và gợi ý vẫn theo luật một lần. Server chấm Work ID đã ký, kiểm tra phạm vi và thời hạn; trình duyệt không tự quyết định điểm.
 
-## Phân loại và chấm đáp án
+## Nhập metadata vào danh mục riêng
 
-- Dùng MusicBrainz **Work**, vì trường `lang` mô tả ngôn ngữ lời bài hát. `Recording.country` là quốc gia phát hành, không xác định ngôn ngữ hay thể loại nhạc.
-- Không tự đoán ngôn ngữ theo tên bài/quốc tịch ca sĩ. Bài chưa có metadata ngôn ngữ sẽ không xuất hiện. Nếu thiếu bài, giữ cách gõ đáp án hoặc ABCD cho vòng đó.
-- Chấm theo MBID tác phẩm được người tạo chọn; các bản biểu diễn chung tác phẩm có thể được chấp nhận. Tác phẩm khác trùng tên là đáp án khác. Cần chọn đúng mục/tác giả khi MusicBrainz có dữ liệu trùng hoặc nhiều phiên bản.
-- Đổi phạm vi quiz sẽ yêu cầu liên kết lại đáp án. Lỗi lưu đưa tới đúng câu và ô chọn MusicBrainz.
-- Máy chủ ký lựa chọn để chống sửa tên, mã bài hoặc phạm vi từ trình duyệt. Không gửi MBID đáp án đúng cho người chơi trước kết quả. Việc chấm không gọi MusicBrainz.
+```powershell
+python scripts/collect-song-catalog.py --target 20000
+python -m unittest discover -s tests -p catalog_import_test.py
+```
 
-## Tải và giới hạn
+- Nguồn: MusicBrainz public API và thống kê tổng hợp ListenBrainz (CC0). Chỉ xuất core metadata theo CC0: mã/tên tác phẩm, ngôn ngữ, tác giả, quan hệ bản thu và credit nghệ sĩ. Không tải audio, video, lời bài hát, ảnh, rating hoặc tag.
+- Tệp dùng trong app: `src/lib/musicCatalogPopular.json`. Manifest ghi nguồn, thời điểm, tiêu chí, số bài từng phạm vi, mục tiêu và trạng thái hoàn tất. Mỗi bài nhập mới có Work ID, Recording ID được dùng đối chiếu credit, ngôn ngữ và số bản thu liên kết.
+- Tiêu chí: Song có ngôn ngữ rõ ràng, có ít nhất một bản thu liên kết và credit ca sĩ thật. Loại nhãn chung Various Artists/unknown và chuỗi lỗi ký tự thay thế. Không dùng tác giả làm ca sĩ; không suy ngôn ngữ theo quốc tịch hoặc tên nghệ sĩ. Một Work chỉ xuất hiện một lần, không nhân bản vì live/remix/cover. Hiển thị credit của một bản thu, không ghép các ca sĩ cover thành một nhóm.
+- Trước tiên đối chiếu các bản thu trong top 1.000 all-time của cộng đồng ListenBrainz với Work/ngôn ngữ/credit trên MusicBrainz. Lưu số lượt nghe tổng hợp và thời điểm cập nhật, không lưu người nghe. Sau đó thu toàn bộ ứng viên tiếng Việt đủ dữ liệu; nhóm tiếng Anh đi theo các dải số bản thu giảm dần. Số bản thu là chỉ dấu độ phủ trong MusicBrainz, **không phải lượt stream, bảng xếp hạng toàn cầu hay bảo đảm 20.000 bài đều là hit**. Độ phủ tiếng Việt phụ thuộc nguồn; không tự bù ngôn ngữ cho bài thiếu dữ liệu.
+- `src/lib/musicCatalogSeed.json` giữ các nhãn/alias đã đối chiếu trước đó và được ưu tiên khi trùng ID. ID và đáp án của quiz cũ không đổi. Danh mục này được đóng gói cùng server khi deploy, không lấy dữ liệu từ quiz riêng tư và không ghi đè quiz/phòng trên Turso.
+- Cache và checkpoint nằm trong `data/catalog-import/` (bị gitignore). Chạy lại cùng lệnh để tiếp tục; không tải lại những response đã lưu. Chỉ một request ngoài tại một thời điểm, cách nhau ít nhất 1,2 giây sau response; timeout 60 giây, tối đa 7 lần thử có backoff. Lỗi vĩnh viễn dừng ngay. Không đánh dấu hoàn tất nếu chưa đủ mục tiêu.
+- API search chỉ cho xem tối đa 500 kết quả của một truy vấn: chia theo prefix UUID Work để phân trang hết, không cố tăng offset qua giới hạn. Không tạo ID giả để đủ số lượng.
 
-- Lọc danh mục đã tải ngay khi gõ; chỉ chờ 300 ms khi cần tìm bài chưa có; lọc theo từ khóa mới khi lượt tìm đang chạy hoàn tất; hủy yêu cầu khi đổi phạm vi/phòng hoặc rời giao diện.
-- Bộ nhớ đệm theo `(phạm vi, từ khóa)` lưu trong Turso, dùng chung nhiều Vercel instances. Kết quả có bài giữ 7 ngày; không có bài giữ 1 giờ. Danh mục metadata công khai giữ tối đa 30 ngày, không thu thập đáp án từ quiz riêng tư.
-- Gộp các truy vấn trùng đang chạy; lease trong database giới hạn toàn ứng dụng, bảo đảm các lần gọi MusicBrainz cách nhau hơn một giây. Lease tự hết hạn khi instance dừng.
-- Khi nhiều từ khóa mới cùng lúc, trả dữ liệu có sẵn hoặc HTTP 202 với thời gian chờ; trình duyệt tự thử tiếp có giới hạn và vẫn cho nhập. **30 kết quả từ cache đã được kiểm tra; không cam kết 30 truy vấn mới/giây qua API công cộng.** Muốn phục vụ tải tìm kiếm lớn liên tục cần danh mục/chỉ mục MusicBrainz tự vận hành hoặc thỏa thuận dịch vụ phù hợp.
-- Không cần API key MusicBrainz. Migration thêm bảng/cột khi server truy cập database; khóa ký được tạo ngẫu nhiên và chỉ lưu phía máy chủ trong database.
+Nguồn và giấy phép: https://listenbrainz.org/data/ ; https://musicbrainz.org/doc/About/Data_License ; API: https://musicbrainz.org/doc/MusicBrainz_API/Search ; giới hạn: https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting .
+
+## Tải và tìm nhanh
+
+- `songSelections.ts` giữ ký/xác minh đáp án tách khỏi thư viện tìm kiếm; game/command/state không kéo theo chỉ mục 20.000 bài khi chỉ cần chấm một token.
+- Danh mục tĩnh được kết hợp với tối đa 5.000 mục cache công khai trong bảng `music_catalog`; giới hạn cache này không cắt bớt 20.000 bài đóng gói. Không join vào questions/answers để tạo gợi ý. Metadata tĩnh không hết hạn sau 30 ngày; chỉ cache tìm ngoài mới có TTL.
+- `/api/music/catalog` kiểm tra tài khoản người tạo hoặc token người chơi trong phòng có SEARCH; scope của người chơi lấy từ quiz phía server. `offset` 0–30.000, `limit` 1–4.000; mỗi trang còn bị chặn ở 3 MB để ở dưới giới hạn response Vercel. Response có `items`, `total`, `nextOffset`; null nghĩa là hết.
+- Trình duyệt tải nối tiếp từng trang, chia sẻ một lượt tải khi nhiều component gọi, giữ tối đa 30.000 mục mỗi scope. Mỗi trang đến là có thể tìm ngay, không chờ toàn bộ. Không âm thầm dừng ở 5.000 bài như trước. Kết quả có token do server ký; provenance nguồn chỉ nằm trên server, không gửi lặp xuống máy người chơi.
+- Chỉ mục chuẩn hóa và sắp xếp một lần khi thêm trang. Khi gõ, lọc trên máy, giới hạn hiển thị 20 bài; memoize độ khớp theo nghệ sĩ trong mỗi truy vấn. Không gọi provider cho nghệ sĩ đã có dữ liệu đủ mạnh.
+- Bài mới ngoài danh mục vẫn có thể tìm thêm: Artist exact/alias trước, prefix/fuzzy sau; Recording theo đúng nghệ sĩ; Work theo Recording IDs và ngôn ngữ. Tựa bài khớp một phần không chặn việc tìm nghệ sĩ (Queen of My Heart không phải ban nhạc Queen).
+- Cache Artist/Recording/Work riêng 24 giờ (rỗng 1 giờ), query cache 7 ngày (rỗng 1 giờ), catalog tích lũy 30 ngày. Khóa provider chia sẻ trên Turso, không tăng tải API công cộng khi 30 người cùng tìm. Đang chờ trả 202 để client tự thử có giới hạn; 429 chỉ dành cho vượt số lượt của một người. Thiếu Work/ngôn ngữ trả thông báo cụ thể, không biến lỗi provider thành rỗng thành công.
 
 ## Kiểm tra
 
-- `node --experimental-strip-types --test --test-isolation=none tests/music-search.test.ts`
-- Khởi động server với database thử nghiệm, sau đó đặt cùng `DATABASE_PATH` chứa `rounds-smoke` và chạy `node tests/music-search-smoke.mjs`. Script từ chối chạy với Turso/URL ngoài localhost.
+```powershell
+node --experimental-strip-types --test --test-isolation=none tests/*.test.ts
+node --experimental-strip-types scripts/benchmark-song-catalog.mjs
+```
 
-## Tài liệu
-
-- [MusicBrainz search: Work.lang và Recording.country](https://musicbrainz.org/doc/MusicBrainz_API/Search)
-- [Rate limiting](https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting)
-- [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API)
-
-## Tìm theo ca sĩ
-
-- Tìm trong Recording theo tên bài hoặc artist-credit/artistname, rồi lấy các Work liên kết với bản thu để kiểm tra ngôn ngữ. Tìm nghệ sĩ bằng tên/alias chính xác trước; chỉ tìm prefix/fuzzy nếu chưa có khớp chính xác, sau đó Recording và Work. Mỗi bước có cache riêng dùng chung; chỉ gọi MusicBrainz khi bước đó chưa có dữ liệu, cách nhau hơn một giây.
-- Ca sĩ lấy từ artist-credit của bản thu, không suy từ tên người sáng tác của Work. Một tác phẩm chỉ hiển thị nhóm ca sĩ của một bản thu phù hợp, tránh gộp các bản cover. Thiếu thông tin sẽ ghi “Chưa có thông tin ca sĩ”.
-- Khi chỉ có một ca sĩ được xác định, phần tạo quiz điền tên đó vào trường nghệ sĩ để người tạo kiểm tra với video YouTube.
-- Mã chấm vẫn là Work MBID nên các quiz đã lưu không phải liên kết lại.
-- Cache/catalog mới dùng namespace artist-prefix-v3, không tái sử dụng kết quả cũ thiếu ca sĩ. Chỉ mục metadata công khai gồm tên bài và ca sĩ; giữ nguyên bộ lọc ngôn ngữ và giới hạn API.
-
-## Tìm nhanh và gửi ngay khi chọn
-
-- Tải trước tối đa 5.000 mục (giới hạn phản hồi 3 MB) metadata công khai đúng phạm vi từ Turso khi vào vòng có SEARCH (kể cả lobby/intro/nghe). Danh mục được chuẩn hóa và sắp xếp một lần trên thiết bị; gõ tiếp chỉ quét chỉ mục và lấy tối đa 20 kết quả.
-- Snapshot metadata dùng chung trong server 30 giây, gộp các lượt tải cùng lúc; trình duyệt tái sử dụng 5 phút. Mỗi lần tìm ngoài bổ sung kết quả vào chỉ mục thiết bị. Không gửi danh sách câu/đáp án riêng của quiz; endpoint catalog không truy vấn nội dung quiz để tạo kết quả.
-- Server trả metadata có sẵn ngay cả khi ít hơn 20 kết quả. Nút “Tìm thêm trên MusicBrainz” cho tìm bổ sung; từ khóa chưa có vẫn cần API bên ngoài và có thể chậm/bận.
-- Chọn bằng chuột hoặc Enter gửi đúng lựa chọn ngay, khóa tức thì để chặn double click. Luật và thời hạn vẫn do server quyết định. Gửi thất bại cho thử lại; nghe chung sai vẫn được nhập tiếp, đấu giá và gợi ý giữ một lần theo luật.
-- Tốc độ gần tức thì áp dụng cho dữ liệu đã tải, không phải toàn bộ thư viện MusicBrainz. Không đổi mốc tính điểm sang đồng hồ máy người chơi.
-
-
-## Tìm tên nhập dở (artist-prefix-v3)
-
-- Chỉ cần một phần tên bài/ca sĩ, ví dụ `backstreet`, `backst`, `backstreet’s boy`, `back street`. Chuẩn hóa riêng cho tìm kiếm; không đổi luật chấm đáp án.
-- Khi cần dữ liệu mới: tìm nghệ sĩ theo tên/alias → lấy tối đa 100 bản thu bằng MBID nghệ sĩ → tìm Work từ các mã bản thu, vẫn lọc theo ngôn ngữ lời. Nếu không nhận diện được nghệ sĩ thì tìm bản thu theo tên bài/ca sĩ như thường.
-- Trả tối đa 20 tác phẩm khác nhau để cuộn chọn; không yêu cầu gõ đủ 100% tên. Hiển thị credit của một bản thu phù hợp; không nối ca sĩ của nhiều bản cover thành một nhóm. Credit song ca thực sự vẫn giữ các ca sĩ trong cùng bản thu.
-- Query cache dùng namespace artist-identity-v5 để bỏ qua kết quả rỗng cũ; giữ catalog artist-prefix-v3 đã tích lũy. Khóa chung chỉ giữ một HTTP request: timeout 7 giây cho Artist/Recording, 15 giây cho Work và lease dài hơn timeout 3 giây. Nếu 429/503 thì cùng chờ 5 giây trước khi thử tiếp, không cache lỗi thành danh sách rỗng. Không vượt giới hạn một request/giây của dịch vụ.
-- Danh mục đã tải lọc ngay trên máy; lần tìm nghệ sĩ mới vẫn phụ thuộc độ trễ/khả dụng và độ đầy đủ metadata MusicBrainz. Không cam kết truy vấn lạnh tức thì.
-- Fixture công khai `tests/fixtures/backstreet-search.json` giữ metadata thực đã lấy ngày 26/10/2026 để kiểm tra đúng trường hợp Backstreet; không cần gọi dịch vụ công cộng khi chạy unit test.
-
-- Khi đang gõ, giữ tối đa một lượt tìm ngoài đang chạy trong component. Kết quả cũ chỉ bổ sung chỉ mục cùng phạm vi; từ khóa hiện tại quyết định danh sách hiển thị. Không gọi lại API cho từng ký tự và không hiển thị dữ liệu của phòng/phạm vi cũ.
-
-
-## Không báo bận giả khi đang trả lời
-
-- Tách trạng thái chờ provider (202 / MUSIC_SEARCH_PENDING) khỏi vượt số lượt tìm của một người (429). Client tự cập nhật theo retryAfter, tối đa khoảng 20 giây, dừng khi hết lượt/đổi phòng/phạm vi/unmount. Không cộng thêm thời gian chơi và không gửi đáp án khi mới tìm.
-- Artist, Recording và Work có cache metadata công khai từng bước 24 giờ (rỗng 1 giờ), dùng chung Turso/Vercel. Người chờ tiếp tục từ bước chưa hoàn tất, không lặp lại cả chuỗi. Chỉ lưu trường cần cho tìm và lọc ngôn ngữ, không lưu payload bản phát hành thừa.
-- Danh mục khởi đầu công khai gồm 227 tác phẩm đã kiểm tra của 13 nghệ sĩ/nhóm nhạc, lấy từ MusicBrainz ngày 26/10/2026. Metadata đóng gói cùng server, thêm vào catalog được ký/tải từ lobby; không lấy nội dung từ quiz riêng tư, không chứa token ký sẵn và không gọi provider cho các mục đã có.
-- Tên nghệ sĩ tìm gần đúng một chữ: rihana → Rihanna. Tìm theo tên/alias MusicBrainz và lọc gần đúng trong danh mục đã tải; không hardcode tên sai thành mã nghệ sĩ.
-- Bài mới ngoài danh mục vẫn phụ thuộc API MusicBrainz. 30 tên hoàn toàn mới cùng lúc không thể được bảo đảm tức thì bằng API công cộng; cần tiếp tục mở rộng catalog/chỉ mục riêng cho quy mô đó.
-- Regression gồm khóa provider bị giữ, 503/timeout, chia sẻ một bước metadata cho 30 client, tự cập nhật và hủy polling; API kiểm tra 30 người trong phòng US–UK tìm Justin Bieber/rihana và gửi lựa chọn khi provider đang bị khóa.
-
-
-## Nhận diện nghệ sĩ và dữ liệu thiếu
-
-- Tên và alias khớp chính xác được ưu tiên trước prefix, rồi mới tới sai tối đa một chữ cho toàn bộ tên. Điểm provider chỉ phân xử cùng mức khớp: Đen Vâu phải chọn Đen qua alias; Da LAB không thể là Ross Daly & Labyrinth.
-- Query chính xác tách khỏi query wildcard/fuzzy. Không cộng nhiều boost alias làm nhân vật Queen che mất ban nhạc Queen. Tìm Work của nghệ sĩ theo các mã bản thu đã chọn, không trộn thêm Work có tiêu đề trùng tên nghệ sĩ.
-- Có một tựa bài khớp chưa làm tìm kiếm kết thúc. Cache yếu được hiện ngay nhưng giao diện vẫn tìm thêm; kết quả của nghệ sĩ khớp xếp trước tựa bài khớp một phần. Queen of My Heart không chặn Queen, Cold Water không chặn Coldplay.
-- Alias của nghệ sĩ được đưa vào chỉ mục công khai, không dùng để chấm. Chọn bài vẫn gửi ngay và server chấm Work MBID như trước.
-- Work response giới hạn 30 mục (candidate Recording vẫn 100) để giảm payload quan hệ lớn; hiển thị tối đa 20 bài. Danh mục 227 mục được tải từ lobby, giúp những nghệ sĩ đã chuẩn bị không phụ thuộc truy vấn lạnh khi trả lời.
-- Khi đã nhận đúng nghệ sĩ và có bản thu nhưng không có Work đủ metadata ngôn ngữ, trả notice rõ ràng và giữ nó khi catalog tải xong. Không chế mã Work từ Recording hoặc đoán tiếng Việt theo quốc tịch. Phần tạo hướng dẫn dùng Gõ đáp án/ABCD nếu thiếu dữ liệu nguồn.
-- Kiểm tra thực tế: Queen trả 20 bài đúng ban nhạc; Đen Vâu trả 2 Work hợp lệ. Da LAB có bản thu đúng nghệ sĩ nhưng chưa có Work đủ điều kiện trong lượt kiểm tra; Sơn Tùng M-TP có 36 bản thu, truy vấn Work không lọc ngôn ngữ chỉ tìm thấy COME MY WAY (tiếng Anh), nên không đưa vào Nhạc Việt.
+API smoke chỉ chạy với database test có `rounds-smoke` trong đường dẫn, không có TURSO_DATABASE_URL. Kiểm tra toàn bộ trang của hai phạm vi, mục cuối danh mục, quyền truy cập, token giả/sai phạm vi, không lộ đáp án, 30 người và luật OPEN/BID/CLUE. Benchmark chỉ đo chỉ mục client, không đại diện độ trễ mạng hoặc khả năng chịu tải toàn server.

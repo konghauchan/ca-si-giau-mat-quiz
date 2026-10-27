@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useId,useRef,useState} from 'react';
 import {musicScopeLabel,MUSIC_RESULT_LIMIT,hasStrongSongMatch,type MusicScope,type SongSuggestion} from '@/lib/musicSearch';
-import {cachedSongMatches,primeSongCatalog,rememberSongs} from '@/lib/musicCatalogClient';
+import {cachedSongMatches,primeSongCatalog,rememberSongs,subscribeSongCatalog} from '@/lib/musicCatalogClient';
 import {loadSongMatches} from '@/lib/musicSearchClient';
 
 export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAnswer,selectedTitle}:{scope:MusicScope;roomId?:string;gameToken?:string;disabled?:boolean;onSelect?:(song:SongSuggestion)=>void;onAnswer?:(token:string,song:SongSuggestion)=>Promise<boolean|void>;selectedTitle?:string}) {
@@ -15,6 +15,7 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
   useEffect(()=>{generation.current++;pendingSearch.current?.controller.abort();pendingSearch.current=null;completedSearch.current='';completedNotice.current='';setQuery('');setSelected(null);setItems([]);setSent(false);setBusy(false);setLoading(false);setWaiting(false);setActive(-1);setError('');submitting.current=false;},[scope,roomId]);
   useEffect(()=>{if(disabled)pendingSearch.current?.controller.abort();},[disabled]);
   useEffect(()=>()=>{generation.current++;pendingSearch.current?.controller.abort();pendingSearch.current=null;},[]);
+  useEffect(()=>subscribeSongCatalog(scope,()=>setCatalogVersion(v=>v+1)),[scope]);
   useEffect(()=>{let alive=true;void primeSongCatalog(scope,{roomId,gameToken}).then(()=>{if(alive)setCatalogVersion(v=>v+1);});return ()=>{alive=false;};},[scope,roomId,gameToken]);
   useEffect(()=>{
     const controller=new AbortController();let alive=true;
@@ -62,7 +63,7 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
   }
   function searchMore(){setForcedTerm(query.trim());setRetry(value=>value+1);}
   return <div className="song-search">
-    <div className="field"><label htmlFor={id}>Tìm bài hát hoặc ca sĩ trên MusicBrainz</label><small>{musicScopeLabel(scope)} · {onAnswer?'Chọn bài là gửi đáp án ngay.':'Tìm theo tên bài hát hoặc ca sĩ'}</small>
+    <div className="field"><label htmlFor={id}>Tìm bài hát hoặc ca sĩ</label><small>{musicScopeLabel(scope)} · {onAnswer?'Chọn bài là gửi đáp án ngay.':'Tìm theo tên bài hát hoặc ca sĩ'}</small>
       <input ref={input} autoFocus={!!onAnswer} id={id} role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={items.length>0} aria-controls={id+'-list'} aria-activedescendant={active>=0?id+'-option-'+active:undefined} value={query} maxLength={80} disabled={disabled||busy||sent} placeholder="Nhập một phần tên bài hát hoặc ca sĩ…" onChange={event=>{const value=event.target.value;setQuery(value);setSelected(null);setSent(false);setForcedTerm('');setError('');setActive(-1);setItems(cachedSongMatches(scope,value));}} onKeyDown={event=>{
         if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();setActive(i=>items.length?(event.key==='ArrowDown'?(i+1)%items.length:i<0?items.length-1:(i-1+items.length)%items.length):-1);}
         else if(event.key==='Escape'){setItems([]);setActive(-1);}
@@ -73,6 +74,6 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
     <p className="song-search-status" role="status" aria-live="polite">{busy?'Đang gửi đáp án…':sent?'Đã gửi lựa chọn.':loading?(waiting?'Đang tải danh mục bài hát… Kết quả sẽ tự cập nhật.':'Đang tìm thêm trên MusicBrainz…'):selected?`Đã chọn: ${selected.title}`:selectedTitle?`Đáp án đã liên kết: ${selectedTitle}`:''}</p>
     {error&&<div className="notice info" role="status">{error} <button type="button" className="button ghost" disabled={disabled||loading||busy} onClick={searchMore}>Tìm lại</button></div>}
     {items.length>0&&!selected&&<button type="button" className="button ghost" disabled={disabled||loading||busy} onClick={searchMore}>Tìm thêm trên MusicBrainz</button>}
-    <small className="song-search-credit">Dữ liệu: <a href="https://musicbrainz.org/" target="_blank" rel="noreferrer">MusicBrainz</a>. Tìm nhanh trong danh mục đã tải; bài mới có thể cần chờ thêm. Chỉ hiện bài đã có thông tin ngôn ngữ.</small>
+    <small className="song-search-credit">Danh mục Đọ Nhạc · Dữ liệu <a href="https://musicbrainz.org/" target="_blank" rel="noreferrer">MusicBrainz</a>. Tìm theo tên bài hoặc ca sĩ, có hỗ trợ không dấu. Bài ngoài danh mục có thể cần chờ thêm.</small>
   </div>;
 }

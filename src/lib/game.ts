@@ -1,4 +1,4 @@
-import {verifySongSelection,savedSongToken} from './musicBrainz';
+import {verifySongSelection,savedSongToken} from './songSelections';
 import type {MusicScope} from './musicSearch';
 import { sharedRead, invalidateRead } from './sharedRead';
 import { fastCommand } from './fastCommands';

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import {MUSIC_SEARCH_VERSION,MUSIC_CATALOG_VERSION,musicBrainzArtistQuery,musicBrainzRecordingQuery,musicBrainzQuery} from '../src/lib/musicSearch.ts';
+import {MUSIC_SEARCH_VERSION,MUSIC_CATALOG_VERSION,MUSIC_CATALOG_PAGE_SIZE,musicBrainzArtistQuery,musicBrainzRecordingQuery,musicBrainzQuery} from '../src/lib/musicSearch.ts';
 import {createClient} from '@libsql/client';
 import {musicMetadataCacheKey} from '../src/lib/musicProvider.ts';
 import {registerTestAccount} from './register-test-account.mjs';
@@ -9,6 +9,19 @@ const base=process.env.SMOKE_BASE_URL||'http://localhost:3219';assert.match(base
 const db=createClient({url:'file:'+path.resolve(process.env.DATABASE_PATH)});const cookie=await registerTestAccount(base);
 async function request(endpoint,body,token='',account=false){const res=await fetch(base+endpoint,{method:body?'POST':'GET',headers:{origin:base,'content-type':'application/json',...(token?{'x-game-token':token}:{}),...(account?{cookie}:{})},body:body?JSON.stringify(body):undefined});const data=await res.json();return {status:res.status,data};}
 async function call(endpoint,body,token='',account=false){const result=await request(endpoint,body,token,account);assert.equal(result.status,200,JSON.stringify(result));return result.data;}
+async function allCatalogPages(scope,token='',account=false,roomId=''){
+  let offset=0;const items=[];let total=0,pages=0;
+  do {
+    const page=await call('/api/music/catalog?'+new URLSearchParams({scope,offset:String(offset),...(roomId?{roomId}:{})}),undefined,token,account);
+    assert.equal(page.scope,scope);assert.ok(page.items.length<=MUSIC_CATALOG_PAGE_SIZE);assert.ok(Buffer.byteLength(JSON.stringify(page))<3.1*1024*1024);
+    assert.ok(page.items.every(item=>item.scope===scope&&item.token&&!('source' in item)));
+    items.push(...page.items);total=page.total;pages++;
+    if(page.nextOffset===null)break;
+    assert.ok(page.nextOffset>offset);offset=page.nextOffset;
+  }while(pages<31);
+  assert.equal(items.length,total);assert.equal(new Set(items.map(song=>song.id)).size,total);
+  return items;
+}
 // Initialize the additive schema without touching production.
 await call('/api/quiz',undefined,'',true);
 const viet=[{id:'00000000-0000-4000-8000-000000000001',title:'Bài thử tiếng Việt',detail:'Tác giả: Kiểm thử',scope:'VI'},{id:'00000000-0000-4000-8000-000000000002',title:'Bài thử tiếng Việt',detail:'Bài trùng tên khác tác giả',scope:'VI'}];
@@ -18,6 +31,11 @@ assert.notEqual((await request('/api/music/search?q=fixture&scope=VI')).status,2
 for(const song of [...viet,...english])await db.execute({sql:'INSERT OR REPLACE INTO music_catalog(scope,id,title,detail,normalized_title,updated_at) VALUES(?,?,?,?,?,?)',args:[MUSIC_CATALOG_VERSION+':'+song.scope,song.id,song.title,JSON.stringify({detail:song.detail,performers:['Test artist']}),song.title.toLowerCase()+' test artist',Date.now()]});
 assert.notEqual((await request('/api/music/catalog?scope=VI')).status,200);
 const creatorCatalog=await call('/api/music/catalog?scope=VI',undefined,'',true);assert.equal(creatorCatalog.scope,'VI');assert.ok(creatorCatalog.items.every(item=>item.scope==='VI'&&item.token));
+assert.equal((await request('/api/music/catalog?scope=VI&offset=-1',undefined,'',true)).status,400);
+assert.equal((await request('/api/music/catalog?scope=VI&limit=4001',undefined,'',true)).status,400);
+const completeVietnamese=await allCatalogPages('VI','',true);
+const completeEnglish=await allCatalogPages('US_UK','',true);
+assert.ok(completeVietnamese.length+completeEnglish.length>=20000,'entire imported catalog is available without truncation');
 
 // Another instance is using the provider: return pending work, never a 429 or empty success.
 await db.execute({sql:"INSERT OR REPLACE INTO music_search_control(id,value,next_at) VALUES('upstream',?,?)",args:['other-instance',Date.now()+45000]});
@@ -50,7 +68,7 @@ const room=await call('/api/room',{action:'create',quizId:quiz.id,nickname:'Sear
 const cmd=(action,value,token=tokens[0])=>call('/api/command',{roomId:room.roomId,action,value},token);
 assert.equal((await request('/api/music/search?q=fixture&scope=US_UK&roomId='+room.roomId,undefined,tokens[0])).status,403);
 const catalogs=await Promise.all(tokens.map(token=>call('/api/music/catalog?scope=US_UK&roomId='+room.roomId,undefined,token)));assert.ok(catalogs.every(result=>result.scope==='VI'&&result.items.every(item=>item.scope==='VI')));
-const preloaded=catalogs[0].items.find(item=>item.id===vi[0].id);assert.ok(preloaded);assert.equal((await request('/api/command',{roomId:room.roomId,action:'answer',value:preloaded.token},tokens[0])).status,400);
+const preloaded=completeVietnamese.find(item=>item.id===vi[0].id);assert.ok(preloaded);assert.equal((await request('/api/command',{roomId:room.roomId,action:'answer',value:preloaded.token},tokens[0])).status,400);
 
 await cmd('start');for(let i=0;i<2;i++){await db.execute({sql:'UPDATE rooms SET phase_ends_at=? WHERE id=?',args:[Date.now()-1,room.roomId]});await call('/api/state?roomId='+room.roomId,undefined,tokens[0]);}
 const searchResults=await Promise.all(tokens.map(token=>call('/api/music/search?q=fixture&scope=US_UK&roomId='+room.roomId,undefined,token)));
