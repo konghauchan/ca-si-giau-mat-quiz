@@ -114,3 +114,16 @@ CREATE TABLE IF NOT EXISTS music_catalog (
 );
 CREATE INDEX IF NOT EXISTS idx_music_search_expiry ON music_search_cache(expires_at);
 CREATE INDEX IF NOT EXISTS idx_music_catalog_scope ON music_catalog(scope,updated_at);
+
+-- Durable public metadata, independent of the temporary provider cache.
+CREATE TABLE IF NOT EXISTS song_library_releases (
+  id TEXT PRIMARY KEY, manifest TEXT NOT NULL, song_count INTEGER NOT NULL,
+  created_at INTEGER NOT NULL, completed_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS song_library_entries (
+  version TEXT NOT NULL REFERENCES song_library_releases(id), scope TEXT NOT NULL,
+  id TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(version,scope,id)
+);
+CREATE TABLE IF NOT EXISTS song_library_active (
+  id TEXT PRIMARY KEY CHECK(id='active'), version TEXT NOT NULL REFERENCES song_library_releases(id)
+);
