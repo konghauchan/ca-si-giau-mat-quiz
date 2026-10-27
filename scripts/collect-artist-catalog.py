@@ -8,6 +8,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import importlib.util
 import json
+from itertools import zip_longest
 from pathlib import Path
 import threading
 import unicodedata
@@ -20,6 +21,22 @@ spec.loader.exec_module(bulk)
 
 def normalized(value):
     return ''.join(c for c in unicodedata.normalize('NFKD', value.casefold()) if c.isalnum())
+
+
+def roster_entries(roster, only=None):
+    groups = [[(era, entry) for entry in group] for era, group in roster.items() if isinstance(group, list)]
+    entries = [pair for row in zip_longest(*groups) for pair in row if pair is not None]
+    names = [entry if isinstance(entry, str) else entry['name'] for _, entry in entries]
+    if len({normalized(name) for name in names}) != len(names):
+        raise ValueError('Duplicate artist names in roster')
+    priority = {normalized(name): index for index, name in enumerate(roster.get('_meta', {}).get('priority', []))}
+    entries.sort(key=lambda pair: priority.get(normalized(pair[1] if isinstance(pair[1], str) else pair[1]['name']), len(priority)))
+    if only:
+        selected = {normalized(name) for name in only}
+        if not selected.issubset({normalized(name) for name in names}):
+            raise ValueError('Requested artist is not in roster')
+        entries = [pair for pair in entries if normalized(pair[1] if isinstance(pair[1], str) else pair[1]['name']) in selected]
+    return entries
 
 
 def resolve_artist(provider, entry):
@@ -87,7 +104,7 @@ def collect(args):
     provider = bulk.Provider(state_dir / 'responses')
     checkpoint = state_dir / 'checkpoint.json'
     state = json.loads(checkpoint.read_text(encoding='utf-8')) if checkpoint.exists() else {'artists': {}, 'songs': {}}
-    entries = [(era, entry) for era, group in roster.items() if isinstance(group, list) for entry in group]
+    entries = roster_entries(roster, getattr(args, 'only', None))
     state_lock = threading.Lock()
     identities_path = state_dir / 'identities.json'
     identities = json.loads(identities_path.read_text(encoding='utf-8')) if identities_path.exists() else {}
@@ -100,7 +117,7 @@ def collect(args):
             return
         try:
             report = state['artists'].get(name, {})
-            artist = report.get('artist') or resolve_artist(provider, entry)
+            artist = (report.get('artist') if not saved else None) or resolve_artist(provider, entry)
             value = {'entry': entry, 'artist': artist}
         except ValueError as error:
             value = {'entry': entry, 'error': str(error)}
@@ -157,11 +174,16 @@ def collect(args):
         list(executor.map(process_artist, entries))
     complete = all(state['artists'].get(entry if isinstance(entry, str) else entry['name'], {}).get('complete') for _, entry in entries)
     requested_names = {entry if isinstance(entry, str) else entry['name'] for _, entry in entries}
+    selected_reports = {k: v for k, v in state['artists'].items() if k in requested_names}
+    selected_works = {work for report in selected_reports.values() for work in report.get('works', [])}
+    songs = sorted((song for wid, song in state['songs'].items() if wid in selected_works), key=lambda s: s['id'])
     source = {'provider': 'MusicBrainz', 'url': 'https://musicbrainz.org/', 'license': 'CC0-1.0',
               'retrievedAt': bulk.time.strftime('%Y-%m-%dT%H:%M:%SZ', bulk.time.gmtime()),
               'selection': roster['description'], 'artistsRequested': len(entries), 'complete': complete,
-              'count': len(state['songs']), 'artistReports': {k: v for k, v in state['artists'].items() if k in requested_names}}
-    result = {'source': source, 'songs': sorted(state['songs'].values(), key=lambda s: s['id'])}
+              'rosterUpdatedAt': roster.get('_meta', {}).get('updatedAt'),
+              'selectionSources': roster.get('_meta', {}).get('sources', []),
+              'count': len(songs), 'artistReports': selected_reports}
+    result = {'source': source, 'songs': songs}
     bulk.atomic_json(ROOT / args.output, result, line_items=True)
     print(json.dumps({'complete': complete, 'artists': len(entries), 'works': len(result['songs']), 'output': str(args.output)}), flush=True)
     if not complete:
@@ -174,4 +196,5 @@ if __name__ == '__main__':
     parser.add_argument('--state-dir', default='data/artist-catalog')
     parser.add_argument('--output', default='data/artist-catalog/expansion.json')
     parser.add_argument('--workers', type=int, choices=range(1, 5), default=4)
+    parser.add_argument('--only', action='append', help='Collect selected roster artists; may be repeated')
     collect(parser.parse_args())

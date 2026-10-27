@@ -30,13 +30,17 @@ Lưu ý: 20.000 bài gồm danh mục có ngôn ngữ rõ ràng, ưu tiên bản
 
 ## Bổ sung danh mục theo nghệ sĩ
 
-`scripts/artist-catalog-roster.json` là danh sách biên tập các nghệ sĩ nổi bật thập niên 1980/1990/2000, gồm cả nghệ sĩ Canada/Úc... Mốc thập niên dùng để nhóm nghệ sĩ; không giới hạn năm phát hành của bài hát. Có thể thêm tên hoặc khai báo `name`, `country`, `type` để phân biệt nghệ sĩ trùng tên.
+`scripts/artist-catalog-roster.json` là danh sách biên tập 377 nghệ sĩ từ thời kỳ kinh điển đến 27/10/2026, giữ đủ 131 nghệ sĩ ban đầu, gồm cả Britney Spears và các nghệ sĩ Canada/Úc... Mốc thập niên dùng để nhóm theo giai đoạn nổi bật, không phải ngày ra mắt hay xếp hạng; không giới hạn năm phát hành của bài hát. Có thể thêm tên hoặc khai báo `name`, `country`, `type` để phân biệt nghệ sĩ trùng tên. `searchName` thêm tên dễ tìm như “98 Degrees” cho tên chuẩn “98°”.
+
+Metadata `_meta` lưu ngày biên tập và nguồn tham khảo gần đây: Official Charts tuần 23/10/2026, IFPI 2025 và Spotify Wrapped 2025. Chỉ nhận tác phẩm tiếng Anh; không đưa mọi nghệ sĩ toàn cầu trong các bảng xếp hạng vào phạm vi US–UK. Danh sách đầy đủ ở `docs/us-uk-artists-2026.md`.
 
 ```powershell
 python scripts/collect-artist-catalog.py
 node --env-file=.env.local --experimental-strip-types scripts/import-song-library.mjs --append --input=data/artist-catalog/expansion.json --snapshot=data/artist-catalog/merged-library.json
 node --env-file=.env.local --experimental-strip-types scripts/import-song-library.mjs --verify --input=data/artist-catalog/merged-library.json
 ```
+
+Các nghệ sĩ trong `_meta.priority` được xếp trước (Britney Spears đầu tiên), sau đó xen kẽ các thời kỳ. Thu thập riêng một nghệ sĩ bằng `--only "Britney Spears"`, hoặc lặp lại `--only` cho một nhóm. Khi đó tệp xuất chỉ chứa tác phẩm của nhóm được chọn, dù dùng chung checkpoint với các nghệ sĩ khác. Dữ liệu đã hoàn tất được tiếp tục từ checkpoint; danh sách mục tiêu không đồng nghĩa toàn bộ danh mục đã được nhập.
 
 Công cụ duyệt tất cả trang bản thu của từng nghệ sĩ, kiểm tra mã nghệ sĩ trong credit, liên kết tác phẩm Song và ngôn ngữ tiếng Anh rõ ràng. Dùng tối đa 4 kết nối đang chờ nhưng có một cổng tốc độ chung: các lần bắt đầu request cách nhau ít nhất 1,2 giây; gặp 503/429 sẽ backoff. Checkpoint/cache cho phép chạy tiếp. Bản thiếu ngôn ngữ hoặc liên kết tác phẩm được thống kê trong `source.artistReports`, không tạo mã giả hay cam kết bao phủ bài chưa có trên MusicBrainz.
 

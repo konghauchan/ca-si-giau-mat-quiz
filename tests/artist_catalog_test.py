@@ -20,6 +20,25 @@ WORK = '00000000-0000-4000-8000-000000000003'
 
 
 class ArtistCatalogTest(unittest.TestCase):
+    def test_roster_prioritizes_britney_interleaves_eras_and_rejects_duplicates(self):
+        roster={'description':'test','_meta':{'priority':['Britney Spears'],'sources':[{'url':'https://example.test'}]},'1990s':['Old band','Britney Spears'],'2020s':['New artist','Other artist']}
+        self.assertEqual([entry for _,entry in c.roster_entries(roster)],['Britney Spears','Old band','New artist','Other artist'])
+        self.assertEqual(c.roster_entries(roster,['Britney Spears']),[('1990s','Britney Spears')])
+        with self.assertRaisesRegex(ValueError,'not in roster'):
+            c.roster_entries(roster,['Missing'])
+        with self.assertRaisesRegex(ValueError,'Duplicate'):
+            c.roster_entries({'1990s':['R.E.M.'],'2020s':['REM']})
+
+    def test_published_roster_covers_current_eras_and_preserves_prior_131(self):
+        root=Path(__file__).resolve().parents[1]
+        roster=json.loads((root/'scripts/artist-catalog-roster.json').read_text(encoding='utf8'))
+        entries=c.roster_entries(roster)
+        self.assertEqual(len(entries),377)
+        names={entry if isinstance(entry,str) else entry['name'] for _,entry in entries}
+        self.assertTrue({'Britney Spears','Backstreet Boys','Westlife','Billie Eilish','Olivia Rodrigo','Sabrina Carpenter','Olivia Dean','sombr','Sienna Spiro'}.issubset(names))
+        self.assertEqual(roster['_meta']['updatedAt'],'2026-10-27')
+        self.assertEqual(entries[0][1],'Britney Spears')
+
     def test_concurrent_io_has_one_global_request_start_gate(self):
         starts = []
         class Response(io.BytesIO):
@@ -93,6 +112,9 @@ class ArtistCatalogTest(unittest.TestCase):
             roster = directory / 'roster.json'
             roster.write_text(json.dumps({'description': 'test', '1990s': ['Actual singer']}))
             args = argparse.Namespace(roster=roster, state_dir=directory / 'state', output=directory / 'out.json')
+            args.state_dir.mkdir()
+            other_work='00000000-0000-4000-8000-000000000004'
+            (args.state_dir/'checkpoint.json').write_text(json.dumps({'artists':{'Other artist':{'complete':True,'works':[other_work]}},'songs':{other_work:{'id':other_work,'title':'Unrelated work','scope':'US_UK'}}}),encoding='utf8')
             with patch.object(c.bulk, 'Provider', Fake), contextlib.redirect_stdout(io.StringIO()):
                 c.collect(args)
                 c.collect(args)
