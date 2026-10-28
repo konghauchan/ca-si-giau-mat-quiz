@@ -68,7 +68,7 @@ def resolve_artist(provider, entry):
             'country': winners[0].get('country'), 'type': winners[0]['type'], 'disambiguation': winners[0].get('disambiguation', '')}
 
 
-def recording_songs(recording, artist):
+def recording_songs(recording, artist, allow_unknown=False):
     credits = [c for c in recording.get('artist-credit', []) if isinstance(c, dict)]
     if not any(c.get('artist', {}).get('id') == artist['id'] for c in credits):
         return [], 'uncredited'
@@ -80,15 +80,24 @@ def recording_songs(recording, artist):
         if relation.get('type') != 'performance' or relation.get('target-type') != 'work':
             continue
         work = relation.get('work', {})
-        languages = work.get('languages') or [work.get('language')]
+        languages = [v for v in (work.get('languages') or [work.get('language')]) if v]
         title = (work.get('title') or '').strip()
-        if not bulk.UUID.fullmatch(work.get('id', '')) or work.get('type') != 'Song' or 'eng' not in languages or 'vie' in languages or not title or len(title) > 120 or '\ufffd' in title:
+        unknown_language = not set(languages).difference({'und', 'zxx', 'mul'})
+        valid_type = work.get('type') == 'Song' or (allow_unknown and not work.get('type'))
+        valid_language = 'eng' in languages or (allow_unknown and unknown_language)
+        if not bulk.UUID.fullmatch(work.get('id', '')) or not valid_type or not valid_language or 'vie' in languages or not title or len(title) > 120 or '\ufffd' in title:
             continue
         songs.append({'id': work['id'], 'title': title, 'scope': 'US_UK', 'detail': 'Tác phẩm âm nhạc',
                       'performers': names, 'artistAliases': list(dict.fromkeys([artist['name'], artist['requested']])),
                       'source': {'provider': 'MusicBrainz', 'workId': work['id'], 'recordingId': recording['id'],
                                  'languages': languages, 'artistIds': [c['artist']['id'] for c in credits if c.get('artist', {}).get('id')],
                                  'performerCredits': [{'artistId': artist['id'], 'name': artist['name'], 'recordingId': recording['id']} ]}})
+        if allow_unknown:
+            songs[-1]['source'].update(languageStatus='unknown' if unknown_language else 'confirmed',
+                                      scopePolicy='verified-artist-unknown-language-v1',
+                                      workType=work.get('type'),
+                                      evidence=[{'provider':'MusicBrainz','id':recording['id'],'artistId':artist['id'],
+                                                 'url':'https://musicbrainz.org/recording/'+recording['id']}])
     return songs, None if songs else 'noEligibleWork'
 
 

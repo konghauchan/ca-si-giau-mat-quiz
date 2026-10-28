@@ -1,5 +1,28 @@
 # Danh mục bài hát trên Turso
 
+## Danh mục nhiều nguồn (28/10/2026)
+
+Danh mục Đọ Nhạc dùng mã nội bộ ổn định, không bắt buộc mọi bài phải có Work ID MusicBrainz. Giữ nguyên mọi mã cũ; bài Wikidata chưa có Work ID dùng UUID v5 theo QID, với `source.workId=null`. Không đưa UUID nội bộ lên MusicBrainz hay giả định đó là Work ID. Token lựa chọn và chấm đáp án dùng cùng mã danh mục ở cả phía tạo câu hỏi và người chơi; tên cột cũ `musicbrainz_work_id` được giữ để tương thích dữ liệu.
+
+Nguồn bổ sung là [Wikidata](https://www.wikidata.org/wiki/Wikidata:Data_access), dữ liệu có cấu trúc [CC0](https://www.wikidata.org/wiki/Wikidata:Licensing). Nghệ sĩ được nối bằng MBID, hoặc bằng liên kết Wikidata trên hồ sơ nghệ sĩ MusicBrainz đã xác minh. Chỉ lấy item bài hát/đĩa đơn có credit nghệ sĩ được nối; tải hết trang kết quả và giữ bằng chứng nguồn.
+
+Chính sách US–UK đã được người dùng chọn: nhận bài chưa rõ ngôn ngữ của nghệ sĩ đã xác minh; loại bài được xác nhận không có tiếng Anh. Không gán `eng` cho trường trống. `source.languageStatus`, `scopePolicy` và bằng chứng giữ rõ trạng thái này. Nguồn đã xác nhận tiếng Việt không được thêm vào US–UK. Bộ lọc MusicBrainz trực tiếp vẫn thận trọng với nghệ sĩ ngoài roster; chính sách mới được áp dụng khi nhập roster đã xác minh.
+
+Nếu có Work ID rõ ràng, giữ ID đó. Nếu item chưa có Work ID nhưng trùng tên/nghệ sĩ với bài đã lưu hoặc vừa khôi phục, ghi ứng viên vào `review.json`, không tự suy ra hai tác phẩm là một và không tạo thêm hàng trùng. Hai Work ID khác nhau vẫn được phân biệt dù trùng tên. Credit của bản cover bổ sung thành alias có bằng chứng; không ghép thành song ca giả.
+
+Quy trình cập nhật dùng snapshot của bản Turso hiện hành để tránh lấy danh mục cũ làm chuẩn chống trùng:
+
+```powershell
+node --env-file=<connection.env> --experimental-strip-types scripts/export-song-library.mjs --output=data/catalog-before.json
+python scripts/collect-catalog-supplement.py --existing=data/catalog-before.json
+node --env-file=<connection.env> --experimental-strip-types scripts/import-song-library.mjs --append --input=data/catalog-supplement/expansion.json --snapshot=data/catalog-supplement/merged-library.json
+node --env-file=<connection.env> --experimental-strip-types scripts/import-song-library.mjs --verify --input=data/catalog-supplement/merged-library.json
+```
+
+Collector cần danh tính đã xác minh tại `data/artist-catalog/identities.json` (có thể giải nén bản công khai `catalog-result/identities.json.gz`). Cache ghi ở `data/catalog-supplement/responses`; chạy lại tái sử dụng kết quả. Script còn đọc lại các trang MusicBrainz đã có tại `data/artist-catalog/responses` để khôi phục Work thiếu type/ngôn ngữ, không quét lại toàn bộ bản thu. Nếu chưa có cache, phần này có thể rỗng; thống kê số trang/record đã xử lý và nguồn bao phủ được ghi trong tệp xuất. Không tuyên bố Wikidata hay roster bao phủ toàn bộ mọi bài từng phát hành.
+
+Chỉ nhập sau khi collector kết thúc thành công. `source.complete` xác nhận tác vụ bổ sung đã hoàn tất, không phải lời cam kết độ phủ tuyệt đối. Bản xuất chứa tên, nghệ sĩ, ID và metadata công khai; không tải âm thanh, video, ảnh bìa hoặc lời bài hát.
+
 Danh mục công khai 20.000 tác phẩm MusicBrainz được lưu lâu dài trong `song_library_entries`. Không lưu MP3, video, lời bài hát hoặc đáp án riêng của quiz.
 
 `song_library_releases` lưu nguồn dữ liệu, số bài, checksum và ngày hoàn tất. `song_library_active` trỏ đến bản đã kiểm tra đầy đủ. Khi có bản đang hoạt động, tìm kiếm và tải danh mục dùng dữ liệu Turso. JSON đi kèm mã nguồn chỉ là nguồn nhập và phương án khởi tạo khi chưa có bản nào trong database.

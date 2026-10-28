@@ -5,7 +5,7 @@ export function signSong(work: SongWork, key: string) {
   return `${payload}.${createHmac('sha256',key).update(payload).digest('base64url')}`;
 }
 export function readSong(token: string, key: string): Pick<SongWork,'id'|'title'|'scope'> {
-  const invalid = () => new Error('Hãy chọn lại bài hát từ MusicBrainz.');
+  const invalid = () => new Error('Hãy chọn lại bài hát từ danh mục Đọ Nhạc.');
   if(token.length>1200) throw invalid();
   const parts=token.split('.');if(parts.length!==2)throw invalid();
   const expected=createHmac('sha256',key).update(parts[0]).digest();const supplied=Buffer.from(parts[1],'base64url');
