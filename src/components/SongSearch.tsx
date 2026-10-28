@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useId,useRef,useState} from 'react';
-import {musicScopeLabel,MUSIC_RESULT_LIMIT,hasStrongSongMatch,type MusicScope,type SongSuggestion} from '@/lib/musicSearch';
+import {musicScopeLabel,MUSIC_RESULT_LIMIT,hasStrongSongMatch,hasExactSongMatch,type MusicScope,type SongSuggestion} from '@/lib/musicSearch';
 import {cachedSongMatches,primeSongCatalog,rememberSongs,subscribeSongCatalog} from '@/lib/musicCatalogClient';
 import {loadSongMatches} from '@/lib/musicSearchClient';
 
@@ -22,7 +22,7 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
     if(disabled||selected||query.trim().length<2){setItems([]);setLoading(false);return ()=>controller.abort();}
     const local=cachedSongMatches(scope,query);const refresh=forcedTerm===query.trim()&&retry>0;
     setItems(local);setActive(-1);setError('');
-    if(!refresh&&(hasStrongSongMatch(local,query)||completedSearch.current===query.trim())){setLoading(false);if(completedSearch.current===query.trim()&&!hasStrongSongMatch(local,query))setError(completedNotice.current||(!local.length?'Chưa tìm thấy bài trong phạm vi này.':''));return ()=>controller.abort();}
+    if(!refresh&&(hasStrongSongMatch(local,query)||hasExactSongMatch(local,query)||completedSearch.current===query.trim())){setLoading(false);if(completedSearch.current===query.trim()&&!local.length)setError(completedNotice.current||(!local.length?'Chưa tìm thấy bài trong phạm vi này.':''));return ()=>controller.abort();}
     setLoading(true);setWaiting(false);
     // Let one cold lookup finish while typing continues. Reuse its metadata for
     // the latest query instead of discarding it and competing for the API lease.
@@ -71,9 +71,9 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
       }}/>
     </div>
     {items.length>0&&<ul className="song-search-results" role="listbox" id={id+'-list'} aria-label="Các bài hát phù hợp">{items.map((song,index)=><li role="option" aria-selected={active===index} id={id+'-option-'+index} key={song.id} className={active===index?'active':''} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(song)}><strong>{song.title}</strong><span className="song-search-performers">{song.performers?.length?`Ca sĩ: ${song.performers.join(', ')}`:'Chưa có thông tin ca sĩ'}</span><small>{song.detail}</small></li>)}</ul>}
-    <p className="song-search-status" role="status" aria-live="polite">{busy?'Đang gửi đáp án…':sent?'Đã gửi lựa chọn.':loading?(waiting?'Đang tải danh mục bài hát… Kết quả sẽ tự cập nhật.':'Đang tìm thêm trên MusicBrainz…'):selected?`Đã chọn: ${selected.title}`:selectedTitle?`Đáp án đã liên kết: ${selectedTitle}`:''}</p>
+    <p className="song-search-status" role="status" aria-live="polite">{busy?'Đang gửi đáp án…':sent?'Đã gửi lựa chọn.':loading?(waiting?'Đang tải danh mục bài hát… Kết quả sẽ tự cập nhật.':'Đang tìm bài hát…'):selected?`Đã chọn: ${selected.title}`:selectedTitle?`Đáp án đã liên kết: ${selectedTitle}`:''}</p>
     {error&&<div className="notice info" role="status">{error} <button type="button" className="button ghost" disabled={disabled||loading||busy} onClick={searchMore}>Tìm lại</button></div>}
     {items.length>0&&!selected&&<button type="button" className="button ghost" disabled={disabled||loading||busy} onClick={searchMore}>Tìm thêm trên MusicBrainz</button>}
-    <small className="song-search-credit">Danh mục Đọ Nhạc · Dữ liệu <a href="https://musicbrainz.org/" target="_blank" rel="noreferrer">MusicBrainz</a>. Tìm theo tên bài hoặc ca sĩ, có hỗ trợ không dấu. Bài ngoài danh mục có thể cần chờ thêm.</small>
+    <small className="song-search-credit">Danh mục Đọ Nhạc · Dữ liệu <a href="https://musicbrainz.org/" target="_blank" rel="noreferrer">MusicBrainz</a> và <a href="https://www.wikidata.org/" target="_blank" rel="noreferrer">Wikidata</a>. Tìm theo tên bài hoặc ca sĩ, có hỗ trợ không dấu. Bài ngoài danh mục có thể cần chờ thêm.</small>
   </div>;
 }

@@ -3,8 +3,27 @@ import assert from 'node:assert/strict';
 import {createClient,type Client} from '@libsql/client';
 import {prepareLibrary,importLibrary,verifyLibrary,readLibraryScope,LIBRARY_SCHEMA,type LibrarySong} from '../src/lib/songLibraryStore.ts';
 import {extendLibrarySongs} from '../src/lib/extendSongLibrary.ts';
+import {signSong,readSong} from '../src/lib/songToken.ts';
 
 const song=(n:number,scope:'VI'|'US_UK'='US_UK'):LibrarySong=>({id:`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`,title:'Song '+n,scope,detail:'Test',performers:['Artist '+n]});
+test('multiple sources preserve legacy identity/evidence and independent catalog IDs work with signed selections',async()=>{
+  const evidence={provider:'Wikidata',id:'Q2365099',artistId:song(9).id,url:'https://www.wikidata.org/wiki/Q2365099'};
+  const old={...song(1),source:{provider:'MusicBrainz',workId:song(1).id}};
+  const next={...song(1),source:{provider:'Wikidata',evidence:[evidence],artistIds:[song(9).id]}};
+  const merged=extendLibrarySongs([old],[next]).songs;
+  assert.equal((merged[0].source as {provider:string}).provider,'MusicBrainz');
+  assert.deepEqual((merged[0].source as {evidence:unknown[]}).evidence,[evidence]);
+  assert.equal(extendLibrarySongs(merged,[next]).updated,0);
+  const independent={...song(2),source:{provider:'Wikidata',workId:null,wikidataId:'Q2'}};
+  const client=createClient({url:':memory:'});
+  try{
+    const prepared=prepareLibrary({songs:[...merged,independent]});await importLibrary(client,prepared);
+    const saved=(await readLibraryScope(client,prepared.version,'US_UK')).find(s=>s.id===independent.id)!;
+    const token=signSong(saved,'catalog-test-key');
+    assert.equal(readSong(token,'catalog-test-key').id,independent.id);
+    assert.notEqual(readSong(token,'catalog-test-key').id,old.id);
+  }finally{client.close();}
+});
 test('durable library imports, preserves curated labels/source and is idempotent',async()=>{
   const client=createClient({url:':memory:'});
   try{

@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {db,one,run} from './db';
-import {findMusicBrainzSongs,musicSearchCacheKey,MUSIC_CATALOG_VERSION,MUSIC_CATALOG_LIMIT,MUSIC_CATALOG_PAGE_SIZE,MUSIC_RESULT_LIMIT,normalizeMusicSearch,hasStrongSongMatch,type MusicScope,type SongWork,type SongSuggestion} from './musicSearch';
+import {findMusicBrainzSongs,musicSearchCacheKey,MUSIC_CATALOG_VERSION,MUSIC_CATALOG_LIMIT,MUSIC_CATALOG_PAGE_SIZE,MUSIC_RESULT_LIMIT,normalizeMusicSearch,hasStrongSongMatch,hasExactSongMatch,type MusicScope,type SongWork,type SongSuggestion} from './musicSearch';
 import {signSong} from './songToken';
 import {songSigningKey} from './songSelections';
 export {songSigningKey,verifySongSelection,savedSongToken} from './songSelections';
@@ -29,7 +29,7 @@ export async function searchSongs(query:string,scope:MusicScope,refresh=false) {
 }
 async function search(query:string,normalized:string,scope:MusicScope,cacheKey:string,refresh:boolean) {
   const defaults=await libraryMatches(query,scope);
-  if(hasStrongSongMatch(defaults,query)&&!refresh)return {items:await suggestions(defaults),source:'catalog'};
+  if((hasStrongSongMatch(defaults,query)||hasExactSongMatch(defaults,query))&&!refresh)return {items:await suggestions(defaults),source:'catalog'};
   const cached=refresh?null:await one('SELECT payload FROM music_search_cache WHERE id=? AND expires_at>?',cacheKey,Date.now());
   if(cached){const value=JSON.parse(String(cached.payload));return {items:await suggestions(Array.isArray(value)?value:value.works),source:'cache',notice:value.notice};}
   // Reuse public provider metadata only. Never index private quiz answers.
@@ -38,7 +38,7 @@ async function search(query:string,normalized:string,scope:MusicScope,cacheKey:s
   const local=await (await db()).execute({sql:`SELECT id,title,detail FROM music_catalog WHERE scope=? AND updated_at>? ${words.map(()=> "AND (normalized_title LIKE ? OR REPLACE(normalized_title,' ','') LIKE ?)").join(' ')} ORDER BY updated_at DESC LIMIT ${MUSIC_RESULT_LIMIT}`,args:[catalogScope,Date.now()-30*DAY,...words.flatMap(w=>['%'+w+'%','%'+w+'%'])]});
   const storedWorks:SongWork[]=local.rows.map(r=>{const saved=JSON.parse(String(r.detail));return {id:String(r.id),title:String(r.title),detail:String(saved.detail),performers:Array.isArray(saved.performers)?saved.performers:[],artistAliases:Array.isArray(saved.artistAliases)?saved.artistAliases:[],scope};}).sort((a,b)=>Number(!!b.performers?.length)-Number(!!a.performers?.length));
   const localWorks=matchSongs(indexSongs([...new Map([...defaults,...storedWorks].map(song=>[song.id,{...song,token:''}])).values()]),query).map(song=>({...song,token:undefined}));
-  if(hasStrongSongMatch(localWorks,query)&&!refresh)return {items:await suggestions(localWorks),source:'catalog'};
+  if((hasStrongSongMatch(localWorks,query)||hasExactSongMatch(localWorks,query))&&!refresh)return {items:await suggestions(localWorks),source:'catalog'};
   try {
     let notice:string|undefined;
     const works=await findMusicBrainzSongs(query,scope,(entity,searchQuery,limit)=>requestMusicMetadata(entity,searchQuery,limit,{

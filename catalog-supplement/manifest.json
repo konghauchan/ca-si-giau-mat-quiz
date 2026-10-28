@@ -1,0 +1,45 @@
+{
+  "version": "d6b78abc48421f593ea6611f1cc9bfbe7d8ba93bca9541b550906c43a87dfa93",
+  "total": 58603,
+  "counts": {
+    "VI": 2117,
+    "US_UK": 56486
+  },
+  "checksum": "d6b78abc48421f593ea6611f1cc9bfbe7d8ba93bca9541b550906c43a87dfa93",
+  "active": true,
+  "previousVersion": "353a53e42464712451a004bd38cedcf5041233f98a1053d5ef0d02c9fceaeddb",
+  "legacyIdsMissing": 0,
+  "sources": {
+    "provider": "MusicBrainz + Wikidata",
+    "license": "CC0-1.0",
+    "complete": true,
+    "scopePolicy": "verified-artist-unknown-language-v1",
+    "retrievedAt": "2026-10-28T05:03:17Z",
+    "rosterArtists": 377,
+    "wikidataArtistsMapped": 377,
+    "wikidataUnresolvedArtists": [],
+    "wikidataItems": 10392,
+    "wikidataForeignItemsExcluded": 163,
+    "cachedRecordingPages": 3160,
+    "cachedRecordingsProcessed": 305895,
+    "coverage": "All Wikidata song/single pages for mapped artists; cached MusicBrainz pages only, not a fresh full recording crawl.",
+    "count": 9370
+  },
+  "knownHit": {
+    "id": "b2ca2699-1db0-470a-8a11-1a04cf20f945",
+    "title": "I Lay My Love on You",
+    "performers": [
+      "Westlife"
+    ],
+    "searchable": true
+  },
+  "independentCatalogRows": 2187,
+  "verifiedAt": "2026-10-28T05:07:54.945Z",
+  "added": 5482,
+  "updated": 3888,
+  "artifact": {
+    "file": "expansion.json.gz",
+    "sha256": "36a80869aee0400b53506a67147551c667e6f717d93977caa85aafadd72e2613",
+    "bytes": 1152108
+  }
+}

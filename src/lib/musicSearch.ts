@@ -2,7 +2,7 @@ import { normalizeAnswer } from './core.ts';
 
 export type MusicScope = 'VI' | 'US_UK';
 export const MUSIC_SCOPES = ['VI', 'US_UK'] as const;
-export const musicScopeLabel = (scope: MusicScope) => scope === 'VI' ? 'Nhạc Việt · tiếng Việt' : 'US–UK · tiếng Anh quốc tế';
+export const musicScopeLabel = (scope: MusicScope) => scope === 'VI' ? 'Nhạc Việt · tiếng Việt' : 'US–UK · nhạc quốc tế';
 export type SongWork = { id: string; title: string; detail: string; scope: MusicScope; performers?:string[]; artistAliases?:string[] };
 export type SongSuggestion = SongWork & { token: string };
 export type MusicBrainzWork = { id?: string; title?: string; type?: string; language?: string; languages?: string[]; disambiguation?: string; relations?: Array<{type?:string;artist?:{name?:string};recording?:{id?:string}}> };
@@ -76,6 +76,10 @@ export function matchingArtist(artists:MusicBrainzArtist[],query:string):MusicBr
 }
 export function hasStrongSongMatch(songs:SongWork[],query:string):boolean {
   return songs.some(song=>[...(song.performers||[]),...(song.artistAliases||[])].some(name=>Number.isFinite(artistNameRank(query,name))));
+}
+export function hasExactSongMatch(songs:SongWork[],query:string):boolean {
+  const term=normalizeMusicSearch(query);
+  return !!term&&songs.some(song=>normalizeMusicSearch(song.title)===term);
 }
 export function musicBrainzRecordingQuery(query:string,artistId?:string) {
   const term=searchTerm(query);
