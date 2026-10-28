@@ -4,15 +4,15 @@ export type IntroMode = 'OPEN' | 'BID' | 'CLUE';
 export const ROUND_INTRO_MS = 18000;
 export function answerAction(answerMode: AnswerMode, film = false, language = 'vi-VN'): string {
   if (language === 'en-US') {
-    if (answerMode === 'SEARCH') return 'Search by song title or artist. Selecting a song submits it immediately.';
+    if (answerMode === 'SEARCH') return film ? 'Search by film title or actor. Selecting a film submits it immediately.' : 'Search by song title or artist. Selecting a song submits it immediately.';
     return answerMode === 'CHOICE' ? 'Choose one of the four answers.' : `Type the ${film ? 'film' : 'song'} title and press Submit.`;
   }
-  if (answerMode === 'SEARCH') return 'Tìm tên bài hoặc ca sĩ. Chọn bài là gửi ngay.';
+  if (answerMode === 'SEARCH') return film ? 'Tìm tên phim hoặc diễn viên. Chọn phim là gửi ngay.' : 'Tìm tên bài hoặc ca sĩ. Chọn bài là gửi ngay.';
   return answerMode === 'CHOICE' ? 'Chọn một trong bốn đáp án.' : `Gõ tên ${film ? 'phim' : 'bài hát'} rồi bấm Gửi đáp án.`;
 }
 export function roundRules(mode: IntroMode, film = false, answerMode: AnswerMode = 'TEXT') {
   const media = film ? 'Xem' : 'Nghe';
-  const answer = { title: answerMode === 'SEARCH' ? 'Tìm và chọn bài' : answerMode === 'CHOICE' ? 'Chọn đáp án' : 'Gõ đáp án', description: answerAction(answerMode, film) };
+  const answer = { title: answerMode === 'SEARCH' ? film ? 'Tìm và chọn phim' : 'Tìm và chọn bài' : answerMode === 'CHOICE' ? 'Chọn đáp án' : 'Gõ đáp án', description: answerAction(answerMode, film) };
   const content = mode === 'OPEN'
     ? { title: `Cùng ${media.toLowerCase()}, cùng đoán`, steps: [
       { title: `${media} cùng nhau`, description: 'Tất cả nhận cùng một đoạn.' },

@@ -5,11 +5,11 @@ export type NarrationState = {
   personal?:{stage:string}|null; me?: { id: string } | null; gameRound?: number; roundQuestionIndex?: number; playMode?: 'OPEN'|'BID'|'CLUE'; category?: string; gameType: string; phase: string; question: { answerMode?: AnswerMode; prompt?: unknown; hint?: unknown; primaryAnswer?: unknown; artist?: unknown };
   clue?: { index: number; items: Array<{ text: string }>; holder?: string | null; answerLocked?: boolean };
 };
-function searchAnswerHelp(single: boolean, language: 'vi-VN'|'en-US'): string {
+function searchAnswerHelp(single: boolean, language: 'vi-VN'|'en-US', film = false): string {
   const limit = language === 'en-US'
-    ? single ? 'You get one selection.' : 'If wrong, select another song before time is up.'
+    ? single ? 'You get one selection.' : `If wrong, select another ${film ? 'film' : 'song'} before time is up.`
     : single ? 'Chỉ được chọn một lần.' : 'Sai có thể chọn lại trước khi hết giờ.';
-  return `${answerAction('SEARCH', false, language)} ${limit}`;
+  return `${answerAction('SEARCH', film, language)} ${limit}`;
 }
 export function narrationText(state: NarrationState, kind: NarrationKind, language: 'vi-VN'|'en-US' = 'vi-VN'): string {
   if (kind === 'intro') {
@@ -28,12 +28,12 @@ export function narrationText(state: NarrationState, kind: NarrationKind, langua
   }
   if (state.gameType === 'SONG_CLUE') {
     if (state.phase !== 'CLUE_ANSWERING' || state.question.answerMode !== 'SEARCH' || !state.me || state.clue?.holder !== state.me.id || state.clue.answerLocked) throw new Error('Chưa đến lượt bạn trả lời.');
-    return searchAnswerHelp(true, language);
+    return searchAnswerHelp(true, language, state.category === 'FILM');
   }
   if (!['TOPIC_INTRO', 'BIDDING', 'BID_REVEAL', 'OPEN_ANSWERING', 'ANSWERING'].includes(state.phase) && !(state.phase==='MEDIA_PLAYING' && state.personal?.stage==='ANSWER')) throw new Error('Câu hỏi chưa sẵn sàng để đọc.');
   const answering = ['OPEN_ANSWERING', 'ANSWERING'].includes(state.phase) || (state.phase === 'MEDIA_PLAYING' && state.personal?.stage === 'ANSWER');
   const searchHelp = state.question.answerMode === 'SEARCH' && answering
-    ? ` ${searchAnswerHelp(state.playMode === 'BID' || state.phase === 'ANSWERING' || state.phase === 'MEDIA_PLAYING', language)}`
+    ? ` ${searchAnswerHelp(state.playMode === 'BID' || state.phase === 'ANSWERING' || state.phase === 'MEDIA_PLAYING', language, state.category === 'FILM')}`
     : '';
   return `${state.question.prompt || 'Đáp án của bạn là gì?'}${state.question.hint && ['BIDDING', 'BID_REVEAL'].includes(state.phase) ? ` ${language === 'en-US' ? 'Hint' : 'Gợi ý'}: ${state.question.hint}` : ''}${searchHelp}`;
 }
@@ -45,7 +45,7 @@ export function narrationPreparationTexts(state: NarrationState, language: 'vi-V
     state = { ...state, gameType: 'SONG_CLUE' };
     const clue = state.clue || { index: 0, items: [] };
     const clues = clue.items.map((_, index) => narrationText({ ...state, phase: 'CLUE_ACTIVE', clue: { ...clue, index } }, 'clue', language));
-    const help = state.question.answerMode === 'SEARCH' ? [searchAnswerHelp(true, language)] : [];
+    const help = state.question.answerMode === 'SEARCH' ? [searchAnswerHelp(true, language, state.category === 'FILM')] : [];
     return [clues[0], answer, ...help, ...clues.slice(1)].filter((text): text is string => !!text);
   }
   const phases = state.playMode === 'BID' ? ['BIDDING', 'ANSWERING'] : ['OPEN_ANSWERING'];

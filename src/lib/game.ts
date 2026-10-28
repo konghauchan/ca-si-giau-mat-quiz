@@ -1,3 +1,4 @@
+import { verifyFilmSelection, savedFilmToken } from './filmSelections';
 import {verifySongSelection,savedSongToken} from './songSelections';
 import type {MusicScope} from './musicSearch';
 import { sharedRead, invalidateRead } from './sharedRead';
@@ -147,9 +148,8 @@ export async function saveQuiz(input: { id?: string; musicScope?:MusicScope; cov
   const searchAnswers=new Map<QuestionInput,string>();
   for(const [index,q] of input.questions.entries()) if(q.answerMode==='SEARCH') {
     try {
-      if(input.gameType==='FILM_DUEL') throw new Error('Tìm bài hát chỉ dành cho Đọ Nhạc.');
-      const song=await verifySongSelection(q.searchToken||'',scope);
-      if(song.title!==q.primaryAnswer.trim()) throw new Error('Tên đáp án đã thay đổi. Hãy chọn lại bài hát từ MusicBrainz.');
+      const song=input.gameType==='FILM_DUEL'?await verifyFilmSelection(q.searchToken||''):await verifySongSelection(q.searchToken||'',scope);
+      if(song.title!==q.primaryAnswer.trim()) throw new Error('Tên đáp án đã thay đổi. Hãy chọn lại từ danh mục.');
       searchAnswers.set(q,song.id);
     }catch(error){throw Object.assign(new Error((error as Error).message),{issues:[{path:['questions',index,'searchToken'],message:(error as Error).message}]});}
   }
@@ -232,7 +232,8 @@ export async function saveQuiz(input: { id?: string; musicScope?:MusicScope; cov
       await run('INSERT INTO questions(id,quiz_id,order_index,type,prompt,reveal_type,reveal_unit,reveal_min,reveal_max,reveal_step,media_type,media_url,media_start,game_round,listen_seconds,answer_seconds,bid_seconds,primary_answer,artist,hint,topic_id,result_start,result_seconds,clues_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', questionId, quizId, index, input.gameType === 'FILM_DUEL' ? inputPlayMode(q,input.gameType) === 'CLUE' ? 'film_clue' : inputPlayMode(q,input.gameType) === 'OPEN' ? 'film_open' : 'film_bid' : inputPlayMode(q,input.gameType) === 'CLUE' ? 'song_clue' : input.gameType === 'MUSIC_DUEL' ? inputPlayMode(q,input.gameType) === 'OPEN' ? 'music_open' : 'music_bid' : 'music', q.prompt.trim(), 'media_time', 'seconds', q.revealMin, q.revealMax, q.revealStep, q.mediaType, q.mediaUrl, q.mediaStart, q.gameRound, q.listenSeconds, q.answerSeconds, q.bidSeconds, q.primaryAnswer.trim(), q.artist.trim(), q.hint.trim(), topicIds.get(q.topicKey)!, q.resultStart ?? null, q.resultSeconds ?? null, JSON.stringify(q.clues || []));
       const options: Choice[] = q.answerMode==='CHOICE' ? [q.primaryAnswer,...(q.distractors||[])].map(label=>({id:id(),label:label.trim()})) : [];
       await run('UPDATE questions SET answer_mode=?,choice_options=?,correct_choice_id=? WHERE id=?', q.answerMode||'TEXT', JSON.stringify(options), options[0]?.id||null, questionId);
-      await run('UPDATE questions SET musicbrainz_work_id=? WHERE id=?',searchAnswers.get(q)||null,questionId);
+      await run('UPDATE questions SET musicbrainz_work_id=? WHERE id=?',input.gameType==='FILM_DUEL'?null:searchAnswers.get(q)||null,questionId);
+      await run('UPDATE questions SET film_catalog_id=? WHERE id=?',input.gameType==='FILM_DUEL'?searchAnswers.get(q)||null:null,questionId);
       await run('UPDATE questions SET title_hint_indices=? WHERE id=?', JSON.stringify(q.titleHintIndices || []), questionId);
       for (const answer of new Set(q.acceptedAnswers.map(x => x.trim()).filter(Boolean))) await run('INSERT OR IGNORE INTO accepted_answers VALUES(?,?)', questionId, answer);
     }
@@ -273,7 +274,7 @@ export async function getQuiz(quizId: string, userId?: string) {
     {sql:'SELECT id,game_round,order_index,title,song_count FROM topics WHERE quiz_id=? ORDER BY game_round,order_index',args:[quizId]},
     {sql:'SELECT 1 FROM rooms WHERE quiz_id=? LIMIT 1',args:[quizId]}
   ]);
-  const questions=await Promise.all(questionRows.map(async question=>({...question,search_token:question.answer_mode==='SEARCH'&&question.musicbrainz_work_id?await savedSongToken(String(question.musicbrainz_work_id),String(question.primary_answer),String(q.music_scope||'VI') as MusicScope):undefined,accepted_answers:aliases.filter(a=>a.question_id===question.id).map(a=>a.answer)})));
+  const questions=await Promise.all(questionRows.map(async question=>({...question,search_token:question.answer_mode==='SEARCH'&&q.game_type==='FILM_DUEL'&&question.film_catalog_id?await savedFilmToken(String(question.film_catalog_id),String(question.primary_answer)):question.answer_mode==='SEARCH'&&question.musicbrainz_work_id?await savedSongToken(String(question.musicbrainz_work_id),String(question.primary_answer),String(q.music_scope||'VI') as MusicScope):undefined,accepted_answers:aliases.filter(a=>a.question_id===question.id).map(a=>a.answer)})));
   return { id: q.id, gameType: q.game_type, musicScope:q.music_scope, title: q.title, description: q.description, visibility: q.visibility, coverUrl: q.cover_url, questionCount: counts?.question_count ?? 0, roundCount: counts?.round_count ?? 0, rounds, roundOneCount: counts?.round_one_count ?? 0, roundTwoCount: counts?.round_two_count ?? 0, topics, questions, own, usedInRoom: rooms.length > 0 };
 }
 export async function listQuizzes(userId?: string) {
@@ -401,14 +402,14 @@ export async function gameCommand(roomId: string, auth: string, action: string, 
         if(previous.some(a=>a.correct===1)) fail('Bạn đã trả lời đúng.');
         if(previous.length>=30) fail('Bạn đã dùng hết 30 lần thử cho câu này.');
         const supplied=String(value??'').trim().slice(0,q.answer_mode==='SEARCH'?1200:120);
-        const selectedSong=q.answer_mode==='SEARCH'?await verifySongSelection(supplied,String((await one('SELECT music_scope FROM quizzes WHERE id=?',String(r.quiz_id)))?.music_scope||'VI') as MusicScope):undefined;
+        const selectedSong=q.answer_mode==='SEARCH'?String(q.type).startsWith('film_')?await verifyFilmSelection(supplied):await verifySongSelection(supplied,String((await one('SELECT music_scope FROM quizzes WHERE id=?',String(r.quiz_id)))?.music_scope||'VI') as MusicScope):undefined;
         const options:Choice[]=JSON.parse(String(q.choice_options||'[]'));
         const chosen=q.answer_mode==='CHOICE'?options.find(c=>c.id===supplied):undefined;
         if(q.answer_mode==='CHOICE' && !chosen) fail('Lựa chọn không hợp lệ.');
         const text=selectedSong?.title || chosen?.label || supplied;if(!text) fail('Nhập đáp án.');
         if(q.answer_mode!=='SEARCH'&&previous.some(a=>normalizeAnswer(String(a.text))===normalizeAnswer(text))) fail('Bạn đã thử đáp án này. Hãy nhập tên khác.');
         const accepted=[String(q.primary_answer),...(await all('SELECT answer FROM accepted_answers WHERE question_id=?',String(q.id))).map(a=>String(a.answer))];
-        const correct=selectedSong?(selectedSong.id===q.musicbrainz_work_id?1:0):chosen ? (chosen.id===q.correct_choice_id?1:0) : (answerMatches(text,accepted)?1:0);
+        const correct=selectedSong?(selectedSong.id===(String(q.type).startsWith('film_')?q.film_catalog_id:q.musicbrainz_work_id)?1:0):chosen ? (chosen.id===q.correct_choice_id?1:0) : (answerMatches(text,accepted)?1:0);
         await run('INSERT INTO answer_attempts(id,room_id,question_index,player_id,amount,text,correct,created_at) VALUES(?,?,?,?,?,?,?,?)',id(),roomId,index,String(p.id),simultaneous?Number(ownBid!.amount):0,text,correct,clock);
         await event(roomId,'ANSWER_SUBMITTED',{playerId:p.id});
         const allAttempts=await all('SELECT player_id,correct FROM answer_attempts WHERE room_id=? AND question_index=?',roomId,index);

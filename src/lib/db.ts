@@ -19,8 +19,8 @@ async function initialize(): Promise<Client> {
     try {
       // A deployed function should not run DDL on every cold start. Check the
       // columns it needs with one read, and migrate only an older database.
-      await client.execute(`SELECT q.music_scope,s.musicbrainz_work_id,q.deleted_at,q.replacement_id,q.cover_url,q.game_type,q.owner_user_id,s.answer_mode,s.choice_options,s.correct_choice_id,s.title_hint_indices,s.clues_json,s.game_round,s.listen_seconds,s.answer_seconds,s.bid_seconds,s.topic_id,s.result_start,s.result_seconds,r.paused_at,r.clue_state,p.ready,p.avatar_id,a.id,u.id,us.token_hash
-        FROM quizzes q,questions s,rooms r,players p,answer_attempts a,users u,user_sessions us,narration_cache nc,narration_usage nu,music_search_control msc,music_search_cache mscache,music_catalog mc,song_library_releases slr,song_library_entries sle,song_library_active sla LIMIT 0`);
+      await client.execute(`SELECT q.music_scope,s.musicbrainz_work_id,s.film_catalog_id,q.deleted_at,q.replacement_id,q.cover_url,q.game_type,q.owner_user_id,s.answer_mode,s.choice_options,s.correct_choice_id,s.title_hint_indices,s.clues_json,s.game_round,s.listen_seconds,s.answer_seconds,s.bid_seconds,s.topic_id,s.result_start,s.result_seconds,r.paused_at,r.clue_state,p.ready,p.avatar_id,a.id,u.id,us.token_hash
+        FROM quizzes q,questions s,rooms r,players p,answer_attempts a,users u,user_sessions us,narration_cache nc,narration_usage nu,music_search_control msc,music_search_cache mscache,music_catalog mc,song_library_releases slr,song_library_entries sle,song_library_active sla,film_library_releases flr,film_library_entries fle,film_library_active fla LIMIT 0`);
       return client;
     } catch (error) {
       if (!/no such (?:table|column)/i.test(String(error))) { client.close(); throw error; }
@@ -39,6 +39,7 @@ async function initialize(): Promise<Client> {
     }
     await addColumn('quizzes', 'music_scope', "TEXT NOT NULL DEFAULT 'VI'");
     await addColumn('questions', 'musicbrainz_work_id', 'TEXT');
+    await addColumn('questions', 'film_catalog_id', 'TEXT');
     await addColumn('quizzes', 'game_type', "TEXT NOT NULL DEFAULT 'MUSIC_BID'");
     await addColumn('questions', 'answer_mode', "TEXT NOT NULL DEFAULT 'TEXT'");
     await addColumn('questions', 'choice_options', "TEXT NOT NULL DEFAULT '[]'");

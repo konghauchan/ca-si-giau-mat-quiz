@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS questions (
   id TEXT PRIMARY KEY, quiz_id TEXT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
   clues_json TEXT NOT NULL DEFAULT '[]',
   musicbrainz_work_id TEXT,
+  film_catalog_id TEXT,
   order_index INTEGER NOT NULL, type TEXT NOT NULL DEFAULT 'music', prompt TEXT NOT NULL,
   reveal_type TEXT NOT NULL DEFAULT 'media_time', reveal_unit TEXT NOT NULL DEFAULT 'seconds',
   reveal_min INTEGER NOT NULL DEFAULT 1, reveal_max INTEGER NOT NULL DEFAULT 10,
@@ -127,3 +128,7 @@ CREATE TABLE IF NOT EXISTS song_library_entries (
 CREATE TABLE IF NOT EXISTS song_library_active (
   id TEXT PRIMARY KEY CHECK(id='active'), version TEXT NOT NULL REFERENCES song_library_releases(id)
 );
+
+CREATE TABLE IF NOT EXISTS film_library_releases(id TEXT PRIMARY KEY,manifest TEXT NOT NULL,film_count INTEGER NOT NULL,completed_at INTEGER);
+CREATE TABLE IF NOT EXISTS film_library_entries(version TEXT NOT NULL REFERENCES film_library_releases(id),id TEXT NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(version,id));
+CREATE TABLE IF NOT EXISTS film_library_active(id TEXT PRIMARY KEY CHECK(id='active'),version TEXT NOT NULL REFERENCES film_library_releases(id));
