@@ -18,7 +18,7 @@ export function narrationText(state: NarrationState, kind: NarrationKind, langua
   }
   if (kind === 'answer') {
     if (!['ROUND_RESULT', 'SCOREBOARD', 'CLUE_RESULT', 'GAME_FINISHED'].includes(state.phase) || !state.question.primaryAnswer) throw new Error('Đáp án chưa được công bố.');
-    return `${language === 'en-US' ? 'The answer is' : 'Đáp án là'}: ${state.question.primaryAnswer}${state.question.artist ? `. ${state.question.artist}` : ''}.`;
+    return `${language === 'en-US' ? 'The answer is' : 'Đáp án là'}: ${state.question.primaryAnswer}${state.category !== 'FILM' && state.question.artist ? `. ${state.question.artist}` : ''}.`;
   }
   if (kind === 'clue') {
     if (state.gameType !== 'SONG_CLUE' || !['CLUE_ACTIVE', 'CLUE_ANSWERING', 'CLUE_FEEDBACK'].includes(state.phase)) throw new Error('Gợi ý chưa được mở.');
@@ -32,6 +32,13 @@ export function narrationText(state: NarrationState, kind: NarrationKind, langua
   }
   if (!['TOPIC_INTRO', 'BIDDING', 'BID_REVEAL', 'OPEN_ANSWERING', 'ANSWERING'].includes(state.phase) && !(state.phase==='MEDIA_PLAYING' && state.personal?.stage==='ANSWER')) throw new Error('Câu hỏi chưa sẵn sàng để đọc.');
   const answering = ['OPEN_ANSWERING', 'ANSWERING'].includes(state.phase) || (state.phase === 'MEDIA_PLAYING' && state.personal?.stage === 'ANSWER');
+  if (state.category === 'FILM') {
+    if (answering) return language === 'en-US' ? 'What is the film title?' : 'Tên phim là gì?';
+    if (['BIDDING', 'BID_REVEAL'].includes(state.phase)) {
+      const hint = state.question.hint ? `${language === 'en-US' ? 'Hint' : 'Gợi ý'}: ${state.question.hint}. ` : '';
+      return `${hint}${language === 'en-US' ? 'How many seconds do you need to watch?' : 'Bạn cần xem bao nhiêu giây?'}`;
+    }
+  }
   const searchHelp = state.question.answerMode === 'SEARCH' && answering
     ? ` ${searchAnswerHelp(state.playMode === 'BID' || state.phase === 'ANSWERING' || state.phase === 'MEDIA_PLAYING', language, state.category === 'FILM')}`
     : '';
@@ -41,13 +48,15 @@ export function narrationText(state: NarrationState, kind: NarrationKind, langua
 // Server-only preparation receives the private question; callers never return these texts.
 export function narrationPreparationTexts(state: NarrationState, language: 'vi-VN'|'en-US' = 'vi-VN'): string[] {
   const answer = narrationText({ ...state, phase: 'ROUND_RESULT' }, 'answer', language);
+  const intro = state.category === 'FILM' && state.roundQuestionIndex === 1
+    ? [narrationText({ ...state, phase: 'TOPIC_INTRO' }, 'intro', language)] : [];
   if (state.gameType === 'SONG_CLUE' || state.playMode === 'CLUE') {
     state = { ...state, gameType: 'SONG_CLUE' };
     const clue = state.clue || { index: 0, items: [] };
     const clues = clue.items.map((_, index) => narrationText({ ...state, phase: 'CLUE_ACTIVE', clue: { ...clue, index } }, 'clue', language));
     const help = state.question.answerMode === 'SEARCH' ? [searchAnswerHelp(true, language, state.category === 'FILM')] : [];
-    return [clues[0], answer, ...help, ...clues.slice(1)].filter((text): text is string => !!text);
+    return [...intro, clues[0], answer, ...help, ...clues.slice(1)].filter((text): text is string => !!text);
   }
   const phases = state.playMode === 'BID' ? ['BIDDING', 'ANSWERING'] : ['OPEN_ANSWERING'];
-  return [...new Set([...phases.map(phase => narrationText({ ...state, phase }, 'question', language)), answer])];
+  return [...new Set([...intro, ...phases.map(phase => narrationText({ ...state, phase }, 'question', language)), answer])];
 }
