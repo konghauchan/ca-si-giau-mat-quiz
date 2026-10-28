@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, generateKeyPairSync, createVerify } from 'node:crypto';
-import { narrationText } from '../src/lib/narrationText.ts';
+import { narrationPreparationTexts, narrationText, type NarrationState } from '../src/lib/narrationText.ts';
+import { roundIntroText, roundRules } from '../src/lib/roundIntro.ts';
 import { audioFromWaveNet, encryptSpeech, decryptSpeech } from '../src/lib/narrationAudio.ts';
 
 test('narration cannot reveal an answer or unopened clue before the result', () => {
@@ -81,4 +82,72 @@ test('round introduction never reads hidden answers and is restricted to the fir
   assert.match(text, /Đấu giá thời gian/); assert.doesNotMatch(text, /Secret track/);
   assert.throws(() => narrationText({...state, roundQuestionIndex: 2}, 'intro'));
   assert.throws(() => narrationText({...state, phase: 'BIDDING'}, 'intro'));
+});
+
+test('search introductions explain immediate submission and the actual retry rule in both languages', () => {
+  for (const language of ['vi-VN', 'en-US'] as const) {
+    for (const mode of ['OPEN', 'BID', 'CLUE'] as const) {
+      const text = roundIntroText(mode, 2, false, language, 'SEARCH');
+      assert.match(text, language === 'vi-VN' ? /Tìm tên bài hoặc ca sĩ\. Chọn bài là gửi ngay/ : /Search by song title or artist\. Selecting a song submits it immediately/);
+      assert.doesNotMatch(text, /ABCD|hé chữ|Gõ|press Submit|Text answers/i);
+      assert.match(text, language === 'vi-VN' ? mode === 'OPEN' ? /Sai có thể thử lại/ : /Chỉ chốt một lần/ : mode === 'OPEN' ? /If wrong, try again/ : /You get one answer/);
+      const visual = roundRules(mode, false, 'SEARCH');
+      assert.ok(visual.steps.some(step => step.title === 'Tìm và chọn bài'));
+      assert.doesNotMatch(visual.rules.join(' '), /ABCD|hé chữ|Gõ/);
+    }
+  }
+  const choice = roundIntroText('OPEN', 1, false, 'vi-VN', 'CHOICE');
+  assert.match(choice, /Chọn một trong bốn đáp án/);
+  assert.match(choice, /Hết giờ mới công bố đúng sai/);
+  assert.doesNotMatch(choice, /thử lại|Tìm tên bài/);
+  assert.match(roundIntroText('OPEN', 1, true), /Gõ tên phim/);
+  assert.match(roundRules('OPEN').notes.join(' '), /Hé chữ/);
+});
+
+test('search narration uses server answer mode and never speaks a hidden answer while answering', () => {
+  const state: NarrationState = { gameType: 'MUSIC_DUEL', playMode: 'OPEN', phase: 'OPEN_ANSWERING', question: { answerMode: 'SEARCH', prompt: 'Bài hát nào?', primaryAnswer: 'SECRET TRACK', artist: 'SECRET ARTIST' } };
+  const open = narrationText(state, 'question');
+  assert.match(open, /Chọn bài là gửi ngay/);
+  assert.match(open, /Sai có thể chọn lại/);
+  assert.doesNotMatch(open, /SECRET/);
+  const intro = narrationText({ ...state, phase: 'TOPIC_INTRO', roundQuestionIndex: 1 }, 'intro');
+  assert.match(intro, /Tìm tên bài hoặc ca sĩ/);
+  assert.doesNotMatch(intro, /SECRET/);
+  const bid: NarrationState = { ...state, playMode: 'BID', phase: 'MEDIA_PLAYING', personal: { stage: 'ANSWER' } };
+  assert.match(narrationText(bid, 'question'), /Chỉ được chọn một lần/);
+  assert.doesNotMatch(narrationText(bid, 'question'), /chọn lại|SECRET/);
+  for (const stage of ['PREPARE', 'LISTEN', 'WAIT']) assert.throws(() => narrationText({ ...bid, personal: { stage } }, 'question'));
+  assert.equal(narrationText({ ...state, question: { ...state.question, answerMode: 'TEXT' } }, 'question'), 'Bài hát nào?');
+});
+
+test('clue search instructions are available only to the current unanswered buzzer winner', () => {
+  const state: NarrationState = { gameType: 'SONG_CLUE', phase: 'CLUE_ANSWERING', me: { id: 'winner' }, clue: { index: 0, items: [{ text: 'Public clue' }], holder: 'winner' }, question: { answerMode: 'SEARCH', primaryAnswer: 'SECRET' } };
+  const text = narrationText(state, 'question');
+  assert.match(text, /Chọn bài là gửi ngay/);
+  assert.match(text, /Chỉ được chọn một lần/);
+  assert.doesNotMatch(text, /SECRET/);
+  assert.throws(() => narrationText({ ...state, me: { id: 'other' } }, 'question'));
+  assert.throws(() => narrationText({ ...state, clue: { ...state.clue!, answerLocked: true } }, 'question'));
+  assert.throws(() => narrationText({ ...state, phase: 'CLUE_ACTIVE' }, 'question'));
+  assert.throws(() => narrationText({ ...state, question: { ...state.question, answerMode: 'TEXT' } }, 'question'));
+});
+
+test('prepared audio texts exactly match the guarded playback variants, including bid hint and search', () => {
+  for (const language of ['vi-VN', 'en-US'] as const) {
+    for (const mode of ['OPEN', 'BID', 'CLUE'] as const) {
+      for (const answerMode of ['TEXT', 'CHOICE', 'SEARCH'] as const) {
+        const state: NarrationState = { gameType: mode === 'CLUE' ? 'SONG_CLUE' : 'MUSIC_DUEL', playMode: mode, phase: 'LOBBY', me: { id: 'winner' }, clue: { index: 0, items: [{ text: 'First clue' }, { text: 'Second clue' }], holder: 'winner' }, question: { answerMode, prompt: 'Public prompt', hint: 'Bidding hint', primaryAnswer: 'Private answer' } };
+        const prepared = narrationPreparationTexts(state, language);
+        assert.ok(prepared.includes(narrationText({ ...state, phase: 'ROUND_RESULT' }, 'answer', language)));
+        const phases = mode === 'CLUE' ? [] : mode === 'BID' ? ['BIDDING', 'BID_REVEAL', 'ANSWERING'] : ['OPEN_ANSWERING'];
+        for (const phase of phases) assert.ok(prepared.includes(narrationText({ ...state, phase }, 'question', language)), `${mode}/${answerMode}/${phase}/${language}`);
+        if (mode === 'CLUE') {
+          assert.ok(prepared.includes(narrationText({ ...state, phase: 'CLUE_ACTIVE' }, 'clue', language)));
+          assert.deepEqual(narrationPreparationTexts({ ...state, gameType: 'MUSIC_DUEL', phase: 'TOPIC_INTRO' }, language), prepared, 'mixed quiz warms clue audio during the round intro too');
+          if (answerMode === 'SEARCH') assert.ok(prepared.includes(narrationText({ ...state, phase: 'CLUE_ANSWERING' }, 'question', language)));
+        }
+        assert.equal(new Set(prepared).size, prepared.length);
+      }
+    }
+  }
 });

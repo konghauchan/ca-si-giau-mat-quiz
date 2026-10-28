@@ -1,8 +1,10 @@
 import { roundRules, type IntroMode } from '@/lib/roundIntro';
-import { Headphones, Film, Lightbulb, Keyboard, Trophy, Timer, Hand, Check, ArrowRight, Info } from 'lucide-react';
-export function RoundIntro({ round, mode, film = false, children }: { round: number; mode: IntroMode; film?: boolean; children?: React.ReactNode }) {
-  const info = roundRules(mode, film);
-  const icons = mode === 'OPEN' ? [film ? Film : Headphones, Keyboard, Trophy] : mode === 'BID' ? [Lightbulb, Timer, Check] : [Lightbulb, Hand, Check];
+import type { AnswerMode } from '@/lib/multiplayer';
+import { Headphones, Film, Lightbulb, Keyboard, Search, MousePointerClick, Trophy, Timer, Hand, ArrowRight, Info } from 'lucide-react';
+export function RoundIntro({ round, mode, film = false, answerMode = 'TEXT', children }: { round: number; mode: IntroMode; film?: boolean; answerMode?: AnswerMode; children?: React.ReactNode }) {
+  const info = roundRules(mode, film, answerMode);
+  const answerIcon = answerMode === 'SEARCH' ? Search : answerMode === 'CHOICE' ? MousePointerClick : Keyboard;
+  const icons = mode === 'OPEN' ? [film ? Film : Headphones, answerIcon, Trophy] : mode === 'BID' ? [Lightbulb, Timer, answerIcon] : [Lightbulb, Hand, answerIcon];
   return <section className="panel round-intro" aria-label={`Giới thiệu vòng ${round}`}>
     <span className="phase-pill">VÒNG {round} · CÁCH CHƠI</span><h2>{info.title}</h2>
     <ol className="round-intro-steps">{info.steps.map((step, index) => {
