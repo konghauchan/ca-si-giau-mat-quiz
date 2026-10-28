@@ -44,6 +44,10 @@ node --env-file=.env.local --experimental-strip-types scripts/import-song-librar
 
 Các nghệ sĩ trong `_meta.priority` được xếp trước (Britney Spears đầu tiên), sau đó xen kẽ các thời kỳ. Thu thập riêng một nghệ sĩ bằng `--only "Britney Spears"`, hoặc lặp lại `--only` cho một nhóm. Khi đó tệp xuất chỉ chứa tác phẩm của nhóm được chọn, dù dùng chung checkpoint với các nghệ sĩ khác. Dữ liệu đã hoàn tất được tiếp tục từ checkpoint; danh sách mục tiêu không đồng nghĩa toàn bộ danh mục đã được nhập.
 
+Mỗi lượt quét mặc định tối đa 5 trang bản thu (500 bản), sau đó nhường cho nghệ sĩ tiếp theo. Nghệ sĩ còn trang sẽ quay lại ở lượt sau cho đến khi hoàn tất. Cách này giúp các danh mục nhỏ không phải chờ hàng chục nghìn bản live của một nghệ sĩ lớn. Có thể điều chỉnh bằng `--pages-per-pass 1..100`; không thay đổi giới hạn tốc độ chung, không cắt bớt trang và không đánh dấu danh mục đang dở là hoàn tất.
+
+Tệp checkpoint/cache được ghi qua tệp tạm rồi thay thế nguyên tử. Trên Windows, nếu thao tác thay tệp bị khóa tạm thời bởi trình đọc hoặc phần mềm kiểm tra tệp, công cụ thử lại có giới hạn và giữ nguyên bản checkpoint hợp lệ trước đó; lỗi kéo dài vẫn được báo, không coi trang chưa lưu là đã hoàn tất.
+
 Công cụ duyệt tất cả trang bản thu của từng nghệ sĩ, kiểm tra mã nghệ sĩ trong credit, liên kết tác phẩm Song và ngôn ngữ tiếng Anh rõ ràng. Dùng tối đa 4 kết nối đang chờ nhưng có một cổng tốc độ chung: các lần bắt đầu request cách nhau ít nhất 1,2 giây; gặp 503/429 sẽ backoff. Checkpoint/cache cho phép chạy tiếp. Bản thiếu ngôn ngữ hoặc liên kết tác phẩm được thống kê trong `source.artistReports`, không tạo mã giả hay cam kết bao phủ bài chưa có trên MusicBrainz.
 
 Các bản cover cùng tác phẩm vẫn một Work ID. Giữ credit hiển thị hiện có, thêm nghệ sĩ của bản thu khác vào tên có thể tìm kiếm và lưu bằng chứng `source.performerCredits`; không ghép các ca sĩ của hai bản cover thành một bản song ca.

@@ -1,0 +1,29 @@
+{
+  "completedArtists": 377,
+  "total": 53121,
+  "counts": {
+    "VI": 2117,
+    "US_UK": 51004
+  },
+  "version": "353a53e42464712451a004bd38cedcf5041233f98a1053d5ef0d02c9fceaeddb",
+  "verifiedAt": "2026-10-28T02:51:01.099Z",
+  "originalWorksPreserved": true,
+  "requestedArtists": 377,
+  "collectedWorks": 40841,
+  "source": "MusicBrainz",
+  "noMedia": true,
+  "artistsScanned": 377,
+  "artistsWithEligibleWorks": 376,
+  "artistsWithoutEligibleWorks": [
+    {
+      "artist": "Bella Kay",
+      "musicBrainzArtistId": "acd1a23c-eba0-4d76-8b92-109d404d5531",
+      "recordingsScanned": 27,
+      "reason": "No linked Song Work with explicit English language metadata"
+    }
+  ],
+  "recordingsScanned": 768559,
+  "artistWorkLinksVerified": 47309,
+  "cloudRun": "https://github.com/konghauchan/ca-si-giau-mat-quiz/actions/runs/40533656647",
+  "cloudCompletedAt": "2026-10-27T18:30:11Z"
+}

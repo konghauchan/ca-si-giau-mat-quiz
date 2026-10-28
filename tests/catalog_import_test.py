@@ -2,6 +2,9 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import json
+import uuid
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('collector', Path(__file__).resolve().parents[1] / 'scripts/collect-song-catalog.py')
 collector = importlib.util.module_from_spec(spec)
@@ -11,6 +14,32 @@ REC = '00000000-0000-4000-8000-000000000002'
 
 
 class CatalogImportTest(unittest.TestCase):
+    def test_windows_checkpoint_replace_retries_without_truncating_previous_data(self):
+        directory=Path(__file__).resolve().parents[1]/'data'/('checkpoint-test-'+uuid.uuid4().hex)
+        directory.mkdir(parents=True)
+        target=directory/'checkpoint.json'
+        target.write_text('{"saved":"previous"}',encoding='utf8')
+        original=collector.os.replace
+        calls=[]
+        def replace(source,destination):
+            calls.append(1)
+            if len(calls)<3:
+                self.assertEqual(json.loads(target.read_text(encoding='utf8')),{'saved':'previous'})
+                raise PermissionError('Temporary sharing violation')
+            return original(source,destination)
+        with patch.object(collector.os,'replace',replace),patch.object(collector.time,'sleep'):
+            collector.atomic_json(target,{'saved':'next'})
+        self.assertEqual(len(calls),3)
+        self.assertEqual(json.loads(target.read_text(encoding='utf8')),{'saved':'next'})
+
+    def test_permanent_checkpoint_failure_preserves_previous_file(self):
+        directory=Path(__file__).resolve().parents[1]/'data'/('checkpoint-test-'+uuid.uuid4().hex)
+        directory.mkdir(parents=True)
+        target=directory/'checkpoint.json';target.write_text('{"saved":"previous"}',encoding='utf8')
+        with patch.object(collector.os,'replace',side_effect=PermissionError('Locked')),patch.object(collector.time,'sleep'):
+            with self.assertRaises(PermissionError):collector.atomic_json(target,{'saved':'next'})
+        self.assertEqual(json.loads(target.read_text(encoding='utf8')),{'saved':'previous'})
+
     def work(self, **changes):
         return {'id': WORK, 'title': 'Một bài hát', 'type': 'Song', 'language': 'vie',
                 'relations': [{'type': 'composer', 'artist': {'name': 'Composer only'}},

@@ -1,0 +1,54 @@
+name: Complete the 377-artist catalog
+on:
+  push:
+    branches: [catalog/complete-377]
+    paths:
+      - .github/workflows/collect-artist-catalog.yml
+      - scripts/collect-artist-catalog.py
+      - scripts/collect-song-catalog.py
+      - scripts/cloud-artist-catalog.py
+      - catalog-seed/**
+permissions:
+  contents: read
+concurrency:
+  group: do-nhac-catalog-377
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    permissions:
+      contents: write
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        segment: [1, 2, 3, 4]
+    steps:
+      - name: Check out reviewed collection code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Offline regression checks
+        run: python3 -m unittest discover -s tests -p '*_test.py'
+      - name: Resume collection and publish public metadata checkpoints
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PYTHONUNBUFFERED: '1'
+        run: python3 -u scripts/cloud-artist-catalog.py --seconds 14400
+  verify:
+    needs: collect
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify all 377 artist catalogs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/cloud-artist-catalog.py --verify-remote

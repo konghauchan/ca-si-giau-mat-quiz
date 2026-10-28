@@ -133,6 +133,34 @@ class ArtistCatalogTest(unittest.TestCase):
             self.assertEqual(result['source']['artistReports']['Actual singer']['recordingsScanned'], 101)
             self.assertEqual(len(result['songs']), 1)
 
+    def test_large_artist_yields_to_small_artist_and_still_finishes_every_page(self):
+        calls=[]
+        artists={'Large artist':ARTIST,'Small artist':WORK}
+        class Fake:
+            requests=0
+            def __init__(self,*args):
+                pass
+            def get(self,entity,**params):
+                if entity=='artist':
+                    name='Large artist' if 'Large artist' in params['query'] else 'Small artist'
+                    return {'artists':[{'id':artists[name],'name':name,'type':'Person','score':100}]}
+                artist_id=params['artist'];offset=params['offset'];calls.append((artist_id,offset))
+                total=201 if artist_id==ARTIST else 1
+                name='Large artist' if artist_id==ARTIST else 'Small artist'
+                record={'id':REC,'artist-credit':[{'name':name,'artist':{'id':artist_id}}],'relations':[]}
+                return {'recording-count':total,'recordings':[record]*min(100,total-offset)}
+        root=Path(__file__).resolve().parents[1]/'data'/('artist-fair-test-'+uuid.uuid4().hex)
+        root.mkdir(parents=True)
+        roster=root/'roster.json';roster.write_text(json.dumps({'description':'test','1990s':list(artists)}),encoding='utf8')
+        args=argparse.Namespace(roster=roster,state_dir=root/'state',output=root/'output.json',pages_per_pass=1)
+        with patch.object(c.bulk,'Provider',Fake),contextlib.redirect_stdout(io.StringIO()):
+            c.collect(args)
+        self.assertEqual(calls,[(ARTIST,0),(WORK,0),(ARTIST,100),(ARTIST,200)])
+        reports=json.loads(args.output.read_text(encoding='utf8'))['source']['artistReports']
+        self.assertEqual(reports['Large artist']['recordingsScanned'],201)
+        self.assertEqual(reports['Small artist']['recordingsScanned'],1)
+        self.assertTrue(all(report['complete'] for report in reports.values()))
+
 
 if __name__ == '__main__':
     unittest.main()
