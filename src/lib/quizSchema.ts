@@ -64,8 +64,7 @@ export const quizSchema = z.object({
     if ((quiz.gameType === 'MUSIC_DUEL' || quiz.gameType === 'FILM_DUEL') && !q.playMode) ctx.addIssue({code:'custom',path:['questions',index,'playMode'],message:'Chọn luật cho vòng chơi.'});
     if (q.titleHintIndices && (new Set(q.titleHintIndices).size !== q.titleHintIndices.length || q.titleHintIndices.length > titleHintLimit(q.primaryAnswer) || q.titleHintIndices.some(i=>!isTitleLetter(titleCharacters(q.primaryAnswer)[i] || '')))) ctx.addIssue({code:'custom',path:['questions',index,'titleHintIndices'],message:'Chữ gợi ý không hợp lệ. Hãy chọn lại chữ trong tên bài hát.'});
     if(q.answerMode==='SEARCH') {
-      if(quiz.gameType==='FILM_DUEL') ctx.addIssue({code:'custom',path:['questions',index,'answerMode'],message:'Tìm bài hát chỉ dành cho Đọ Nhạc.'});
-      if(!q.searchToken) ctx.addIssue({code:'custom',path:['questions',index,'searchToken'],message:'Chọn đáp án từ danh mục theo phạm vi nhạc của quiz.'});
+      if(!q.searchToken) ctx.addIssue({code:'custom',path:['questions',index,'searchToken'],message:quiz.gameType==='FILM_DUEL'?'Chọn đáp án từ danh mục Đọ Phim.':'Chọn đáp án từ danh mục theo phạm vi nhạc của quiz.'});
     }
     if(q.answerMode==='CHOICE') {
       if(q.distractors?.length!==3) ctx.addIssue({code:'custom',path:['questions',index,'distractors'],message:'Cần nhập đủ 3 đáp án nhiễu.'});

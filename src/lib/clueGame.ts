@@ -1,3 +1,4 @@
+import { verifyFilmSelection } from './filmSelections';
 import {verifySongSelection} from './songSelections';
 import type {MusicScope} from './musicSearch';
 import crypto from 'node:crypto';
@@ -61,12 +62,12 @@ export async function clueCommand(roomId: string, auth: string, action: string, 
     else if (action === 'nextClue') s = voteClue(s, cfg[s.questionIndex], String(p.id), ids, Date.now());
     else if (action === 'answer') {
       const supplied=String(value??'').trim().slice(0,q.answer_mode==='SEARCH'?1200:120);
-      const selectedSong=q.answer_mode==='SEARCH'?await verifySongSelection(supplied,String((await one('SELECT music_scope FROM quizzes WHERE id=?',String(r.quiz_id)))?.music_scope||'VI') as MusicScope):undefined;
+      const selectedSong=q.answer_mode==='SEARCH'?String(q.type).startsWith('film_')?await verifyFilmSelection(supplied):await verifySongSelection(supplied,String((await one('SELECT music_scope FROM quizzes WHERE id=?',String(r.quiz_id)))?.music_scope||'VI') as MusicScope):undefined;
       const options:Choice[]=JSON.parse(String(q.choice_options||'[]'));const chosen=q.answer_mode==='CHOICE'?options.find(c=>c.id===supplied):undefined;
       if(q.answer_mode==='CHOICE'&&!chosen)throw new Error('Lựa chọn không hợp lệ.');
       const text=selectedSong?.title||chosen?.label||supplied;if(!text)throw new Error('Nhập đáp án.');
       const aliases = await all('SELECT answer FROM accepted_answers WHERE question_id=?', String(q.id));
-      const correct = selectedSong ? selectedSong.id===q.musicbrainz_work_id : chosen ? chosen.id===q.correct_choice_id : answerMatches(text, [String(q.primary_answer), ...aliases.map(a => String(a.answer))]);
+      const correct = selectedSong ? selectedSong.id===(String(q.type).startsWith('film_')?q.film_catalog_id:q.musicbrainz_work_id) : chosen ? chosen.id===q.correct_choice_id : answerMatches(text, [String(q.primary_answer), ...aliases.map(a => String(a.answer))]);
       s = q.answer_mode==='CHOICE' ? queueClueAnswer(s,String(p.id),correct,text,Date.now()) : answerClue(s, String(p.id), correct, text, Date.now());
       await run('INSERT INTO answer_attempts(id,room_id,question_index,player_id,amount,text,correct,created_at) VALUES(?,?,?,?,?,?,?,?)', crypto.randomUUID(), roomId, s.questionIndex, String(p.id), s.lockedScore, text, correct ? 1 : 0, Date.now());
       if (correct && q.answer_mode!=='CHOICE') {
