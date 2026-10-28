@@ -4,11 +4,12 @@ import { Mic, Play, Square, Volume2, VolumeX } from 'lucide-react';
 import { useAudioPreferences } from '@/lib/audioPreferences';
 import { useGameSounds } from '@/lib/useGameSounds';
 type Kind = 'question' | 'clue' | 'answer' | 'preview' | 'intro';
-export function NarrationControl({ roomId, token, questionId, kind, clueIndex, paused = false, previewText, prepare = false, header = false }: {
-  roomId?: string; token?: string; questionId?: string; kind?: Kind; clueIndex?: number; paused?: boolean; previewText?: string; prepare?: boolean; header?: boolean;
+export function NarrationControl({ roomId, token, questionId, kind, clueIndex, paused = false, previewText, prepare = false, header = false, autoPlay = true, eventKey }: {
+  roomId?: string; token?: string; questionId?: string; kind?: Kind; clueIndex?: number; paused?: boolean; previewText?: string; prepare?: boolean; header?: boolean; autoPlay?: boolean; eventKey?: string;
 }) {
   const { settings, update } = useAudioPreferences();
   const { enabled: effectsEnabled, toggle: toggleEffects } = useGameSounds();
+  const spoken = useRef(new Set<string>());
   const menu = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const close = (event: PointerEvent) => { if (menu.current && !menu.current.contains(event.target as Node)) menu.current.open = false; };
@@ -35,7 +36,14 @@ export function NarrationControl({ roomId, token, questionId, kind, clueIndex, p
     void fetch('/api/narration', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-game-token': token || '' }, body: JSON.stringify({ roomId, questionId, kind: 'prepare', language: settings.language }) }).catch(() => {});
   }, [configured, automatic, prepare, roomId, token, questionId, settings.language]);
   useEffect(() => {
+    start.current = () => {}; stop.current = () => {};
     if (!configured || !kind || paused) { setStatus('idle'); return; }
+    const playbackKey = eventKey ? `${roomId}:${questionId}:${eventKey}:${settings.language}` : undefined;
+    const rememberPlayback = () => {
+      if (!playbackKey) return;
+      spoken.current.add(playbackKey);
+      try { sessionStorage.setItem(`quiz-spoken:${playbackKey}`, '1'); } catch { /* Keep the in-memory fallback. */ }
+    };
     const controller = new AbortController(); let objectUrl = ''; let fetching = false;
     setStatus('idle'); setError('');
     const announce = (playing: boolean) => window.dispatchEvent(new CustomEvent('quiz-narration', { detail: playing }));
@@ -44,8 +52,8 @@ export function NarrationControl({ roomId, token, questionId, kind, clueIndex, p
     const play = async () => {
       if (fetching || controller.signal.aborted) return;
       if (audio.current) {
-        try { audio.current.currentTime=0; await audio.current.play(); setStatus('playing'); announce(true); }
-        catch { setStatus('blocked'); }
+        try { const current = audio.current; current.currentTime=0; await current.play(); if (controller.signal.aborted) { current.pause(); return; } rememberPlayback(); setStatus('playing'); announce(true); }
+        catch { if (!controller.signal.aborted) setStatus('blocked'); }
         return;
       }
       fetching = true; setStatus('loading'); setError('');
@@ -53,20 +61,24 @@ export function NarrationControl({ roomId, token, questionId, kind, clueIndex, p
         const response = await fetch('/api/narration', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-game-token': token || '' }, body: JSON.stringify({ roomId, questionId, kind, language: settings.language, ...(kind === 'preview' ? { text: previewText } : {}) }), signal: controller.signal });
         if (!response.ok) { const body = await response.json(); throw new Error(body.error || 'Chưa phát được giọng đọc.'); }
         const blob = await response.blob(); if (controller.signal.aborted) return;
-        objectUrl = URL.createObjectURL(blob); audio.current = new Audio(objectUrl); audio.current.volume = volume.current / 100;
+        objectUrl = URL.createObjectURL(blob); const current = new Audio(objectUrl); audio.current = current; current.volume = volume.current / 100;
         audio.current.onended = () => { setStatus('idle'); announce(false); };
         audio.current.onerror = () => { setStatus('error'); setError('Không phát được âm thanh.'); announce(false); };
-        try { await audio.current.play(); if (!controller.signal.aborted) { setStatus('playing'); announce(true); } }
+        try { await current.play(); if (controller.signal.aborted) { current.pause(); return; } rememberPlayback(); setStatus('playing'); announce(true); }
         catch { if (!controller.signal.aborted) setStatus('blocked'); }
       } catch (failure) { if (!controller.signal.aborted) { setStatus('error'); setError((failure as Error).message); } }
       finally { fetching = false; }
     };
     start.current = () => void play();
-    if (automatic) void play();
+    let alreadySpoken = playbackKey ? spoken.current.has(playbackKey) : false;
+    try { if (playbackKey) alreadySpoken ||= sessionStorage.getItem(`quiz-spoken:${playbackKey}`) === '1'; } catch { /* Storage can be unavailable in private browsing. */ }
+    if (automatic && autoPlay && !alreadySpoken) {
+      void play();
+    }
     return halt;
-  }, [configured, kind, roomId, token, questionId, clueIndex, paused, previewText, automatic, settings.language]);
+  }, [configured, kind, roomId, token, questionId, clueIndex, paused, previewText, automatic, settings.language, autoPlay, eventKey]);
   if ((!configured || !kind) && !header) return null;
-  const label = kind === 'intro' ? 'giới thiệu' : kind === 'answer' ? 'đáp án' : kind === 'clue' ? 'gợi ý' : 'câu hỏi';
+  const label = kind === 'intro' ? 'luật' : kind === 'answer' ? 'đáp án' : kind === 'clue' ? 'gợi ý' : 'câu hỏi';
   const controls = <div className="narration-control">
     <div className="narration-buttons"><span><Mic size={16}/>Giọng đọc</span>
       <button type="button" className="button secondary" disabled={!configured || !kind || paused || status === 'loading'} onClick={() => { if (status === 'playing') { stop.current(); setStatus('idle'); } else start.current(); }}>{status === 'playing' ? <Square size={14}/> : <Play size={14}/>} {status === 'loading' ? 'Đang chuẩn bị…' : status === 'playing' ? 'Dừng đọc' : `Nghe ${label}`}</button>

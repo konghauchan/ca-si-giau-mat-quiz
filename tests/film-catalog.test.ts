@@ -46,7 +46,8 @@ test('film imports activate only a verified snapshot, retain old IDs and keep sa
 test('film narration describes film selection, retry limits and preserves the hidden-answer guard',()=>{
   const state={gameType:'MUSIC_DUEL',category:'FILM',phase:'TOPIC_INTRO',roundQuestionIndex:1,playMode:'OPEN' as const,question:{answerMode:'SEARCH' as const,primaryAnswer:'SECRET FILM'}};
   const intro=narrationText(state,'intro');assert.match(intro,/Tìm tên phim hoặc diễn viên/);assert.doesNotMatch(intro,/ca sĩ|SECRET FILM/);
-  const help=narrationText({...state,phase:'OPEN_ANSWERING'},'question');assert.match(help,/Chọn phim là gửi ngay/);assert.match(help,/chọn lại/);
-  assert.match(narrationText({...state,phase:'ANSWERING',playMode:'BID'},'question'),/Chỉ được chọn một lần/);
+  const help=narrationText({...state,phase:'OPEN_ANSWERING'},'question');assert.equal(help,'Tên phim là gì?');assert.doesNotMatch(help,/SECRET FILM/);
+  assert.equal(narrationText({...state,phase:'ANSWERING',playMode:'BID'},'question'),'Tên phim là gì?');
+  const bidIntro=narrationText({...state,playMode:'BID'},'intro');assert.match(bidIntro,/Chỉ chốt một lần/);assert.doesNotMatch(bidIntro,/thử lại/);
   assert.throws(()=>narrationText({...state,phase:'OPEN_ANSWERING'},'answer'));
 });

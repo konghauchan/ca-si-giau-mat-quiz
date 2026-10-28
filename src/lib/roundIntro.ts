@@ -34,6 +34,20 @@ export function roundRules(mode: IntroMode, film = false, answerMode: AnswerMode
 }
 export function roundIntroText(mode: IntroMode, round: number, film = false, language = 'vi-VN', answerMode: AnswerMode = 'TEXT'): string {
   const action = answerAction(answerMode, film, language);
+  if (film) {
+    const rules = language === 'en-US'
+      ? mode === 'OPEN'
+        ? `Watch together, then answer. ${action} ${answerMode === 'CHOICE' ? 'Choose once. Results appear when time is up.' : 'If wrong, try again before time is up.'}`
+        : mode === 'BID'
+        ? `Bid your viewing time. Everyone watches together for their chosen duration. ${action} You get one answer. Fewer seconds and faster answers earn more points.`
+        : `Guess the film from clues. Press I know to answer. ${action} You get one answer. A wrong answer or timeout eliminates you from this question.`
+      : mode === 'OPEN'
+      ? `Cùng xem, cùng đoán. ${action} ${answerMode === 'CHOICE' ? 'Chỉ chọn một lần. Hết giờ mới công bố đúng sai.' : 'Sai có thể thử lại trước khi hết giờ.'}`
+      : mode === 'BID'
+      ? `Đấu giá thời gian. Mọi người xem cùng lúc, theo số giây đã chọn. ${action} Chỉ chốt một lần. Ít giây, trả lời nhanh được nhiều điểm.`
+      : `Đoán phim qua các gợi ý. Bấm Tôi biết để trả lời. ${action} Chỉ chốt một lần. Sai hoặc hết giờ thì dừng câu này.`;
+    return `${round > 0 ? `${language === 'en-US' ? 'Round' : 'Vòng'} ${round}. ` : ''}${rules}`;
+  }
   if (language === 'en-US') {
     const media = film ? 'watch' : 'listen';
     const rules = mode === 'OPEN' ? `Everyone ${film ? 'watches' : 'listens'} together. ${action} ${answerMode === 'CHOICE' ? 'You get one selection. Results appear when time is up.' : 'If wrong, try again before time is up.'} Faster correct answers earn more points.` : mode === 'BID' ? `Read the hint and bid your ${film ? 'viewing' : 'listening'} time. Everyone starts together; ${media} for your own bid duration. ${action} You get one answer. Fewer seconds and faster answers earn more points.${answerMode === 'CHOICE' ? ' Results appear when time is up.' : ''}` : `Six clues open one by one. Press I know first to answer. ${action} You get one answer. A wrong answer or timeout eliminates you from this question.`;
