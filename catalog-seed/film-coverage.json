@@ -1,0 +1,345 @@
+{
+  "source": "Wikidata QIDs checked against title, director and release metadata; labels below are documentation, not invented aliases.",
+  "people": [
+    {
+      "id": "Q311179",
+      "name": "Stephen Chow / Châu Tinh Trì"
+    },
+    {
+      "id": "Q49561909",
+      "name": "Sydney Sweeney"
+    }
+  ],
+  "works": [
+    {
+      "id": "Q1055069",
+      "title": "Cold Fish",
+      "searchAliases": [
+        "Cá lạnh"
+      ]
+    },
+    {
+      "id": "Q1138083",
+      "title": "Love Exposure",
+      "searchAliases": [
+        "Tình yêu tội lỗi"
+      ]
+    },
+    {
+      "id": "Q742195",
+      "title": "Secretary",
+      "searchAliases": [
+        "Thư ký",
+        "Thư ký và vị sếp bịnh họn"
+      ]
+    },
+    {
+      "id": "Q73792015",
+      "title": "The Voyeurs",
+      "searchAliases": [
+        "Kẻ dòm ngó"
+      ]
+    },
+    {
+      "id": "Q21427355",
+      "title": "Raw"
+    },
+    {
+      "id": "Q1331978",
+      "title": "Ichi the Killer"
+    },
+    {
+      "id": "Q131429164",
+      "title": "The Ugly Stepsister"
+    },
+    {
+      "id": "Q124435493",
+      "title": "Black Phone 2"
+    },
+    {
+      "id": "Q50650165",
+      "title": "Terrifier"
+    },
+    {
+      "id": "Q101002778",
+      "title": "Terrifier 2"
+    },
+    {
+      "id": "Q119821866",
+      "title": "Terrifier 3"
+    },
+    {
+      "id": "Q16250945",
+      "title": "The Guest"
+    },
+    {
+      "id": "Q39069693",
+      "title": "The Empty Man"
+    },
+    {
+      "id": "Q132083406",
+      "title": "Demon City"
+    },
+    {
+      "id": "Q20001488",
+      "title": "Corpse Party"
+    },
+    {
+      "id": "Q29245784",
+      "title": "The Void"
+    },
+    {
+      "id": "Q1234728",
+      "title": "Doghouse"
+    },
+    {
+      "id": "Q13634557",
+      "title": "Fight Back to School II"
+    },
+    {
+      "id": "Q1015816",
+      "title": "Fight Back to School III"
+    },
+    {
+      "id": "Q775390",
+      "title": "Tricky Brains"
+    },
+    {
+      "id": "Q7254100",
+      "title": "The Tricky Master"
+    },
+    {
+      "id": "Q131414367",
+      "title": "Takopi's Original Sin",
+      "searchAliases": [
+        "Nguyên tội của Takopi"
+      ]
+    },
+    {
+      "id": "Q612036",
+      "title": "Saw"
+    },
+    {
+      "id": "Q270410",
+      "title": "Saw II"
+    },
+    {
+      "id": "Q276392",
+      "title": "Saw III"
+    },
+    {
+      "id": "Q326319",
+      "title": "Saw IV"
+    },
+    {
+      "id": "Q326177",
+      "title": "Saw V"
+    },
+    {
+      "id": "Q834327",
+      "title": "Saw VI"
+    },
+    {
+      "id": "Q676284",
+      "title": "Saw 3D"
+    },
+    {
+      "id": "Q15712110",
+      "title": "Jigsaw"
+    },
+    {
+      "id": "Q64590532",
+      "title": "Spiral"
+    },
+    {
+      "id": "Q115734942",
+      "title": "Saw X"
+    },
+    {
+      "id": "Q16078804",
+      "title": "The Saint of Gamblers (1995)",
+      "searchAliases": [
+        "Đổ thánh 2",
+        "Đỗ thánh 2"
+      ]
+    },
+    {
+      "id": "Q19854444",
+      "title": "My Name Is Nobody (2000)",
+      "searchAliases": [
+        "Đổ thánh 3",
+        "Đỗ thánh 3"
+      ]
+    },
+    {
+      "id": "Q692720",
+      "title": "American Gigolo",
+      "searchAliases": [
+        "Trai bao",
+        "Trai bao 1980"
+      ]
+    },
+    {
+      "id": "Q655205",
+      "title": "Deuce Bigalow: Male Gigolo",
+      "searchAliases": [
+        "Trai bao",
+        "Trai bao 1999"
+      ]
+    },
+    {
+      "id": "Q61696",
+      "title": "Midnight Cowboy",
+      "searchAliases": [
+        "Trai bao",
+        "Trai bao 1969"
+      ]
+    }
+  ],
+  "unresolved": [
+    "Kingdom: film and series both exist; keep separate identities.",
+    "Hello Ghost: Korean original and remakes must remain separate."
+  ],
+  "searchAliasSource": "Project search names supplied by the user; not asserted to be official distribution titles.",
+  "checks": [
+    {
+      "query": "Audition",
+      "id": "Q565130"
+    },
+    {
+      "query": "Black Phone",
+      "id": "Q105584511"
+    },
+    {
+      "query": "Evil Dead",
+      "id": "Q327604"
+    },
+    {
+      "query": "Chơi ngải",
+      "id": "Q705856"
+    },
+    {
+      "query": "Chơi ngải 2",
+      "id": "Q705859"
+    },
+    {
+      "query": "Chơi ngải 3",
+      "id": "Q4797259"
+    },
+    {
+      "query": "The House That Jack Built",
+      "id": "Q27920121"
+    },
+    {
+      "query": "Final Destination Bloodlines",
+      "id": "Q118212751"
+    },
+    {
+      "query": "Independence Day Resurgence",
+      "id": "Q19614711"
+    },
+    {
+      "query": "Captain America Brave New World",
+      "id": "Q112322116"
+    },
+    {
+      "query": "Kingdom",
+      "id": "Q30947892"
+    },
+    {
+      "query": "Đông Tà Tây Độc",
+      "id": "Q725167"
+    },
+    {
+      "query": "Speed Racer",
+      "id": "Q312078"
+    },
+    {
+      "query": "Trùng Khánh Sâm Lâm",
+      "id": "Q766263"
+    },
+    {
+      "query": "Rogue",
+      "id": "Q1515931"
+    },
+    {
+      "query": "Bad Boys Ride or Die",
+      "id": "Q31271357"
+    },
+    {
+      "query": "Big Hero 6",
+      "id": "Q13091172"
+    },
+    {
+      "query": "Ferris Bueller's Day Off",
+      "id": "Q498906"
+    },
+    {
+      "query": "Hello Ghost",
+      "id": "Q5232957"
+    },
+    {
+      "query": "Jennifer's Body",
+      "id": "Q861640"
+    },
+    {
+      "query": "Lighting Up The Stars",
+      "id": "Q114785545"
+    },
+    {
+      "query": "Lilo Stitch",
+      "id": "Q36092"
+    },
+    {
+      "query": "Lilo Stitch",
+      "id": "Q59395971"
+    },
+    {
+      "query": "Mỹ nhân ngư",
+      "id": "Q21834546"
+    },
+    {
+      "query": "Now You See Me 2",
+      "id": "Q18703028"
+    },
+    {
+      "query": "PK",
+      "id": "Q7117022"
+    },
+    {
+      "query": "Tây du ký Mối tình ngoại truyện",
+      "id": "Q4253250"
+    },
+    {
+      "query": "Tèo em",
+      "id": "Q16480592"
+    },
+    {
+      "query": "Thánh bài",
+      "id": "Q2837581"
+    },
+    {
+      "query": "Thần ăn",
+      "id": "Q2554607"
+    },
+    {
+      "query": "The Watch",
+      "id": "Q29313"
+    },
+    {
+      "query": "Tiểu yêu quái núi Lãng Lãng",
+      "id": "Q135479882"
+    },
+    {
+      "query": "Fight Back to School",
+      "id": "Q3071625"
+    },
+    {
+      "query": "Vua hài kịch",
+      "id": "Q2706517"
+    }
+  ],
+  "disambiguation": {
+    "Trai bao": "Hollywood search name shared by multiple works; retain separate QIDs and release years rather than choosing an intended version without evidence."
+  }
+}

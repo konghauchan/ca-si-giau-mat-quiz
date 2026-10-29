@@ -3,7 +3,7 @@ type Context = { roomId?: string; gameToken?: string };
 let index: ReturnType<typeof indexFilms> = [], expiresAt = 0, pending: Promise<void>|undefined;
 const listeners = new Set<()=>void>();
 export function subscribeFilmCatalog(listener: ()=>void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
-export const cachedFilmMatches = (query: string, kind: FilmKind = 'ALL') => matchFilms(index,query,kind);
+export const cachedFilmMatches = (query: string, kind: FilmKind = 'ALL', limit = 30) => matchFilms(index,query,kind,limit);
 export const cachedFilmById = (id: string) => index.find(row=>row.film.id===id)?.film;
 export function primeFilmCatalog(context: Context = {}): Promise<void> {
   if (pending) return pending;

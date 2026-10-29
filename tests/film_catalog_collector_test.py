@@ -15,6 +15,37 @@ spec.loader.exec_module(collector)
 
 
 class FilmCollectorTest(unittest.TestCase):
+    def test_targeted_coverage_checks_qids_and_keeps_film_type_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            provider = collector.Provider(Path(directory))
+            with patch.object(provider, 'query', return_value=[]) as query:
+                provider.coverage(['Q1'], ['Q2'])
+                self.assertEqual(query.call_count, 2)
+                self.assertIn('wdt:P161', query.call_args_list[0].args[0])
+                self.assertIn('wdt:P57', query.call_args_list[0].args[0])
+                self.assertIn('(wd:Q11424 "MOVIE")', query.call_args.args[0])
+                self.assertIn('(wd:Q5398426 "SERIES")', query.call_args.args[0])
+            with patch.object(provider, 'query') as query:
+                with self.assertRaises(ValueError):
+                    provider.coverage(['Q1} invalid query'], [])
+                query.assert_not_called()
+
+    def test_direct_class_resolves_only_unambiguous_roots(self):
+        selected = {qid: ('SERIES', 5) for qid in ['Q1', 'Q2', 'Q3']}
+        ambiguous = set(selected)
+        def row(qid, kind):
+            return {'item': {'value': 'http://www.wikidata.org/entity/' + qid}, 'kind': {'value': kind}}
+        resolved = collector.resolve_direct_kinds(selected, ambiguous, [row('Q1', 'MOVIE'), row('Q2', 'MOVIE'), row('Q2', 'SERIES')])
+        self.assertEqual(resolved, {'Q1': 'MOVIE'})
+        self.assertEqual(selected['Q1'], ('MOVIE', 5))
+        self.assertEqual(ambiguous, {'Q2', 'Q3'})
+
+    def test_verified_vietnamese_wikipedia_title_can_fill_missing_labels(self):
+        film = collector.parse_metadata('Q123', 'MOVIE', 2, [], 'Tên phim tiếng Việt')
+        self.assertEqual(film['title'], 'Tên phim tiếng Việt')
+        self.assertEqual(film['id'], collector.film_id('Q123'))
+        self.assertIsNone(collector.parse_metadata('Q123', 'MOVIE', 2, []))
+
     def test_resume_uses_only_cache_newer_than_cutoff(self):
         with tempfile.TemporaryDirectory() as directory:
             cache = Path(directory) / (hashlib.sha256(b'query').hexdigest() + '.json.gz')
@@ -57,6 +88,19 @@ class FilmCollectorTest(unittest.TestCase):
                     self.assertIn('2026-01-01T00:00:00Z', text)
                     self.assertIn('?released <= NOW()', text)
                     self.assertIn('LIMIT 2000', text)
+
+    def test_vietnamese_wikipedia_selection_has_no_popularity_or_country_filter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            provider = collector.Provider(Path(directory))
+            with patch.object(provider, 'query', return_value=[]) as query:
+                for kind, root in [('MOVIE', 'Q11424'), ('SERIES', 'Q5398426')]:
+                    provider.vietnamese_wikipedia(kind, 15000)
+                    text = query.call_args.args[0]
+                    self.assertIn('https://vi.wikipedia.org/', text)
+                    self.assertIn('wd:' + root, text)
+                    self.assertIn('schema:name ?title', text)
+                    self.assertNotIn('FILTER(?links', text)
+                    self.assertNotIn('P495', text)
 
 
 if __name__ == '__main__':
