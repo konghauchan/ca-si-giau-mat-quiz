@@ -150,3 +150,37 @@
 .game-screen .choice-answers { gap: 6px; margin: 4px 0; }
 .game-screen .choice-option { min-height: 50px; padding: 8px; gap: 8px; }
 .game-screen .choice-option .choice-letter { flex-basis: 28px; height: 28px; font-size: 18px; }
+
+/* Question playback gets the same clear stage as the result video. */
+.game-screen.question-video-only .game-heading,
+.game-screen.question-video-only .game-progress,
+.game-screen.question-video-only .game-topic-label,
+.game-screen.question-video-only .game-timer-track { display: none; }
+.game-screen.question-video-only .game-content { padding-top: 10px; }
+.game-screen.question-video-only .room-main > .media-panel { background: transparent; border: 0; box-shadow: none; padding: 4px 0; }
+.game-screen.question-video-only .media-panel > .notice.info { display: none; }
+.game-screen.question-video-only .phase-banner { position: relative; justify-content: center; text-align: center; padding: 0 56px; }
+.game-screen.question-video-only .phase-banner h2 { font-size: clamp(23px, 3vw, 36px); margin: 8px 0; }
+.game-screen.question-video-only .phase-banner .timer { position: absolute; top: 4px; right: 6px; }
+.game-screen.question-video-only .clip-player { margin-top: 4px; }
+
+/* Dock the input near the bottom; suggestions float above/below it unclipped. */
+.game-screen .song-search { justify-content: flex-end; flex: 1 0 auto; min-height: 130px; width: min(100%, 980px); align-self: center; margin: 12px auto 0; }
+.game-screen .song-search input { font-size: 18px; min-height: 50px; }
+.search-suggestions-popover { position: fixed; z-index: 100; color: #f8f8ed; filter: drop-shadow(0 10px 22px #0006); }
+.search-suggestions-popover .song-search-results { display: block; height: auto; max-height: inherit; min-height: 0; margin: 0; padding: 0; overflow: auto; overscroll-behavior: contain; background: #102e34; border: 1px solid #66898b; border-radius: 12px; }
+.search-suggestions-popover .song-search-results [role=option] { min-height: 54px; margin: 0; padding: 9px 16px; border: 0; border-bottom: 1px solid #31545a; border-radius: 0; cursor: pointer; }
+.search-suggestions-popover .song-search-results [role=option]:last-child { border-bottom: 0; }
+.search-suggestions-popover .song-search-results strong { font-size: 16px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-suggestions-popover .search-result-meta { display: block; font-size: 12px; line-height: 1.4; margin-top: 2px; color: #c4d7d5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-suggestions-popover .song-search-results [role=option]:hover,
+.search-suggestions-popover .song-search-results .active { background: #305259; box-shadow: inset 3px 0 #d4ef8b; }
+@media (max-width: 600px) {
+  .game-screen.question-video-only .phase-banner h2 { font-size: 23px; }
+  .game-screen.question-video-only .phase-banner { padding: 0 38px; }
+  .game-screen.question-video-only .phase-banner .timer { font-size: 23px; right: 0; }
+  .search-suggestions-popover .song-search-results [role=option] { padding: 9px 12px; }
+}
+.search-suggestions-popover strong:has(.search-result-title) { display: flex; gap: 6px; }
+.search-suggestions-popover .search-result-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.search-suggestions-popover .search-result-year { flex: none; }
