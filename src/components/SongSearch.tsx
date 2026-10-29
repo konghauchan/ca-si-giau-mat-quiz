@@ -1,4 +1,5 @@
 'use client';
+import { SearchSuggestions } from './SearchSuggestions';
 import {useEffect,useId,useRef,useState} from 'react';
 import {musicScopeLabel,MUSIC_RESULT_LIMIT,hasStrongSongMatch,hasExactSongMatch,type MusicScope,type SongSuggestion} from '@/lib/musicSearch';
 import {cachedSongMatches,primeSongCatalog,rememberSongs,subscribeSongCatalog} from '@/lib/musicCatalogClient';
@@ -6,6 +7,7 @@ import {loadSongMatches} from '@/lib/musicSearchClient';
 
 export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAnswer,selectedTitle}:{scope:MusicScope;roomId?:string;gameToken?:string;disabled?:boolean;onSelect?:(song:SongSuggestion)=>void;onAnswer?:(token:string,song:SongSuggestion)=>Promise<boolean|void>;selectedTitle?:string}) {
   const isAnswering=!!onAnswer;
+  const [expanded,setExpanded]=useState(false);
   const id=useId();const input=useRef<HTMLInputElement>(null);const submitting=useRef(false);const generation=useRef(0);
   const pendingSearch=useRef<{controller:AbortController}|null>(null);const completedSearch=useRef('');const completedNotice=useRef('');
   const [query,setQuery]=useState('');const [items,setItems]=useState<SongSuggestion[]>([]);const [selected,setSelected]=useState<SongSuggestion|null>(null);
@@ -46,6 +48,8 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
     },300);
     return ()=>{alive=false;clearTimeout(timer);if(!started)controller.abort();};
   },[query,scope,roomId,gameToken,disabled,selected,retry,forcedTerm,catalogVersion,isAnswering]);
+  const showResults=items.length>0&&(!onAnswer||expanded)&&!disabled;
+  const activeId=showResults&&active>=0&&active<items.length?id+'-option-'+active:undefined;
   async function submit(song:SongSuggestion){
     if(!onAnswer||disabled||submitting.current||sent)return;
     const requestGeneration=generation.current;submitting.current=true;setBusy(true);setError('');
@@ -61,19 +65,19 @@ export function SongSearch({scope,roomId,gameToken,disabled=false,onSelect,onAns
     setSelected(song);setQuery(song.title);setItems([]);setActive(-1);setError('');onSelect?.(song);
     if(onAnswer)void submit(song);
   }
-  function searchMore(){setForcedTerm(query.trim());setRetry(value=>value+1);}
+  function searchMore(){setExpanded(true);input.current?.focus();setForcedTerm(query.trim());setRetry(value=>value+1);}
   return <div className="song-search">
     <div className="field"><label htmlFor={id}>Tìm bài hát hoặc ca sĩ</label><small>{musicScopeLabel(scope)} · {onAnswer?'Chọn bài là gửi đáp án ngay.':'Tìm theo tên bài hát hoặc ca sĩ'}</small>
-      <input ref={input} autoFocus={!!onAnswer} id={id} role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={items.length>0} aria-controls={id+'-list'} aria-activedescendant={active>=0?id+'-option-'+active:undefined} value={query} maxLength={80} disabled={disabled||busy||sent} placeholder="Nhập một phần tên bài hát hoặc ca sĩ…" onChange={event=>{const value=event.target.value;setQuery(value);setSelected(null);setSent(false);setForcedTerm('');setError('');setActive(-1);setItems(cachedSongMatches(scope,value));}} onKeyDown={event=>{
-        if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();setActive(i=>items.length?(event.key==='ArrowDown'?(i+1)%items.length:i<0?items.length-1:(i-1+items.length)%items.length):-1);}
-        else if(event.key==='Escape'){setItems([]);setActive(-1);}
-        else if(event.key==='Enter'){event.preventDefault();if(active>=0&&items[active])choose(items[active]);}
+      <input ref={input} autoFocus={!!onAnswer} id={id} role="combobox" autoComplete="off" aria-autocomplete="list" aria-expanded={showResults} aria-controls={showResults?id+'-list':undefined} aria-activedescendant={activeId} value={query} maxLength={80} disabled={disabled||busy||sent} placeholder="Nhập một phần tên bài hát hoặc ca sĩ…" onClick={()=>setExpanded(true)} onFocus={()=>setExpanded(true)} onChange={event=>{setExpanded(true);const value=event.target.value;setQuery(value);setSelected(null);setSent(false);setForcedTerm('');setError('');setActive(-1);setItems(cachedSongMatches(scope,value));}} onKeyDown={event=>{
+        if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();setExpanded(true);setActive(i=>items.length?(event.key==='ArrowDown'?(i+1)%items.length:i<0?items.length-1:(i-1+items.length)%items.length):-1);}
+        else if(event.key==='Escape'){if(onAnswer)setExpanded(false);else setItems([]);setActive(-1);}
+        else if(event.key==='Enter'){event.preventDefault();if(showResults&&active>=0&&items[active])choose(items[active]);}
       }}/>
     </div>
-    {items.length>0&&<ul className="song-search-results" role="listbox" id={id+'-list'} aria-label="Các bài hát phù hợp">{items.map((song,index)=><li role="option" aria-selected={active===index} id={id+'-option-'+index} key={song.id} className={active===index?'active':''} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(song)}><strong>{song.title}</strong><span className="song-search-performers">{song.performers?.length?`Ca sĩ: ${song.performers.join(', ')}`:'Chưa có thông tin ca sĩ'}</span><small>{song.detail}</small></li>)}</ul>}
+    <SearchSuggestions anchor={input} open={showResults} floating={!!onAnswer} activeId={activeId} onDismiss={()=>{setExpanded(false);setActive(-1);}}><ul className="song-search-results" role="listbox" id={id+'-list'} aria-label="Các bài hát phù hợp">{items.map((song,index)=><li role="option" aria-selected={active===index} id={id+'-option-'+index} key={song.id} className={active===index?'active':''} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(song)}><strong>{song.title}</strong><span className="song-search-performers search-result-meta">{song.performers?.length?`Ca sĩ: ${song.performers.join(', ')}`:'Chưa có thông tin ca sĩ'}</span>{!onAnswer&&<small>{song.detail}</small>}</li>)}</ul></SearchSuggestions>
     <p className="song-search-status" role="status" aria-live="polite">{busy?'Đang gửi đáp án…':sent?'Đã gửi lựa chọn.':loading?(waiting?'Đang tải danh mục bài hát… Kết quả sẽ tự cập nhật.':'Đang tìm bài hát…'):selected?`Đã chọn: ${selected.title}`:selectedTitle?`Đáp án đã liên kết: ${selectedTitle}`:''}</p>
     {error&&<div className="notice info" role="status">{error} <button type="button" className="button ghost" disabled={disabled||loading||busy} onClick={searchMore}>Tìm lại</button></div>}
     {items.length>0&&!selected&&<button type="button" className="button ghost" disabled={disabled||loading||busy} onClick={searchMore}>Tìm thêm trên MusicBrainz</button>}
-    <small className="song-search-credit">Danh mục Đọ Nhạc · Dữ liệu <a href="https://musicbrainz.org/" target="_blank" rel="noreferrer">MusicBrainz</a> và <a href="https://www.wikidata.org/" target="_blank" rel="noreferrer">Wikidata</a>. Tìm theo tên bài hoặc ca sĩ, có hỗ trợ không dấu. Bài ngoài danh mục có thể cần chờ thêm.</small>
+    {!onAnswer&&<small className="song-search-credit">Danh mục Đọ Nhạc · Dữ liệu <a href="https://musicbrainz.org/" target="_blank" rel="noreferrer">MusicBrainz</a> và <a href="https://www.wikidata.org/" target="_blank" rel="noreferrer">Wikidata</a>. Tìm theo tên bài hoặc ca sĩ, có hỗ trợ không dấu. Bài ngoài danh mục có thể cần chờ thêm.</small>}
   </div>;
 }
