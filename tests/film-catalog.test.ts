@@ -7,7 +7,21 @@ import { signFilm, readFilm } from '../src/lib/filmToken.ts';
 import { signSong, readSong } from '../src/lib/songToken.ts';
 import { importFilmLibrary, prepareFilmLibrary, readFilmLibrary } from '../src/lib/filmLibraryStore.ts';
 import { narrationText } from '../src/lib/narrationText.ts';
+import { readFileSync } from 'node:fs';
 const film = (title:string,year=1997,kind:'MOVIE'|'SERIES'='MOVIE'):FilmWork=>({id:randomUUID(),title,year,kind,originalTitle:title,aliases:[],directors:['James Cameron'],cast:['Kate Winslet','Leonardo DiCaprio'],countries:['Q30'],rank:20,source:{provider:'Wikidata',id:'Q1'}});
+
+test('bundled catalog finds previously missing films by Vietnamese names and stable Wikidata IDs', () => {
+  const dataset = JSON.parse(readFileSync(new URL('../src/lib/filmCatalogData.json', import.meta.url), 'utf8')) as {films: FilmWork[]};
+  const index = indexFilms(dataset.films.map(f => ({...f, token: 'test'})));
+  for (const [query, qid, kind] of [
+    ['diep van 3', 'Q19757672', 'MOVIE'],
+    ['lang gia bang', 'Q15905576', 'SERIES'],
+    ['ky sinh thu vung xam', 'Q124480521', 'SERIES'],
+    ['co nang ngo ngao', 'Q483166', 'MOVIE'],
+  ] as const) {
+    assert.ok(matchFilms(index, query).some(f => f.source.id === qid && f.kind === kind), query);
+  }
+});
 
 test('film search supports prefixes, unaccented aliases, actors, directors, years and kind without merging remakes',()=>{
   const a=film('Titanic'),b=film('Titanic',1953),c={...film('Bố già',2021),aliases:['Bo Gia'],originalTitle:'Dad, I’m Sorry'},d={...film('A television series',2000,'SERIES'),aliases:['西游记']};
@@ -50,4 +64,15 @@ test('film narration describes film selection, retry limits and preserves the hi
   assert.equal(narrationText({...state,phase:'ANSWERING',playMode:'BID'},'question'),'Tên phim là gì?');
   const bidIntro=narrationText({...state,playMode:'BID'},'intro');assert.match(bidIntro,/Chỉ chốt một lần/);assert.doesNotMatch(bidIntro,/thử lại/);
   assert.throws(()=>narrationText({...state,phase:'OPEN_ANSWERING'},'answer'));
+});
+
+test('requested films and supplied Vietnamese search names resolve to verified identities', () => {
+  const dataset = JSON.parse(readFileSync(new URL('../src/lib/filmCatalogData.json', import.meta.url), 'utf8')) as {films: FilmWork[]};
+  const coverage = JSON.parse(readFileSync(new URL('../catalog-seed/film-coverage.json', import.meta.url), 'utf8')) as {works: Array<{id: string; title: string; searchAliases?: string[]}>; checks: Array<{query: string; id: string}>};
+  const index = indexFilms(dataset.films.map(f => ({...f, token: 'test'})));
+  const checks = [...coverage.checks, ...coverage.works.flatMap(f => [f.title.replace(/ \(\d{4}\)$/, ''), ...(f.searchAliases || [])].map(query => ({query, id: f.id})))];
+  for (const {query, id} of checks) assert.ok(matchFilms(index, query, 'ALL', 100).some(f => f.source.id === id), `${query}: ${id}`);
+  assert.equal(matchFilms(index, 'Stephen Chow').length, 30);
+  assert.ok(matchFilms(index, 'Stephen Chow', 'ALL', 100).length > 30);
+  assert.ok(matchFilms(index, 'Sydney Sweeney', 'ALL', 100).length >= 20);
 });
