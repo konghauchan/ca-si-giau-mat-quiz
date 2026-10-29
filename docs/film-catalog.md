@@ -59,7 +59,7 @@ Lần đối chiếu phân loại trực tiếp khôi phục thêm 7 mục, gồ
 
 ### Đối chiếu danh sách phim yêu cầu
 
-Bản mở rộng cuối có **14.821 mục** (9.707 phim lẻ và 5.114 phim bộ). Bổ sung riêng danh sách QID đã đối chiếu tên, năm/đạo diễn trong `catalog-seed/film-coverage.json`, và thu thập credit diễn viên/đạo diễn cho **Sydney Sweeney (Q49561909)** và **Châu Tinh Trì / Stephen Chow (Q311179)**. Không nhầm với người trùng tên Stephen Chow mang QID khác. Snapshot hiện có 22 tác phẩm với credit Sydney Sweeney và 49 với credit Stephen Chow; đây là độ phủ credit Wikidata, không phải cam kết filmography đầy đủ ngoài nguồn này.
+Bản mở rộng cuối có **14.822 mục** (9.708 phim lẻ và 5.114 phim bộ). Bổ sung riêng danh sách QID đã đối chiếu tên, năm/đạo diễn trong `catalog-seed/film-coverage.json`, và thu thập credit diễn viên/đạo diễn cho **Sydney Sweeney (Q49561909)** và **Châu Tinh Trì / Stephen Chow (Q311179)**. Không nhầm với người trùng tên Stephen Chow mang QID khác. Snapshot hiện có 22 tác phẩm với credit Sydney Sweeney và 49 với credit Stephen Chow; đây là độ phủ credit Wikidata, không phải cam kết filmography đầy đủ ngoài nguồn này.
 
 ```powershell
 python scripts/collect-film-catalog.py --refresh --vietnamese-wikipedia-limit 15000 --only-new --coverage-file catalog-seed/film-coverage.json
@@ -67,6 +67,6 @@ python scripts/collect-film-catalog.py --refresh --vietnamese-wikipedia-limit 15
 
 `--coverage-file` nhận QID phim và người đã xác minh, chỉ bổ sung tác phẩm thuộc lớp phim/phim bộ. Dù dùng `--only-new`, các mục được yêu cầu cụ thể vẫn lấy lại metadata; aliases cũ được giữ. Các `searchAliases` là tên tìm kiếm do người dùng dự án cung cấp (ví dụ “Cá lạnh”, “Tình yêu tội lỗi”, “Kẻ dòm ngó”), không được khẳng định là tên phát hành chính thức. Không thêm các mô tả đùa của người dùng thành tên phim chính thức. Mã phim không thay đổi.
 
-Danh sách kiểm tra bao gồm Cold Fish, Love Exposure, Secretary, The Voyeurs, Raw, Ichi the Killer, The Ugly Stepsister, Black Phone 1–2, Terrifier 1–3, các phim Saw, The Guest (2014), Demon City (2025), Nguyên tội của Takopi (anime), Chơi ngải 1–3, Trường học Uy Long 1–3 và Đổ thánh 1–3. Với phim có nhiều bản, kiểm tra theo QID, không gộp theo tên. “Trai Bao” vẫn cần năm/diễn viên để xác định bản người dùng muốn; Kingdom và Hello Ghost có nhiều bản khác nhau, bộ kiểm tra hiện đối chiếu Kingdom (series 2019) và Hello Ghost (phim Hàn 2010).
+Danh sách kiểm tra bao gồm Cold Fish, Love Exposure, Secretary, The Voyeurs, Raw, Ichi the Killer, The Ugly Stepsister, Black Phone 1–2, Terrifier 1–3, các phim Saw, The Guest (2014), Demon City (2025), Nguyên tội của Takopi (anime), Chơi ngải 1–3, Trường học Uy Long 1–3 và Đổ thánh 1–3. Với phim có nhiều bản, kiểm tra theo QID, không gộp theo tên. “Trai bao” tìm được các bản Hollywood riêng biệt: American Gigolo (1980, Richard Gere), Deuce Bigalow: Male Gigolo (1999, Rob Schneider) và Midnight Cowboy (1969, Jon Voight); không gộp chúng thành một phim; Kingdom và Hello Ghost có nhiều bản khác nhau, bộ kiểm tra hiện đối chiếu Kingdom (series 2019) và Hello Ghost (phim Hàn 2010).
 
 Giao diện tìm phim có nút **Xem thêm phim** khi vượt 30 kết quả, giữ quy tắc chọn là gửi ngay; tìm theo diễn viên không còn bị giới hạn ở 30 mục đầu mà không có cách xem tiếp.

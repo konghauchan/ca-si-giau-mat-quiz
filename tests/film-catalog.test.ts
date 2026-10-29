@@ -76,3 +76,13 @@ test('requested films and supplied Vietnamese search names resolve to verified i
   assert.ok(matchFilms(index, 'Stephen Chow', 'ALL', 100).length > 30);
   assert.ok(matchFilms(index, 'Sydney Sweeney', 'ALL', 100).length >= 20);
 });
+
+test('Hollywood Trai bao search keeps the three films distinct by identity and year', () => {
+  const dataset = JSON.parse(readFileSync(new URL('../src/lib/filmCatalogData.json', import.meta.url), 'utf8')) as {films: FilmWork[]};
+  const index = indexFilms(dataset.films.map(f => ({...f, token: 'test'})));
+  const results = matchFilms(index, 'trai bao', 'ALL', 100);
+  for (const [qid, year] of [['Q692720', 1980], ['Q655205', 1999], ['Q61696', 1969]] as const) {
+    assert.ok(results.some(f => f.source.id === qid && f.year === year));
+    assert.ok(matchFilms(index, `trai bao ${year}`).some(f => f.source.id === qid));
+  }
+});

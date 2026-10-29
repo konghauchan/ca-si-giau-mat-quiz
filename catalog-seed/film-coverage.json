@@ -170,10 +170,33 @@
         "Đổ thánh 3",
         "Đỗ thánh 3"
       ]
+    },
+    {
+      "id": "Q692720",
+      "title": "American Gigolo",
+      "searchAliases": [
+        "Trai bao",
+        "Trai bao 1980"
+      ]
+    },
+    {
+      "id": "Q655205",
+      "title": "Deuce Bigalow: Male Gigolo",
+      "searchAliases": [
+        "Trai bao",
+        "Trai bao 1999"
+      ]
+    },
+    {
+      "id": "Q61696",
+      "title": "Midnight Cowboy",
+      "searchAliases": [
+        "Trai bao",
+        "Trai bao 1969"
+      ]
     }
   ],
   "unresolved": [
-    "Trai Bao: several films use this Vietnamese name; year or actor needed to select the intended work.",
     "Kingdom: film and series both exist; keep separate identities.",
     "Hello Ghost: Korean original and remakes must remain separate."
   ],
@@ -315,5 +338,8 @@
       "query": "Vua hài kịch",
       "id": "Q2706517"
     }
-  ]
+  ],
+  "disambiguation": {
+    "Trai bao": "Hollywood search name shared by multiple works; retain separate QIDs and release years rather than choosing an intended version without evidence."
+  }
 }

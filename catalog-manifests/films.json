@@ -3,7 +3,7 @@
     "provider": "Wikidata",
     "license": "CC0-1.0",
     "url": "https://www.wikidata.org/",
-    "retrievedAt": "2026-10-29T05:04:41.617178+00:00",
+    "retrievedAt": "2026-10-29T05:18:06.156571+00:00",
     "complete": true,
     "coverage": "Bounded selections by Wikipedia sitelink count, country-of-origin Vietnam, recent releases, and optional Vietnamese Wikipedia coverage; not an exhaustive filmography. No guessed translations.",
     "selection": {
@@ -18,20 +18,20 @@
     "freshFetch": true,
     "cacheFreshSince": "2026-10-29T04:33:00+00:00",
     "metadataMode": "new-and-targeted",
-    "previousSnapshotAt": "2026-10-29T05:02:33.095688+00:00",
+    "previousSnapshotAt": "2026-10-29T05:04:41.617178+00:00",
     "vietnameseAliasUpdates": 0,
-    "refreshedCount": 100,
-    "retainedCount": 14721,
-    "projectAliasUpdates": 7,
-    "targetedCount": 100,
+    "refreshedCount": 103,
+    "retainedCount": 14719,
+    "projectAliasUpdates": 3,
+    "targetedCount": 103,
     "ambiguityResolved": {
-      "Q483166": "MOVIE",
-      "Q549722": "SERIES",
       "Q673349": "MOVIE",
+      "Q4310898": "SERIES",
+      "Q549722": "SERIES",
+      "Q4498856": "SERIES",
       "Q4454696": "MOVIE",
       "Q10841870": "SERIES",
-      "Q4310898": "SERIES",
-      "Q4498856": "SERIES"
+      "Q483166": "MOVIE"
     },
     "ambiguousExcluded": [
       "Q10828606",
@@ -56,11 +56,11 @@
       "Q5297475",
       "Q689763"
     ],
-    "count": 14821,
-    "movies": 9707,
+    "count": 14822,
+    "movies": 9708,
     "series": 5114,
     "vietnam": 497
   },
-  "bytes": 6965516,
-  "sha256": "38bd3156f5d7cd133df2eec7d51010855e536c53498c806a8240419a91322c3e"
+  "bytes": 6966189,
+  "sha256": "4208ca34ef830f95be2558d8fe4628be096553f7d9b18d611353731905e8a95e"
 }
