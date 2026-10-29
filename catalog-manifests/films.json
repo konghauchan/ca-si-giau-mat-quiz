@@ -3,24 +3,37 @@
     "provider": "Wikidata",
     "license": "CC0-1.0",
     "url": "https://www.wikidata.org/",
-    "retrievedAt": "2026-10-28T08:37:47.771960+00:00",
+    "retrievedAt": "2026-10-29T04:44:25.979067+00:00",
     "complete": true,
-    "coverage": "Bounded selections by Wikipedia sitelink count plus country-of-origin Vietnam; not an exhaustive filmography. No guessed translations.",
+    "coverage": "Bounded selections by Wikipedia sitelink count, country-of-origin Vietnam, and recent releases; not an exhaustive filmography. No guessed translations.",
     "selection": {
       "movies": 5000,
       "series": 2000,
-      "vietnam": 1500
+      "vietnam": 1500,
+      "recentSince": "2026-01-01",
+      "recentLimit": 2000
     },
+    "freshFetch": true,
+    "cacheFreshSince": "2026-10-29T04:33:00+00:00",
+    "refreshedCount": 9931,
+    "retainedCount": 0,
     "ambiguousExcluded": [
       "Q1131225",
+      "Q116998480",
+      "Q130739638",
+      "Q130739682",
+      "Q130739685",
       "Q131912021",
+      "Q135313451",
+      "Q135313460",
+      "Q137426613",
       "Q483166"
     ],
-    "count": 7492,
-    "movies": 5351,
-    "series": 2141,
+    "count": 9931,
+    "movies": 7067,
+    "series": 2864,
     "vietnam": 497
   },
-  "bytes": 4079185,
-  "sha256": "b3895e3354bf32c878e6399fbe74ca6be520d2430e225fdc0831cd54ce2eb4d8"
+  "bytes": 4942786,
+  "sha256": "e77bb40a6fdba46e38778c9958859e911eb6c171b863747f56b6ffa0a92d30cd"
 }
