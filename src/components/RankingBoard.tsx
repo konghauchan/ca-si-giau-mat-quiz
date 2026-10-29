@@ -30,7 +30,7 @@ export function RankingBoard({ players, finished,meId }: { players: RankedPlayer
 
   const positionProgress = Math.max(0, Math.min(1, (progress - .22) / .78));
   const maxScore = Math.max(1, ...players.map(player => player.score));
-  return <div>{players.length>5&&<button type="button" className="button secondary" onClick={()=>setExpanded(!expanded)}>{expanded?"Thu gọn bảng điểm":`Xem tất cả ${players.length} người`}</button>}<div className="ranking-scroll"><div className="ranking-board" style={{height:visible.length*70}} aria-label="Bảng xếp hạng">
+  return <div className="ranking-section">{players.length>5&&<button type="button" className="button secondary" onClick={()=>setExpanded(!expanded)}>{expanded?"Thu gọn bảng điểm":`Xem tất cả ${players.length} người`}</button>}<div className="ranking-scroll"><div className="ranking-board" style={{height:visible.length*70}} aria-label="Bảng xếp hạng">
     {visible.map((player, displayIndex) => {
       const finalIndex=players.findIndex(p=>p.id===player.id);
       const previousIndex = previousOrder.findIndex(item => item.id === player.id);
