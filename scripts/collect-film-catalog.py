@@ -11,6 +11,8 @@ import time
 import urllib.parse
 import urllib.request
 import uuid
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMESPACE = uuid.UUID('5df7f13b-c6d0-55c6-b913-9653fd8762ac')
@@ -22,19 +24,23 @@ def film_id(qid):
     return str(uuid.uuid5(NAMESPACE, 'wikidata:' + qid))
 
 class Provider:
-    def __init__(self, directory):
+    def __init__(self, directory, refresh=False, refresh_since=None):
+        self.refresh_since = refresh_since
+        self.rate_lock = threading.Lock()
+        self.refresh = refresh
         self.directory = directory
         self.directory.mkdir(parents=True, exist_ok=True)
         self.next_at = 0
 
     def query(self, query):
         cache = self.directory / (hashlib.sha256(query.encode()).hexdigest() + '.json.gz')
-        if cache.exists():
+        if cache.exists() and not self.refresh and (self.refresh_since is None or cache.stat().st_mtime >= self.refresh_since.timestamp()):
             return json.loads(gzip.decompress(cache.read_bytes()))
         url = 'https://query.wikidata.org/sparql?' + urllib.parse.urlencode({'query': query, 'format': 'json'})
         for attempt in range(5):
-            time.sleep(max(0, self.next_at - time.monotonic()))
-            self.next_at = time.monotonic() + 2
+            with self.rate_lock:
+                time.sleep(max(0, self.next_at - time.monotonic()))
+                self.next_at = time.monotonic() + 2
             try:
                 req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': 'application/sparql-results+json'})
                 with urllib.request.urlopen(req, timeout=65) as response:
@@ -58,6 +64,16 @@ class Provider:
           FILTER(?links >= {1 if vietnam else 15})
         }} ORDER BY DESC(?links) ?item LIMIT {limit}'''
         return self.query(query)
+
+    def recent(self, kind, since, limit):
+        root = 'Q11424' if kind == 'MOVIE' else 'Q5398426'
+        date = 'P577' if kind == 'MOVIE' else 'P580'
+        return self.query(f'''SELECT DISTINCT ?item ?links WHERE {{
+          ?item wdt:{date} ?released; wikibase:sitelinks ?links.
+          FILTER(?released >= "{since}T00:00:00Z"^^xsd:dateTime && ?released <= NOW())
+          FILTER(?links >= 1)
+          ?item wdt:P31/wdt:P279* wd:{root}.
+        }} ORDER BY DESC(?links) ?item LIMIT {limit}''')
 
     def metadata(self, ids):
         values = ' '.join('wd:' + qid for qid in ids)
@@ -110,8 +126,14 @@ def main():
     parser.add_argument('--movies', type=int, default=5000)
     parser.add_argument('--series', type=int, default=2000)
     parser.add_argument('--vietnam', type=int, default=1500)
+    parser.add_argument('--refresh', action='store_true', help='Fetch fresh responses instead of reusing cached metadata')
+    parser.add_argument('--recent-since', type=datetime.date.fromisoformat, help='Also select recently released films and series (YYYY-MM-DD)')
+    parser.add_argument('--recent-limit', type=int, default=2000, help='Maximum recent entries per kind')
+    parser.add_argument('--refresh-since', type=datetime.datetime.fromisoformat, help='Resume using only cache fetched after this timezone-aware timestamp')
     args = parser.parse_args()
-    provider = Provider(ROOT / 'data/film-catalog/responses')
+    if args.refresh_since and args.refresh_since.tzinfo is None:
+        parser.error('--refresh-since requires a timezone, e.g. 2026-10-29T00:00:00Z')
+    provider = Provider(ROOT / 'data/film-catalog/responses', refresh=args.refresh, refresh_since=args.refresh_since)
     selected = {}
     ambiguous = set()
     for kind, limit, vietnam in [('MOVIE', args.movies, False), ('SERIES', args.series, False), ('MOVIE', args.vietnam, True), ('SERIES', args.vietnam, True)]:
@@ -122,19 +144,36 @@ def main():
             if qid in selected and selected[qid][0] != kind:
                 ambiguous.add(qid)
             selected[qid] = (kind, int(row['links']['value']))
+    if args.recent_since:
+        for kind in ('MOVIE', 'SERIES'):
+            rows = provider.recent(kind, args.recent_since.isoformat(), args.recent_limit)
+            print(json.dumps({'recent': kind, 'since': args.recent_since.isoformat(), 'count': len(rows)}), flush=True)
+            for row in rows:
+                qid = row['item']['value'].rsplit('/', 1)[-1]
+                if qid in selected and selected[qid][0] != kind:
+                    ambiguous.add(qid)
+                selected[qid] = (kind, int(row['links']['value']))
+    output = ROOT / 'src/lib/filmCatalogData.json'
+    previous = json.loads(output.read_text(encoding='utf-8'))['films'] if output.exists() else []
+    # Refresh existing entries too, even if they fall outside today's selections.
+    for film in previous:
+        selected.setdefault(film['source']['id'], (film['kind'], film['rank']))
     ids = sorted(set(selected) - ambiguous)
     films = []
-    for offset in range(0, len(ids), 80):
-        group = ids[offset:offset + 80]
-        rows = provider.metadata(group)
-        by_id = {qid: [] for qid in group}
-        for row in rows:
-            by_id[row['item']['value'].rsplit('/', 1)[-1]].append(row)
-        for qid in group:
-            film = parse_metadata(qid, *selected[qid], by_id[qid])
-            if film:
-                films.append(film)
-        print(json.dumps({'metadata': min(offset + 80, len(ids)), 'total': len(ids)}), flush=True)
+    groups = [ids[offset:offset + 80] for offset in range(0, len(ids), 80)]
+    # Two in-flight requests, with globally spaced starts, keep the public
+    # endpoint load bounded while one request waits for a response.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        for index, rows in enumerate(pool.map(provider.metadata, groups)):
+            group = groups[index]
+            by_id = {qid: [] for qid in group}
+            for row in rows:
+                by_id[row['item']['value'].rsplit('/', 1)[-1]].append(row)
+            for qid in group:
+                film = parse_metadata(qid, *selected[qid], by_id[qid])
+                if film:
+                    films.append(film)
+            print(json.dumps({'metadata': min((index + 1) * 80, len(ids)), 'total': len(ids)}), flush=True)
     # TV series often records its first broadcast as start time (P580), not P577.
     by_film = {film['source']['id']: film for film in films if film['kind'] == 'SERIES'}
     series_ids = sorted(by_film)
@@ -146,20 +185,25 @@ def main():
             if date[:4].isdigit() and 1800 <= int(date[:4]) <= 2100:
                 film = by_film[row['item']['value'].rsplit('/', 1)[-1]]
                 film['year'] = min(film['year'] or 2100, int(date[:4]))
-    output = ROOT / 'src/lib/filmCatalogData.json'
-    previous = json.loads(output.read_text(encoding='utf-8'))['films'] if output.exists() else []
+    refreshed_count = len(films)
     merged = {film['id']: film for film in previous}
     merged.update({film['id']: film for film in films})
     films = sorted(merged.values(), key=lambda film: film['id'])
     report = {'provider': 'Wikidata', 'license': 'CC0-1.0', 'url': 'https://www.wikidata.org/',
               'retrievedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'complete': True,
-              'coverage': 'Bounded selections by Wikipedia sitelink count plus country-of-origin Vietnam; not an exhaustive filmography. No guessed translations.',
-              'selection': vars(args), 'ambiguousExcluded': sorted(ambiguous), 'count': len(films),
+              'coverage': 'Bounded selections by Wikipedia sitelink count, country-of-origin Vietnam, and recent releases; not an exhaustive filmography. No guessed translations.',
+              'selection': {'movies': args.movies, 'series': args.series, 'vietnam': args.vietnam, 'recentSince': args.recent_since.isoformat() if args.recent_since else None, 'recentLimit': args.recent_limit}, 'freshFetch': args.refresh or args.refresh_since is not None, 'cacheFreshSince': args.refresh_since.isoformat() if args.refresh_since else None, 'refreshedCount': refreshed_count, 'retainedCount': len(films) - refreshed_count, 'ambiguousExcluded': sorted(ambiguous), 'count': len(films),
               'movies': sum(f['kind'] == 'MOVIE' for f in films), 'series': sum(f['kind'] == 'SERIES' for f in films),
               'vietnam': sum('Q881' in f['countries'] for f in films)}
     temporary = output.with_suffix('.json.tmp')
     temporary.write_text(json.dumps({'source': report, 'films': films}, ensure_ascii=False, separators=(',', ':')) + '\n', encoding='utf-8')
+    payload = temporary.read_bytes()
+    manifest = ROOT / 'catalog-manifests/films.json'
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest_temp = manifest.with_suffix('.json.tmp')
+    manifest_temp.write_text(json.dumps({'source': report, 'bytes': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     temporary.replace(output)
+    manifest_temp.replace(manifest)
     print(json.dumps(report), flush=True)
 
 if __name__ == '__main__':
