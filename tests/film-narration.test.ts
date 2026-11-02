@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filmNarrationEvent } from '../src/lib/filmNarrationEvent.ts';
+import { gameNarrationEvent } from '../src/lib/gameNarrationEvent.ts';
 import { narrationText, narrationPreparationTexts, type NarrationState } from '../src/lib/narrationText.ts';
 
 const film: NarrationState = {
@@ -45,21 +45,21 @@ test('film preparation includes exact intro, bid, answer and result variants for
 });
 
 test('film playback stays silent during clips and waits for each player answer window', () => {
-  const state = { phase: 'MEDIA_PLAYING', question: { mediaType: 'youtube', mediaUrl: 'https://youtu.be/example' } };
+  const state = { category: 'FILM', phase: 'MEDIA_PLAYING', question: { mediaType: 'youtube', mediaUrl: 'https://youtu.be/example' } };
   for (const phase of ['LOBBY', 'OPEN_MEDIA_PLAYING', 'TURN_TRANSITION'])
-    assert.equal(filmNarrationEvent({ ...state, phase }).kind, undefined);
+    assert.equal(gameNarrationEvent({ ...state, phase }).kind, undefined);
   for (const stage of ['PREPARE', 'LISTEN', 'WAIT'])
-    assert.equal(filmNarrationEvent({ ...state, personal: { stage } }).kind, undefined);
-  assert.deepEqual(filmNarrationEvent({ ...state, personal: { stage: 'ANSWER' } }), { kind: 'question', key: 'question', autoPlay: true });
-  const result = filmNarrationEvent({ ...state, phase: 'ROUND_RESULT' });
+    assert.equal(gameNarrationEvent({ ...state, personal: { stage } }).kind, undefined);
+  assert.deepEqual(gameNarrationEvent({ ...state, personal: { stage: 'ANSWER' } }), { kind: 'question', key: 'question', autoPlay: true });
+  const result = gameNarrationEvent({ ...state, phase: 'ROUND_RESULT' });
   assert.equal(result.kind, 'answer'); // Manual replay remains available.
   assert.equal(result.autoPlay, false);
-  const board = filmNarrationEvent({ ...state, phase: 'SCOREBOARD' });
+  const board = gameNarrationEvent({ ...state, phase: 'SCOREBOARD' });
   assert.equal(board.autoPlay, true);
   assert.equal(board.key, result.key);
-  assert.equal(filmNarrationEvent({ ...state, phase: 'GAME_FINISHED' }).key, board.key);
-  assert.equal(filmNarrationEvent({ phase: 'ROUND_RESULT', question: {} }).autoPlay, true);
-  assert.equal(filmNarrationEvent({ ...state, phase: 'BIDDING' }).key,
-    filmNarrationEvent({ ...state, phase: 'BID_REVEAL' }).key);
-  assert.equal(filmNarrationEvent({ ...state, phase: 'TOPIC_INTRO', roundQuestionIndex: 2 }).kind, undefined);
+  assert.equal(gameNarrationEvent({ ...state, phase: 'GAME_FINISHED' }).key, board.key);
+  assert.equal(gameNarrationEvent({ phase: 'ROUND_RESULT', question: {} }).autoPlay, true);
+  assert.equal(gameNarrationEvent({ ...state, phase: 'BIDDING' }).key,
+    gameNarrationEvent({ ...state, phase: 'BID_REVEAL' }).key);
+  assert.equal(gameNarrationEvent({ ...state, phase: 'TOPIC_INTRO', roundQuestionIndex: 2 }).kind, undefined);
 });

@@ -104,17 +104,17 @@ test('search introductions explain immediate submission and the actual retry rul
   assert.match(roundRules('OPEN').notes.join(' '), /Hé chữ/);
 });
 
-test('search narration uses server answer mode and never speaks a hidden answer while answering', () => {
+test('answer narration reads only the prompt without repeating intro instructions', () => {
   const state: NarrationState = { gameType: 'MUSIC_DUEL', playMode: 'OPEN', phase: 'OPEN_ANSWERING', question: { answerMode: 'SEARCH', prompt: 'Bài hát nào?', primaryAnswer: 'SECRET TRACK', artist: 'SECRET ARTIST' } };
   const open = narrationText(state, 'question');
-  assert.match(open, /Chọn bài là gửi ngay/);
-  assert.match(open, /Sai có thể chọn lại/);
+  assert.equal(open, 'Bài hát nào?');
+  assert.doesNotMatch(open, /Tìm tên bài|Chọn bài|chọn lại/);
   assert.doesNotMatch(open, /SECRET/);
   const intro = narrationText({ ...state, phase: 'TOPIC_INTRO', roundQuestionIndex: 1 }, 'intro');
   assert.match(intro, /Tìm tên bài hoặc ca sĩ/);
   assert.doesNotMatch(intro, /SECRET/);
   const bid: NarrationState = { ...state, playMode: 'BID', phase: 'MEDIA_PLAYING', personal: { stage: 'ANSWER' } };
-  assert.match(narrationText(bid, 'question'), /Chỉ được chọn một lần/);
+  assert.equal(narrationText(bid, 'question'), 'Bài hát nào?');
   assert.doesNotMatch(narrationText(bid, 'question'), /chọn lại|SECRET/);
   for (const stage of ['PREPARE', 'LISTEN', 'WAIT']) assert.throws(() => narrationText({ ...bid, personal: { stage } }, 'question'));
   assert.equal(narrationText({ ...state, question: { ...state.question, answerMode: 'TEXT' } }, 'question'), 'Bài hát nào?');

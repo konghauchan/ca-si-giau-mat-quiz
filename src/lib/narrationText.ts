@@ -39,16 +39,14 @@ export function narrationText(state: NarrationState, kind: NarrationKind, langua
       return `${hint}${language === 'en-US' ? 'How many seconds do you need to watch?' : 'Bạn cần xem bao nhiêu giây?'}`;
     }
   }
-  const searchHelp = state.question.answerMode === 'SEARCH' && answering
-    ? ` ${searchAnswerHelp(state.playMode === 'BID' || state.phase === 'ANSWERING' || state.phase === 'MEDIA_PLAYING', language, state.category === 'FILM')}`
-    : '';
-  return `${state.question.prompt || 'Đáp án của bạn là gì?'}${state.question.hint && ['BIDDING', 'BID_REVEAL'].includes(state.phase) ? ` ${language === 'en-US' ? 'Hint' : 'Gợi ý'}: ${state.question.hint}` : ''}${searchHelp}`;
+  // Answer windows read the prompt; submission rules belong to the round intro.
+  return `${state.question.prompt || 'Đáp án của bạn là gì?'}${state.question.hint && ['BIDDING', 'BID_REVEAL'].includes(state.phase) ? ` ${language === 'en-US' ? 'Hint' : 'Gợi ý'}: ${state.question.hint}` : ''}`;
 }
 
 // Server-only preparation receives the private question; callers never return these texts.
 export function narrationPreparationTexts(state: NarrationState, language: 'vi-VN'|'en-US' = 'vi-VN'): string[] {
   const answer = narrationText({ ...state, phase: 'ROUND_RESULT' }, 'answer', language);
-  const intro = state.category === 'FILM' && state.roundQuestionIndex === 1
+  const intro = state.roundQuestionIndex === 1
     ? [narrationText({ ...state, phase: 'TOPIC_INTRO' }, 'intro', language)] : [];
   if (state.gameType === 'SONG_CLUE' || state.playMode === 'CLUE') {
     state = { ...state, gameType: 'SONG_CLUE' };
