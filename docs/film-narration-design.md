@@ -49,9 +49,15 @@ Không cần đổi nhà cung cấp TTS hoặc schema database cho phiên bản 
 
 ## Tiêu chí nghiệm thu
 
-- Ba kiểu vòng và ba cách trả lời đều có lời dẫn đúng luật phim, không dùng “bài hát/ca sĩ/nghe nhạc”. Quiz nhạc vẫn giữ hành vi hiện có.
+- Ba kiểu vòng và ba cách trả lời đều có lời dẫn đúng luật phim, không dùng “bài hát/ca sĩ/nghe nhạc”. Quiz nhạc dùng cùng cơ chế chống tự đọc lặp; màn trả lời đọc câu hỏi, không nhắc lại hướng dẫn tìm kiếm đã giới thiệu đầu vòng.
 - Không lấy được audio đáp án trước kết quả; không đọc gợi ý chưa mở hoặc thông tin trả lời của người khác.
 - Không chồng tiếng lên clip, không phát muộn sau đổi phase, không lặp đáp án khi sang bảng điểm hoặc kết nối lại.
 - Kiểm tra đấu giá với hai người có thời điểm trả lời riêng khác nhau; mỗi người chỉ nhận hướng dẫn đúng lúc của mình.
 - Kiểm tra tắt tự đọc nhưng nghe thủ công, âm lượng 0, pause/resume, trình duyệt chặn tự phát và dịch vụ TTS lỗi/chậm.
 - Unit test kiểm tra văn bản/quyền truy cập và sự kiện đọc; kiểm thử trình duyệt kiểm tra phát/dừng thực tế. Kiểm thử giọng WaveNet thật cần cấu hình dịch vụ an toàn; mock API không xác nhận chất lượng phát âm.
+
+## Chống lặp cho quiz nhạc
+
+`src/lib/gameNarrationEvent.ts` chọn sự kiện cho cả nhạc và phim. Giữ khóa `intro`, `bid`, `question`, `answer` ổn định theo phòng, câu hỏi và ngôn ngữ để `NarrationControl` nhớ nội dung đã bắt đầu phát trong bộ nhớ và sessionStorage. Đấu giá và công bố thời gian dùng chung khóa `bid`; kết quả và bảng điểm dùng chung `answer`. Tạm dừng/tiếp tục, tải lại trang hoặc chuyển component không tự phát lại nội dung đã nghe. Nút Nghe vẫn cho phát thủ công.
+
+Trong vòng gợi ý, mỗi gợi ý có khóa riêng theo chỉ số; hướng dẫn tìm đáp án cho người giành quyền chỉ tự đọc một lần mỗi câu. Lời giới thiệu của nhạc được chuẩn bị trước như phim. Việc hủy yêu cầu và dừng audio khi đổi màn tiếp tục áp dụng, nên phản hồi lời giới thiệu đến muộn không được phát trên màn trả lời.
